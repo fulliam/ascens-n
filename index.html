@@ -99,7 +99,7 @@
   .pause-hint:hover{color:var(--text); border-color:var(--accent);}
 
   /* ---------- Level up cards ---------- */
-  .cards-wrap{display:flex; gap:18px; z-index:2;}
+  .cards-wrap{display:flex; flex-wrap:wrap; align-items:stretch; justify-content:center; gap:18px; z-index:2; width:min(90vw,760px);}
   .card{width:230px; background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:20px 16px; cursor:pointer; transition:transform .15s, border-color .15s, box-shadow .15s;}
   .card:hover{transform:translateY(-6px); border-color:var(--accent); box-shadow:0 12px 30px rgba(185,140,255,0.15);}
   .card .icon{font-size:30px; margin-bottom:14px;}
@@ -186,11 +186,9 @@
   .slider-row input[type=range]::-moz-range-thumb{width:17px; height:17px; border-radius:50%; background:var(--accent); cursor:pointer; border:2px solid #14101c;}
   .slider-val{font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--accent); width:34px; text-align:right;}
 
-  /* ---------- Touch joystick ---------- */
-  .joystick-zone{position:absolute; width:132px; height:132px; bottom:calc(96px + env(safe-area-inset-bottom,0px)); z-index:6; pointer-events:none; touch-action:none; display:none;}
-  .joystick-zone.side-left{left:calc(22px + env(safe-area-inset-left,0px));}
-  .joystick-zone.side-right{right:calc(22px + env(safe-area-inset-right,0px));}
-  .joystick-zone.enabled{pointer-events:auto;}
+  /* ---------- Touch joystick (floating — can be summoned anywhere on screen) ---------- */
+  .joystick-capture{position:absolute; inset:0; z-index:1; touch-action:none; pointer-events:none;}
+  .joystick-zone{position:absolute; width:132px; height:132px; z-index:6; pointer-events:none; touch-action:none; display:none; transform:translate(-50%,-50%);}
   .joystick-base{position:absolute; inset:0; border-radius:50%; background:rgba(18,20,27,0.45); border:1px solid var(--line); backdrop-filter:blur(2px);}
   .joystick-knob{position:absolute; width:52%; height:52%; top:24%; left:24%; border-radius:50%; background:rgba(185,140,255,0.32); border:1px solid var(--accent); transition:transform .04s linear;}
 
@@ -213,6 +211,14 @@
     .settings-tab{font-size:12px; padding:9px 4px;}
     .setting-row{padding:12px 14px;}
     .slider-row{width:150px;}
+
+    /* level-up cards: single column, full width so they always fit */
+    #screen-levelup{overflow-y:auto; padding:24px 0; justify-content:flex-start;}
+    .cards-wrap{flex-direction:column; width:min(92vw,360px); gap:12px; margin-top:8px;}
+    .card{width:100%;}
+  }
+  @media (max-width:520px){
+    .cards-wrap{width:94vw;}
   }
 
   /* ---------- Boss / mini-boss warning ---------- */
@@ -238,6 +244,11 @@
 
   <!-- HUD -->
   <div id="hud" class="hidden">
+    <div class="joystick-capture" id="joystickCapture"></div>
+    <div class="joystick-zone" id="joystickZone">
+      <div class="joystick-base"></div>
+      <div class="joystick-knob" id="joystickKnob"></div>
+    </div>
     <div class="hud-top">
       <div>
         <div class="hp-row"><span class="lvl-chip" id="lvlChip">1</span>
@@ -251,7 +262,7 @@
       </div>
       <div class="timer"><span id="timerVal">00:00</span><span class="phase" id="phaseVal">DISCOVERY</span></div>
       <div style="display:flex; gap:8px;">
-        <div class="mute-btn" id="muteBtnHud" style="pointer-events:auto;">🔊</div>
+        <div class="pause-hint" id="fullscreenBtnHud" style="pointer-events:auto;">⛶</div>
         <div class="pause-hint" id="pauseBtn" style="pointer-events:auto;">⏸ PAUSE (Esc)</div>
       </div>
     </div>
@@ -260,10 +271,6 @@
     <div class="hud-bottom">
       <div class="weapon-row" id="weaponRow"></div>
       <div class="bar-track xp-track"><div class="bar-fill" id="xpFill" style="width:0%;background:linear-gradient(90deg,#2f8f22,var(--xp));"></div><div class="bar-label" id="xpLabel">0 / 10 XP</div></div>
-    </div>
-    <div class="joystick-zone side-left" id="joystickZone">
-      <div class="joystick-base"></div>
-      <div class="joystick-knob" id="joystickKnob"></div>
     </div>
   </div>
 
@@ -389,18 +396,11 @@
     <div class="settings-wrap">
       <div class="settings-pane" id="pane-controls">
         <div class="setting-row">
-          <div><div class="s-name">Movement Input</div><div class="s-desc">Auto uses a touch joystick on phones/tablets and keyboard (WASD / arrows) elsewhere.</div></div>
+          <div><div class="s-name">Movement Input</div><div class="s-desc">Auto uses a floating touch joystick on phones/tablets and keyboard (WASD / arrows) elsewhere. The joystick appears wherever you place your thumb.</div></div>
           <div class="seg-control" id="ctrlMode">
             <button class="seg-btn" data-val="auto">Auto</button>
             <button class="seg-btn" data-val="joystick">Joystick</button>
             <button class="seg-btn" data-val="keyboard">Keyboard</button>
-          </div>
-        </div>
-        <div class="setting-row">
-          <div><div class="s-name">Joystick Side</div><div class="s-desc">Which side of the screen the movement stick appears on.</div></div>
-          <div class="seg-control" id="ctrlSide">
-            <button class="seg-btn" data-val="left">Left</button>
-            <button class="seg-btn" data-val="right">Right</button>
           </div>
         </div>
         <div class="setting-row">
@@ -420,6 +420,10 @@
         <div class="setting-row">
           <div><div class="s-name">Screen Shake</div><div class="s-desc">Camera shake on hits and impacts. Disable if it bothers you.</div></div>
           <div class="toggle-switch" id="vidShake"><div class="knob"></div></div>
+        </div>
+        <div class="setting-row">
+          <div><div class="s-name">Fullscreen</div><div class="s-desc">Expand the game to fill your entire screen. Also available via the ⛶ button during a run.</div></div>
+          <button class="buy-btn" id="fullscreenToggleBtn" style="border-color:var(--accent); color:var(--accent);">ENTER FULLSCREEN</button>
         </div>
       </div>
       <div class="settings-pane hidden" id="pane-audio">
@@ -621,7 +625,7 @@ const ACHIEVEMENTS = [
 
 const DEFAULT_SAVE = { soul:0, metaLevels:{}, lifetime:{ runs:0, kills:0, deaths:0, bestTime:0, bestLevel:0, totalGold:0, totalSoul:0, eliteKills:0, bossKills:0 }, activeRun:null,
   achievements:{ unlocked:{} },
-  settings:{ muted:false, sfxVolume:1, musicVolume:0.35, controlMode:'auto', joystickSide:'left', haptics:true, quality:'high', screenShake:true } };
+  settings:{ muted:false, sfxVolume:1, musicVolume:0.35, controlMode:'auto', haptics:true, quality:'high', screenShake:true } };
 let save = JSON.parse(JSON.stringify(DEFAULT_SAVE));
 
 async function loadSave(){
@@ -904,32 +908,38 @@ function applySettings(){
   hapticsOn = !!save.settings.haptics;
   updateMuteButtons();
 
-  const joyZone = document.getElementById('joystickZone');
-  if(joyZone){
-    joyZone.classList.toggle('side-left', save.settings.joystickSide!=='right');
-    joyZone.classList.toggle('side-right', save.settings.joystickSide==='right');
+  const joyCapture = document.getElementById('joystickCapture');
+  if(joyCapture){
     const show = shouldShowJoystick();
-    joyZone.style.display = show ? 'block' : 'none';
-    joyZone.classList.toggle('enabled', show);
-    if(!show){ touchVec.x=0; touchVec.y=0; }
+    joyCapture.style.pointerEvents = show ? 'auto' : 'none';
+    if(!show){
+      touchVec.x = 0; touchVec.y = 0;
+      const zone = document.getElementById('joystickZone');
+      if(zone) zone.style.display = 'none';
+    }
   }
 }
 
-/* ---------- Virtual joystick (touch) — purely additive to `keys`, so
-   keyboard/mouse play is completely unaffected whether or not this is used. */
+/* ---------- Floating virtual joystick (touch) — summoned wherever the
+   player places their thumb, anywhere on screen, instead of living in a
+   fixed corner. Purely additive to `keys`, so keyboard/mouse play is
+   completely unaffected whether or not this is used. Buttons in the HUD
+   sit visually above the capture layer, so tapping them still works. */
 (function setupJoystick(){
+  const capture = document.getElementById('joystickCapture');
   const zone = document.getElementById('joystickZone');
   const knob = document.getElementById('joystickKnob');
-  if(!zone || !knob) return;
+  if(!capture || !zone || !knob) return;
   const RADIUS = 40;   // px of knob travel
   const DEADZONE = 0.15;
   let activeId = null;
   let originX = 0, originY = 0;
 
-  function originFromZone(){
-    const r = zone.getBoundingClientRect();
-    originX = r.left + r.width/2;
-    originY = r.top + r.height/2;
+  function showZoneAt(x,y){
+    originX = x; originY = y;
+    zone.style.left = x+'px';
+    zone.style.top = y+'px';
+    zone.style.display = 'block';
   }
   function updateFromPoint(cx, cy){
     const dx = cx-originX, dy = cy-originY;
@@ -945,16 +955,17 @@ function applySettings(){
     activeId = null;
     touchVec.x = 0; touchVec.y = 0;
     knob.style.transform = 'translate(0px,0px)';
+    zone.style.display = 'none';
   }
-  zone.addEventListener('touchstart', e=>{
+  capture.addEventListener('touchstart', e=>{
     if(activeId!==null) return;
     const t = e.changedTouches[0];
     activeId = t.identifier;
-    originFromZone();
+    showZoneAt(t.clientX, t.clientY);
     updateFromPoint(t.clientX, t.clientY);
     e.preventDefault();
   }, {passive:false});
-  zone.addEventListener('touchmove', e=>{
+  capture.addEventListener('touchmove', e=>{
     if(activeId===null) return;
     const t = Array.from(e.changedTouches).find(tt=>tt.identifier===activeId);
     if(!t) return;
@@ -966,9 +977,48 @@ function applySettings(){
     const ended = Array.from(e.changedTouches).some(tt=>tt.identifier===activeId);
     if(ended) reset();
   }
-  zone.addEventListener('touchend', onEnd, {passive:true});
-  zone.addEventListener('touchcancel', onEnd, {passive:true});
+  capture.addEventListener('touchend', onEnd, {passive:true});
+  capture.addEventListener('touchcancel', onEnd, {passive:true});
 })();
+
+/* ---------- Fullscreen ---------- */
+function isFullscreen(){
+  return !!(document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement);
+}
+function fullscreenSupported(){
+  const el = document.documentElement;
+  return !!(el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen);
+}
+function toggleFullscreen(){
+  try{
+    if(!isFullscreen()){
+      const el = document.documentElement;
+      const req = el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen;
+      if(req) req.call(el).catch ? req.call(el).catch(()=>{}) : req.call(el);
+    } else {
+      const exit = document.exitFullscreen || document.webkitExitFullscreen || document.msExitFullscreen;
+      if(exit) { const r = exit.call(document); if(r && r.catch) r.catch(()=>{}); }
+    }
+  }catch(e){ /* fullscreen unavailable in this environment (e.g. sandboxed iframe) */ }
+}
+function updateFullscreenButtons(){
+  const fs = isFullscreen();
+  const toggleBtn = document.getElementById('fullscreenToggleBtn');
+  if(toggleBtn) toggleBtn.textContent = fs ? "EXIT FULLSCREEN" : "ENTER FULLSCREEN";
+  const hudBtn = document.getElementById('fullscreenBtnHud');
+  if(hudBtn) hudBtn.title = fs ? "Exit fullscreen" : "Enter fullscreen";
+}
+['fullscreenchange','webkitfullscreenchange','MSFullscreenChange'].forEach(evt=>{
+  document.addEventListener(evt, updateFullscreenButtons);
+});
+document.getElementById('fullscreenBtnHud').onclick = ()=>{ SFX.uiClick(); toggleFullscreen(); };
+document.getElementById('fullscreenToggleBtn').onclick = ()=>{ SFX.uiClick(); toggleFullscreen(); };
+if(!fullscreenSupported()){
+  const toggleBtn = document.getElementById('fullscreenToggleBtn');
+  if(toggleBtn){ toggleBtn.disabled = true; toggleBtn.textContent = "UNAVAILABLE"; }
+  const hudBtn = document.getElementById('fullscreenBtnHud');
+  if(hudBtn) hudBtn.style.opacity = '0.35';
+}
 
 /* ---------- Settings screen wiring ---------- */
 function setSegActive(containerId, value){
@@ -982,11 +1032,11 @@ function setToggle(id, on){
 }
 function refreshSettingsUI(){
   setSegActive('ctrlMode', save.settings.controlMode);
-  setSegActive('ctrlSide', save.settings.joystickSide);
   setSegActive('vidQuality', save.settings.quality);
   setToggle('ctrlHaptics', save.settings.haptics);
   setToggle('vidShake', save.settings.screenShake);
   setToggle('audioMuted', save.settings.muted);
+  updateFullscreenButtons();
   const vol = Math.round(save.settings.sfxVolume*100);
   document.getElementById('audioVolume').value = vol;
   document.getElementById('audioVolumeVal').textContent = vol;
@@ -1013,10 +1063,6 @@ document.querySelectorAll('.settings-tab').forEach(tab=>{
 document.getElementById('ctrlMode').addEventListener('click', e=>{
   const b = e.target.closest('.seg-btn'); if(!b) return;
   save.settings.controlMode = b.dataset.val; persistSave(); applySettings(); refreshSettingsUI();
-});
-document.getElementById('ctrlSide').addEventListener('click', e=>{
-  const b = e.target.closest('.seg-btn'); if(!b) return;
-  save.settings.joystickSide = b.dataset.val; persistSave(); applySettings(); refreshSettingsUI();
 });
 document.getElementById('vidQuality').addEventListener('click', e=>{
   const b = e.target.closest('.seg-btn'); if(!b) return;
@@ -1046,7 +1092,6 @@ document.getElementById('audioMuted').onclick = ()=>{
   save.settings.muted = !save.settings.muted; persistSave(); applySettings(); refreshSettingsUI();
 };
 document.getElementById('muteBtnMenu').onclick = toggleMute;
-document.getElementById('muteBtnHud').onclick = toggleMute;
 document.getElementById('settingsBack').onclick = ()=>{
   if(settingsReturnTo==='pause'){ show('screen-pause'); }
   else{ goMenu(); }
@@ -1332,11 +1377,8 @@ function toggleMute(){
 }
 function updateMuteButtons(){
   const label = SFX.isMuted() ? '🔇 SOUND' : '🔊 SOUND';
-  const hudLabel = SFX.isMuted() ? '🔇' : '🔊';
   const menuBtn = document.getElementById('muteBtnMenu');
-  const hudBtn = document.getElementById('muteBtnHud');
   if(menuBtn) menuBtn.textContent = label;
-  if(hudBtn) hudBtn.textContent = hudLabel;
 }
 
 /* =========================================================================
