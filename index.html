@@ -547,7 +547,7 @@ const ACHIEVEMENTS = [
 ];
 
 /* =========================================================================
-   SAVE / META STATE  (persisted via window.storage, personal & non-shared)
+   SAVE / META STATE  (persisted via local storage, personal & non-shared)
    ========================================================================= */
 
 const DEFAULT_SAVE = { soul:0, metaLevels:{}, lifetime:{ runs:0, kills:0, deaths:0, bestTime:0, bestLevel:0, totalGold:0, totalSoul:0, eliteKills:0, bossKills:0 }, activeRun:null,
@@ -557,9 +557,9 @@ let save = JSON.parse(JSON.stringify(DEFAULT_SAVE));
 
 async function loadSave(){
   try{
-    const r = await window.storage.get('ascension_save', false);
-    if(r && r.value){
-      const loaded = JSON.parse(r.value);
+    const raw = localStorage.getItem('ascension_save');
+    if (raw) {
+      const loaded = JSON.parse(raw);
       save = Object.assign(JSON.parse(JSON.stringify(DEFAULT_SAVE)), loaded);
       // Settings / lifetime / achievements are nested objects — merge them
       // field-by-field so saves made before a new field existed still pick
@@ -587,8 +587,7 @@ async function persistSave(){
     let lastErr = null;
     for(let attempt=0; attempt<3; attempt++){
       try{
-        if(!window.storage) throw new Error("storage unavailable");
-        await window.storage.set('ascension_save', payload, false);
+        localStorage.setItem('ascension_save', payload);
         lastErr = null;
         break;
       }catch(e){
