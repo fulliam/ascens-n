@@ -137,6 +137,28 @@
   ::-webkit-scrollbar{width:6px;}
   ::-webkit-scrollbar-thumb{background:var(--line); border-radius:3px;}
 
+  /* ---------- Achievements ---------- */
+  .ach-chip{font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--dim); border:1px solid var(--line); border-radius:8px; padding:1px 7px; margin-left:8px; letter-spacing:0.5px;}
+  .ach-wrap{width:760px; max-width:88vw; max-height:60vh; overflow-y:auto; z-index:2; display:grid; grid-template-columns:1fr 1fr; gap:10px; padding:4px 6px 4px 0; touch-action:pan-y;}
+  .ach-card{display:flex; gap:14px; align-items:flex-start; background:var(--panel); border:1px solid var(--line); border-radius:5px; padding:13px 15px; transition:border-color .15s;}
+  .ach-card.unlocked{border-color:rgba(255,179,71,0.5); box-shadow:0 0 18px rgba(255,179,71,0.06) inset;}
+  .ach-card.locked{opacity:0.5;}
+  .ach-icon{font-size:24px; width:34px; text-align:center; flex-shrink:0;}
+  .ach-icon.locked-icon{filter:grayscale(1);}
+  .ach-name{font-family:'Rajdhani',sans-serif; font-weight:700; font-size:15px; margin-bottom:3px;}
+  .ach-card.unlocked .ach-name{color:var(--gold);}
+  .ach-desc{font-size:11.5px; color:var(--dim); line-height:1.4;}
+  .ach-date{font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--soul); margin-top:5px; letter-spacing:0.5px;}
+
+  #achToastLayer{position:absolute; top:22px; left:50%; transform:translateX(-50%); z-index:40; display:flex; flex-direction:column; gap:8px; align-items:center; pointer-events:none;}
+  .ach-toast{display:flex; align-items:center; gap:12px; background:linear-gradient(180deg,#1c1710,#141821); border:1px solid var(--gold); border-radius:5px; padding:10px 18px; box-shadow:0 10px 30px rgba(0,0,0,0.5), 0 0 24px rgba(255,179,71,0.15);
+    animation:toastIn .35s cubic-bezier(.2,.9,.3,1) forwards, toastOut .4s ease-in 3.6s forwards;}
+  .ach-toast .t-icon{font-size:22px;}
+  .ach-toast .t-kicker{font-family:'JetBrains Mono',monospace; font-size:9px; letter-spacing:2px; color:var(--gold);}
+  .ach-toast .t-name{font-family:'Rajdhani',sans-serif; font-weight:700; font-size:15px; color:#fff;}
+  @keyframes toastIn{from{opacity:0; transform:translateY(-16px) scale(0.96);} to{opacity:1; transform:translateY(0) scale(1);}}
+  @keyframes toastOut{to{opacity:0; transform:translateY(-10px) scale(0.98);}}
+
   /* ---------- Settings screen ---------- */
   .settings-wrap{width:640px; max-width:92vw; max-height:74vh; overflow-y:auto; z-index:2; padding-right:6px; touch-action:pan-y;}
   .settings-tabs{display:flex; gap:8px; margin-bottom:16px; z-index:2;}
@@ -244,6 +266,7 @@
       <button class="btn primary" id="btnNewRun">New Run</button>
       <button class="btn" id="btnMeta">Meta Upgrades</button>
       <button class="btn" id="btnStats">Statistics</button>
+      <button class="btn" id="btnAchievements">Achievements <span id="achProgressChip" class="ach-chip"></span></button>
       <button class="btn" id="btnSettings">Settings</button>
       <button class="btn" id="btnReset" style="font-size:12px; opacity:0.5;">Reset Save</button>
     </div>
@@ -308,6 +331,18 @@
     <div class="back-link" id="statsBack">← BACK TO BASE</div>
   </div>
 
+  <!-- ACHIEVEMENTS -->
+  <div class="screen hidden" id="screen-achievements">
+    <div class="veil"></div>
+    <div class="title-wrap" style="margin-bottom:6px;">
+      <div class="kicker">proof of ascension</div>
+      <div class="title" style="font-size:40px;">ACHIEVEMENTS</div>
+      <div class="subtitle" id="achSummary" style="margin-top:14px;"></div>
+    </div>
+    <div class="ach-wrap" id="achWrap"></div>
+    <div class="back-link" id="achBack">← BACK TO BASE</div>
+  </div>
+
   <!-- SETTINGS -->
   <div class="screen hidden" id="screen-settings">
     <div class="veil"></div>
@@ -370,6 +405,8 @@
     <div class="back-link" id="settingsBack">← BACK</div>
   </div>
 </div>
+
+<div id="achToastLayer"></div>
 
 <script>
 (() => {
@@ -484,11 +521,37 @@ const META_UPGRADES = [
   { id:"m_regen", name:"Blood of the Old Gods", desc:"+0.4 HP regen per second, per level.", max:5, baseCost:14, costMult:1.35, apply:(p,lvl)=>{p.stats.regen+=0.4*lvl;} },
 ];
 
+/* ---------- Achievements Database (pure data — same philosophy as ENEMIES /
+   WAVES / UPGRADES: a definition table + a single generic checker below) ---------- */
+
+const ACHIEVEMENTS = [
+  { id:"first_blood",   icon:"🩸", name:"First Blood",     desc:"Kill your first enemy.",                        check:(c)=>c.lifetime.kills>=1 },
+  { id:"slayer_50",     icon:"🗡️", name:"Slayer",           desc:"Kill 50 enemies in a single run.",              check:(c)=>c.run.kills>=50 },
+  { id:"slayer_300",    icon:"⚔️", name:"Exterminator",     desc:"Kill 300 enemies in a single run.",             check:(c)=>c.run.kills>=300 },
+  { id:"massacre_2000", icon:"💀", name:"Massacre",         desc:"Reach 2000 lifetime kills.",                    check:(c)=>c.lifetime.kills>=2000 },
+  { id:"survivor_5",    icon:"⏱️", name:"Foothold",         desc:"Survive 5 minutes in a single run.",            check:(c)=>c.run.time>=300 },
+  { id:"survivor_10",   icon:"🕐", name:"Dug In",           desc:"Survive 10 minutes in a single run.",           check:(c)=>c.run.time>=600 },
+  { id:"survivor_30",   icon:"🏔️", name:"The Test",         desc:"Survive 30 minutes in a single run.",           check:(c)=>c.run.time>=1800 },
+  { id:"level_10",      icon:"⭐", name:"Ascending",        desc:"Reach level 10 in a single run.",               check:(c)=>c.run.level>=10 },
+  { id:"level_25",      icon:"🌟", name:"Transcendent",     desc:"Reach level 25 in a single run.",               check:(c)=>c.run.level>=25 },
+  { id:"arsenal",       icon:"🎒", name:"Full Arsenal",     desc:"Unlock every weapon in one run.",               check:(c)=>c.run.weaponsCount>=Object.keys(WEAPONS).length },
+  { id:"weapon_mastery",icon:"🔧", name:"Mastercraft",      desc:"Level any single weapon to level 8.",           check:(c)=>c.run.maxWeaponLvl>=8 },
+  { id:"elite_hunter",  icon:"👹", name:"Elite Hunter",     desc:"Kill 5 elites in a single run.",                check:(c)=>c.run.eliteKills>=5 },
+  { id:"boss_slayer",   icon:"🐉", name:"Boss Slayer",      desc:"Defeat a boss.",                                check:(c)=>c.run.bossKilled },
+  { id:"bane_of_beasts",icon:"🐲", name:"Bane of Beasts",   desc:"Defeat a boss 5 times, lifetime.",              check:(c)=>c.lifetime.bossKills>=5 },
+  { id:"rich_run",      icon:"💰", name:"Gold Rush",        desc:"Collect 500 gold in a single run.",             check:(c)=>c.run.gold>=500 },
+  { id:"hoarder",       icon:"🏦", name:"Hoarder",          desc:"Accumulate 1000 lifetime Soul.",                check:(c)=>c.lifetime.totalSoul>=1000 },
+  { id:"persistent",    icon:"☠️", name:"Persistent",       desc:"Die 10 times. Progress, not failure.",          check:(c)=>c.lifetime.deaths>=10 },
+  { id:"veteran",       icon:"📜", name:"Veteran",          desc:"Complete 25 runs.",                             check:(c)=>c.lifetime.runs>=25 },
+  { id:"ascended",      icon:"👑", name:"Ascended",         desc:"Max out every permanent upgrade.",              check:(c)=>META_UPGRADES.every(m=>(c.meta[m.id]||0)>=m.max) },
+];
+
 /* =========================================================================
    SAVE / META STATE  (persisted via window.storage, personal & non-shared)
    ========================================================================= */
 
-const DEFAULT_SAVE = { soul:0, metaLevels:{}, lifetime:{ runs:0, kills:0, deaths:0, bestTime:0, bestLevel:0, totalGold:0, totalSoul:0 }, activeRun:null,
+const DEFAULT_SAVE = { soul:0, metaLevels:{}, lifetime:{ runs:0, kills:0, deaths:0, bestTime:0, bestLevel:0, totalGold:0, totalSoul:0, eliteKills:0, bossKills:0 }, activeRun:null,
+  achievements:{ unlocked:{} },
   settings:{ muted:false, sfxVolume:1, controlMode:'auto', joystickSide:'left', haptics:true, quality:'high', screenShake:true } };
 let save = JSON.parse(JSON.stringify(DEFAULT_SAVE));
 
@@ -498,9 +561,13 @@ async function loadSave(){
     if(r && r.value){
       const loaded = JSON.parse(r.value);
       save = Object.assign(JSON.parse(JSON.stringify(DEFAULT_SAVE)), loaded);
-      // Settings is a nested object — merge it field-by-field so saves made
-      // before a new setting existed still pick up that setting's default.
+      // Settings / lifetime / achievements are nested objects — merge them
+      // field-by-field so saves made before a new field existed still pick
+      // up that field's default instead of losing it entirely.
       save.settings = Object.assign({}, DEFAULT_SAVE.settings, loaded.settings||{});
+      save.lifetime = Object.assign({}, DEFAULT_SAVE.lifetime, loaded.lifetime||{});
+      save.achievements = Object.assign({}, DEFAULT_SAVE.achievements, loaded.achievements||{});
+      save.achievements.unlocked = Object.assign({}, save.achievements.unlocked, (loaded.achievements && loaded.achievements.unlocked)||{});
     }
   }catch(e){ /* no save yet */ }
   applySettings();
@@ -513,6 +580,8 @@ function metaCost(def, currentLvl){ return Math.ceil(def.baseCost * Math.pow(def
 function refreshSoulBadges(){
   document.getElementById('menuSoul').textContent = Math.floor(save.soul);
   document.getElementById('metaSoul').textContent = Math.floor(save.soul);
+  const chip = document.getElementById('achProgressChip');
+  if(chip) chip.textContent = `${Object.keys(save.achievements.unlocked).length}/${ACHIEVEMENTS.length}`;
 }
 
 /* =========================================================================
@@ -545,6 +614,8 @@ let spawnedBossIds = new Set();
 const AUTOSAVE_INTERVAL = 6; // seconds between full-state autosaves
 let autosaveTimer = AUTOSAVE_INTERVAL;
 let appliedKills = 0, appliedGold = 0; // portion of this run's kills/gold already folded into lifetime stats
+let eliteKillsRun = 0, bossKilledRun = false; // this run's achievement-relevant counters
+let appliedEliteKills = 0, appliedBossFolded = false; // same "applied cursor" pattern as appliedKills/appliedGold
 
 function freshStats(){
   return { dmgMult:1, atkSpeedMult:1, moveSpeed:230, pickupRadius:70, armor:0, regen:0, goldMult:1 };
@@ -575,6 +646,7 @@ function startRun(){
   keys = {};
   spawnedBossIds = new Set();
   appliedKills = 0; appliedGold = 0; autosaveTimer = AUTOSAVE_INTERVAL;
+  eliteKillsRun = 0; bossKilledRun = false; appliedEliteKills = 0; appliedBossFolded = false;
   save.activeRun = null; persistSave();
   updateContinueButton();
   setState("playing");
@@ -602,6 +674,9 @@ function continueRun(){
   spawnedBossIds = new Set(snap.bossesSpawned||[]);
   appliedKills = snap.appliedKills!=null ? snap.appliedKills : killCount;
   appliedGold = snap.appliedGold!=null ? snap.appliedGold : Math.floor(player.gold);
+  eliteKillsRun = snap.eliteKillsRun||0; bossKilledRun = !!snap.bossKilledRun;
+  appliedEliteKills = snap.appliedEliteKills!=null ? snap.appliedEliteKills : eliteKillsRun;
+  appliedBossFolded = snap.appliedBossFolded!=null ? snap.appliedBossFolded : false;
   autosaveTimer = AUTOSAVE_INTERVAL;
   setState("playing");
   document.getElementById('hud').classList.remove('hidden');
@@ -627,6 +702,9 @@ function applyRunStatsIncrement(final){
   const curGold = Math.floor(player.gold);
   const deltaGold = curGold - appliedGold;
   if(deltaGold > 0){ save.lifetime.totalGold += deltaGold; appliedGold = curGold; }
+  const deltaElite = eliteKillsRun - appliedEliteKills;
+  if(deltaElite > 0){ save.lifetime.eliteKills += deltaElite; appliedEliteKills = eliteKillsRun; }
+  if(bossKilledRun && !appliedBossFolded){ save.lifetime.bossKills++; appliedBossFolded = true; }
   save.lifetime.bestTime = Math.max(save.lifetime.bestTime, runTime);
   save.lifetime.bestLevel = Math.max(save.lifetime.bestLevel, player.level);
   if(final){ save.lifetime.runs++; save.lifetime.deaths++; }
@@ -646,6 +724,7 @@ async function doAutosave(showIndicator){
   save.activeRun = {
     player: snapshotPlayer(player),
     runTime, killCount, appliedKills, appliedGold,
+    eliteKillsRun, bossKilledRun, appliedEliteKills, appliedBossFolded,
     bossesSpawned: Array.from(spawnedBossIds),
     savedAt: Date.now(),
   };
@@ -1347,6 +1426,8 @@ function killEnemy(enemy){
   const idx = enemies.indexOf(enemy);
   if(idx>=0) enemies.splice(idx,1);
   killCount++;
+  if(enemy.elite) eliteKillsRun++;
+  if(enemy.boss) bossKilledRun = true;
   orbs.push({ type:"xp", x:enemy.x, y:enemy.y, value:enemy.xp, radius:6, vx:0, vy:0 });
   if(Math.random()<0.75) orbs.push({ type:"gold", x:enemy.x+rand(-8,8), y:enemy.y+rand(-8,8), value:enemy.gold, radius:5, vx:0, vy:0 });
   spawnParticle(enemy.x, enemy.y, enemy.color, 10);
@@ -1391,6 +1472,53 @@ function gainXp(v){
     player.xpNext = Math.round(10 * Math.pow(1.16, player.level-1));
     openLevelUp();
   }
+}
+
+/* =========================================================================
+   ACHIEVEMENTS — one generic checker reads ACHIEVEMENTS data, exactly like
+   the weapon pipeline and enemy AI. Runs continuously during a run (cheap
+   comparisons) and once more inside die(), right after lifetime totals are
+   rolled up, so lifetime-scoped achievements (deaths, runs, totalSoul,
+   bossKills…) land on the same frame as the run that earned them.
+   ========================================================================= */
+
+function buildAchievementContext(){
+  const lvls = Object.values(player.weapons);
+  return {
+    run: {
+      kills: killCount,
+      eliteKills: eliteKillsRun,
+      bossKilled: bossKilledRun,
+      time: runTime,
+      level: player.level,
+      gold: Math.floor(player.gold),
+      weaponsCount: Object.keys(player.weapons).length,
+      maxWeaponLvl: lvls.length ? Math.max(...lvls) : 0,
+    },
+    lifetime: save.lifetime,
+    meta: save.metaLevels,
+  };
+}
+
+function checkAchievements(){
+  const ctx = buildAchievementContext();
+  let changed = false;
+  for(const a of ACHIEVEMENTS){
+    if(save.achievements.unlocked[a.id]) continue;
+    if(a.check(ctx)){ save.achievements.unlocked[a.id] = Date.now(); showAchievementToast(a); changed = true; }
+  }
+  if(changed){ persistSave(); refreshSoulBadges(); }
+}
+
+function showAchievementToast(a){
+  const layer = document.getElementById('achToastLayer');
+  const el = document.createElement('div');
+  el.className = 'ach-toast';
+  el.innerHTML = `<div class="t-icon">${a.icon}</div><div><div class="t-kicker">ACHIEVEMENT UNLOCKED</div><div class="t-name">${a.name}</div></div>`;
+  layer.appendChild(el);
+  setTimeout(()=>el.remove(), 4000);
+  logEvent("Achievement: " + a.name);
+  SFX.uiClick();
 }
 
 /* =========================================================================
@@ -1440,6 +1568,7 @@ function die(){
   const soulGain = Math.floor((player.gold*0.12 + player.level*2 + Math.floor(runTime/10)) * soulMult);
   save.soul += soulGain;
   save.lifetime.totalSoul += soulGain;
+  checkAchievements(); // lifetime-scoped achievements land now, using this run's final totals
   persistSave();
 
   document.getElementById('deathStats').innerHTML = `
@@ -1637,6 +1766,7 @@ function loop(now){
     updateWeapons(dt);
     updateBullets(dt);
     updateOrbs(dt);
+    checkAchievements();
     updateJuice(dt);
     refreshHud();
   }
@@ -1721,7 +1851,26 @@ function renderStatsScreen(){
     <div class="stat-row"><span class="k">Best Level</span><span>${L.bestLevel}</span></div>
     <div class="stat-row"><span class="k">Lifetime Gold</span><span>${L.totalGold}</span></div>
     <div class="stat-row"><span class="k">Lifetime Soul</span><span>${L.totalSoul}</span></div>
+    <div class="stat-row"><span class="k">Elite Kills</span><span>${L.eliteKills}</span></div>
+    <div class="stat-row"><span class="k">Bosses Slain</span><span>${L.bossKills}</span></div>
   `;
+}
+
+function renderAchievementsScreen(){
+  const unlocked = save.achievements.unlocked;
+  const unlockedCount = Object.keys(unlocked).length;
+  document.getElementById('achSummary').textContent = `${unlockedCount} / ${ACHIEVEMENTS.length} unlocked`;
+  const wrap = document.getElementById('achWrap');
+  wrap.innerHTML = "";
+  for(const a of ACHIEVEMENTS){
+    const ts = unlocked[a.id];
+    const el = document.createElement('div');
+    el.className = 'ach-card ' + (ts ? 'unlocked' : 'locked');
+    const dateStr = ts ? new Date(ts).toLocaleDateString() : '';
+    el.innerHTML = `<div class="ach-icon ${ts?'':'locked-icon'}">${ts?a.icon:'🔒'}</div>
+      <div><div class="ach-name">${a.name}</div><div class="ach-desc">${a.desc}</div>${ts?`<div class="ach-date">UNLOCKED ${dateStr}</div>`:''}</div>`;
+    wrap.appendChild(el);
+  }
 }
 
 /* =========================================================================
@@ -1731,6 +1880,7 @@ function renderStatsScreen(){
 document.getElementById('btnNewRun').onclick = startRun;
 document.getElementById('btnMeta').onclick = ()=>{ setState('meta'); renderMetaScreen(); show('screen-meta'); };
 document.getElementById('btnStats').onclick = ()=>{ setState('stats'); renderStatsScreen(); show('screen-stats'); };
+document.getElementById('btnAchievements').onclick = ()=>{ setState('achievements'); renderAchievementsScreen(); show('screen-achievements'); };
 document.getElementById('btnSettings').onclick = ()=>{ setState('settings'); openSettings('menu'); };
 document.getElementById('btnPauseSettings').onclick = ()=>{ openSettings('pause'); };
 document.getElementById('btnReset').onclick = ()=>{
@@ -1743,6 +1893,7 @@ document.getElementById('btnReset').onclick = ()=>{
 };
 document.getElementById('metaBack').onclick = goMenu;
 document.getElementById('statsBack').onclick = goMenu;
+document.getElementById('achBack').onclick = goMenu;
 document.getElementById('pauseBtn').onclick = togglePause;
 document.getElementById('btnResume').onclick = ()=>{ hideAll(); setState('playing'); };
 document.getElementById('btnQuitRun').onclick = goMenu;
