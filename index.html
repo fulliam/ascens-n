@@ -1998,6 +1998,41 @@ function die(){
 }
 
 /* =========================================================================
+   VICTORY — triggered when the final boss (FINAL_BOSS_ID) is defeated.
+   Unlike die(), the run isn't necessarily over: "Keep Playing" drops the
+   player back into the same run (waves keep escalating past the final
+   boss) for anyone who wants to keep farming, while "Return to Base" ends
+   it cleanly and books the rewards exactly like a normal run would.
+   ========================================================================= */
+
+function win(){
+  setState('victory');
+  SFX.stopHeartbeat();
+  SFX.victory();
+  vibrate([0,60,60,60,60,120]);
+
+  document.getElementById('victoryStats').innerHTML = `
+    <div class="stat-row"><span class="k">Time Survived</span><span>${fmtTime(runTime)}</span></div>
+    <div class="stat-row"><span class="k">Level Reached</span><span>${player.level}</span></div>
+    <div class="stat-row"><span class="k">Kills</span><span>${killCount}</span></div>
+    <div class="stat-row"><span class="k">Gold Collected</span><span>${Math.floor(player.gold)}</span></div>
+  `;
+
+  const soulMult = 1 + 0.08*(save.metaLevels['m_soul']||0);
+  const victoryBonus = 150; // flat bonus Soul for actually finishing the game
+  const soulGain = Math.floor((victoryBonus + player.gold*0.12 + player.level*2 + Math.floor(runTime/10)) * soulMult);
+  save.soul += soulGain;
+  save.lifetime.totalSoul += soulGain;
+  applyRunStatsIncrement(false); // fold in lifetime kills/gold so far, but don't count this as a "death"
+  checkAchievements();
+  persistSave();
+
+  document.getElementById('victorySoulGain').textContent = `+ ${soulGain} SOUL earned (includes a victory bonus)`;
+  refreshSoulBadges();
+  show('screen-victory');
+}
+
+/* =========================================================================
    PARTICLES / FLOATERS (juice)
    ========================================================================= */
 
@@ -2208,7 +2243,7 @@ function loop(now){
     autosaveTimer -= dt;
     if(autosaveTimer<=0){ doAutosave(true); autosaveTimer = AUTOSAVE_INTERVAL; }
   }
-  if(state==="playing" || state==="levelup" || state==="paused" || state==="dead"){
+  if(state==="playing" || state==="levelup" || state==="paused" || state==="dead" || state==="victory"){
     render();
   }
   requestAnimationFrame(loop);
@@ -2339,6 +2374,8 @@ document.getElementById('btnResume').onclick = ()=>{ hideAll(); setState('playin
 document.getElementById('btnQuitRun').onclick = quitRun;
 document.getElementById('btnAgain').onclick = startRun;
 document.getElementById('btnToMenu').onclick = goMenu;
+document.getElementById('btnKeepPlaying').onclick = ()=>{ hideAll(); setState('playing'); MUSIC.start(); };
+document.getElementById('btnVictoryMenu').onclick = ()=>{ applyRunStatsIncrement(true); save.activeRun=null; persistSave(); goMenu(); };
 
 /* =========================================================================
    BOOT
