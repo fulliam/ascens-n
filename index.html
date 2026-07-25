@@ -2,6 +2,11 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#08090d">
 <title>PROJECT: ASCENSION</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
@@ -20,10 +25,11 @@
     --accent:#b98cff;
     --accent2:#ff6f9c;
   }
-  *{box-sizing:border-box; margin:0; padding:0;}
-  html,body{width:100%; height:100%; overflow:hidden; background:var(--void); color:var(--text); font-family:'Inter',sans-serif;}
+  *{box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent;}
+  html,body{width:100%; height:100%; overflow:hidden; background:var(--void); color:var(--text); font-family:'Inter',sans-serif;
+    overscroll-behavior:none; touch-action:none; -webkit-user-select:none; user-select:none;}
   #app{position:relative; width:100%; height:100%;}
-  canvas{position:absolute; inset:0; width:100%; height:100%; display:block;}
+  canvas{position:absolute; inset:0; width:100%; height:100%; display:block; touch-action:none;}
 
   .mono{font-family:'JetBrains Mono',monospace;}
   .display{font-family:'Rajdhani',sans-serif; font-weight:700; letter-spacing:0.5px;}
@@ -108,7 +114,7 @@
   .soul-gain{font-family:'JetBrains Mono',monospace; color:var(--soul); font-size:15px; margin-bottom:18px; z-index:2;}
 
   /* ---------- Meta upgrade screen ---------- */
-  .meta-wrap{width:640px; max-height:78vh; overflow-y:auto; z-index:2; padding-right:6px;}
+  .meta-wrap{width:640px; max-height:78vh; overflow-y:auto; z-index:2; padding-right:6px; touch-action:pan-y;}
   .meta-item{display:flex; align-items:center; justify-content:space-between; background:var(--panel); border:1px solid var(--line); border-radius:4px; padding:14px 18px; margin-bottom:10px;}
   .meta-item .m-name{font-family:'Rajdhani',sans-serif; font-weight:700; font-size:16px;}
   .meta-item .m-desc{color:var(--dim); font-size:12px; margin-top:3px;}
@@ -130,6 +136,62 @@
 
   ::-webkit-scrollbar{width:6px;}
   ::-webkit-scrollbar-thumb{background:var(--line); border-radius:3px;}
+
+  /* ---------- Settings screen ---------- */
+  .settings-wrap{width:640px; max-width:92vw; max-height:74vh; overflow-y:auto; z-index:2; padding-right:6px; touch-action:pan-y;}
+  .settings-tabs{display:flex; gap:8px; margin-bottom:16px; z-index:2;}
+  .settings-tab{flex:1; text-align:center; font-family:'Rajdhani',sans-serif; font-weight:600; font-size:14px; letter-spacing:1.5px;
+    text-transform:uppercase; padding:10px 8px; border:1px solid var(--line); background:var(--panel); color:var(--dim); cursor:pointer; border-radius:2px; transition:border-color .15s,color .15s;}
+  .settings-tab:hover{color:var(--text);}
+  .settings-tab.active{color:var(--accent); border-color:var(--accent); background:var(--panel2);}
+  .settings-pane{display:flex; flex-direction:column; gap:10px;}
+  .settings-pane.hidden{display:none;}
+  .setting-row{background:var(--panel); border:1px solid var(--line); border-radius:4px; padding:14px 18px; display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;}
+  .setting-row .s-name{font-family:'Rajdhani',sans-serif; font-weight:700; font-size:15px;}
+  .setting-row .s-desc{color:var(--dim); font-size:11.5px; margin-top:3px; max-width:340px;}
+  .seg-control{display:flex; border:1px solid var(--line); border-radius:2px; overflow:hidden; flex-shrink:0;}
+  .seg-btn{font-family:'JetBrains Mono',monospace; font-size:11.5px; letter-spacing:0.5px; padding:9px 13px; background:var(--panel2); color:var(--dim); border:none; cursor:pointer; border-right:1px solid var(--line); white-space:nowrap;}
+  .seg-btn:last-child{border-right:none;}
+  .seg-btn.active{background:var(--accent); color:#14101c;}
+  .seg-btn:hover:not(.active){color:var(--text);}
+  .toggle-switch{position:relative; width:46px; height:25px; background:var(--panel2); border:1px solid var(--line); border-radius:13px; cursor:pointer; flex-shrink:0; transition:border-color .15s;}
+  .toggle-switch .knob{position:absolute; top:2px; left:2px; width:19px; height:19px; border-radius:50%; background:var(--dim); transition:transform .15s, background .15s;}
+  .toggle-switch.on{border-color:var(--accent);}
+  .toggle-switch.on .knob{transform:translateX(21px); background:var(--accent);}
+  .slider-row{display:flex; align-items:center; gap:12px; flex-shrink:0; width:200px;}
+  .slider-row input[type=range]{-webkit-appearance:none; appearance:none; flex:1; height:4px; background:var(--line); border-radius:2px; outline:none;}
+  .slider-row input[type=range]::-webkit-slider-thumb{-webkit-appearance:none; appearance:none; width:17px; height:17px; border-radius:50%; background:var(--accent); cursor:pointer; border:2px solid #14101c;}
+  .slider-row input[type=range]::-moz-range-thumb{width:17px; height:17px; border-radius:50%; background:var(--accent); cursor:pointer; border:2px solid #14101c;}
+  .slider-val{font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--accent); width:34px; text-align:right;}
+
+  /* ---------- Touch joystick ---------- */
+  .joystick-zone{position:absolute; width:132px; height:132px; bottom:calc(96px + env(safe-area-inset-bottom,0px)); z-index:6; pointer-events:none; touch-action:none; display:none;}
+  .joystick-zone.side-left{left:calc(22px + env(safe-area-inset-left,0px));}
+  .joystick-zone.side-right{right:calc(22px + env(safe-area-inset-right,0px));}
+  .joystick-zone.enabled{pointer-events:auto;}
+  .joystick-base{position:absolute; inset:0; border-radius:50%; background:rgba(18,20,27,0.45); border:1px solid var(--line); backdrop-filter:blur(2px);}
+  .joystick-knob{position:absolute; width:52%; height:52%; top:24%; left:24%; border-radius:50%; background:rgba(185,140,255,0.32); border:1px solid var(--accent); transition:transform .04s linear;}
+
+  /* ---------- Mobile / touch responsive tweaks ---------- */
+  @media (max-width:760px), (pointer:coarse){
+    .title{font-size:40px; letter-spacing:3px;}
+    .subtitle{font-size:11.5px; max-width:86vw;}
+    .menu-col{width:min(300px,84vw);}
+    .btn{padding:15px 18px; font-size:16px;}
+    .meta-wrap, .settings-wrap{width:94vw;}
+    .stats-grid{width:90vw; grid-template-columns:1fr 1fr; gap:8px 18px;}
+    .hud-top{padding:calc(10px + env(safe-area-inset-top,0px)) 12px 10px;}
+    .hp-wrap{width:180px;}
+    .resource-row{gap:8px; font-size:11px;}
+    .res-chip{padding:5px 8px;}
+    .timer{font-size:19px;}
+    .event-log{display:none;}
+    .hud-bottom{padding:10px 12px calc(10px + env(safe-area-inset-bottom,0px));}
+    .xp-track{width:min(420px,60vw);}
+    .settings-tab{font-size:12px; padding:9px 4px;}
+    .setting-row{padding:12px 14px;}
+    .slider-row{width:150px;}
+  }
 </style>
 </head>
 <body>
@@ -161,6 +223,10 @@
       <div class="weapon-row" id="weaponRow"></div>
       <div class="bar-track xp-track"><div class="bar-fill" id="xpFill" style="width:0%;background:linear-gradient(90deg,#2f8f22,var(--xp));"></div><div class="bar-label" id="xpLabel">0 / 10 XP</div></div>
     </div>
+    <div class="joystick-zone side-left" id="joystickZone">
+      <div class="joystick-base"></div>
+      <div class="joystick-knob" id="joystickKnob"></div>
+    </div>
   </div>
 
   <!-- MAIN MENU -->
@@ -178,6 +244,7 @@
       <button class="btn primary" id="btnNewRun">New Run</button>
       <button class="btn" id="btnMeta">Meta Upgrades</button>
       <button class="btn" id="btnStats">Statistics</button>
+      <button class="btn" id="btnSettings">Settings</button>
       <button class="btn" id="btnReset" style="font-size:12px; opacity:0.5;">Reset Save</button>
     </div>
   </div>
@@ -198,6 +265,7 @@
     <div class="title-wrap"><div class="title" style="font-size:44px;">PAUSED</div></div>
     <div class="menu-col">
       <button class="btn primary" id="btnResume">Resume</button>
+      <button class="btn" id="btnPauseSettings">Settings</button>
       <button class="btn" id="btnQuitRun">Quit Run</button>
     </div>
   </div>
@@ -238,6 +306,68 @@
     </div>
     <div class="stats-grid" id="lifetimeStats"></div>
     <div class="back-link" id="statsBack">← BACK TO BASE</div>
+  </div>
+
+  <!-- SETTINGS -->
+  <div class="screen hidden" id="screen-settings">
+    <div class="veil"></div>
+    <div class="title-wrap" style="margin-bottom:16px;">
+      <div class="kicker">preferences</div>
+      <div class="title" style="font-size:40px;">SETTINGS</div>
+    </div>
+    <div class="settings-tabs" style="width:min(640px,92vw);">
+      <div class="settings-tab active" data-tab="controls">Controls</div>
+      <div class="settings-tab" data-tab="video">Video</div>
+      <div class="settings-tab" data-tab="audio">Sound</div>
+    </div>
+    <div class="settings-wrap">
+      <div class="settings-pane" id="pane-controls">
+        <div class="setting-row">
+          <div><div class="s-name">Movement Input</div><div class="s-desc">Auto uses a touch joystick on phones/tablets and keyboard (WASD / arrows) elsewhere.</div></div>
+          <div class="seg-control" id="ctrlMode">
+            <button class="seg-btn" data-val="auto">Auto</button>
+            <button class="seg-btn" data-val="joystick">Joystick</button>
+            <button class="seg-btn" data-val="keyboard">Keyboard</button>
+          </div>
+        </div>
+        <div class="setting-row">
+          <div><div class="s-name">Joystick Side</div><div class="s-desc">Which side of the screen the movement stick appears on.</div></div>
+          <div class="seg-control" id="ctrlSide">
+            <button class="seg-btn" data-val="left">Left</button>
+            <button class="seg-btn" data-val="right">Right</button>
+          </div>
+        </div>
+        <div class="setting-row">
+          <div><div class="s-name">Vibration</div><div class="s-desc">Short haptic pulse on hits, level-ups and death (supported devices only).</div></div>
+          <div class="toggle-switch" id="ctrlHaptics"><div class="knob"></div></div>
+        </div>
+      </div>
+      <div class="settings-pane hidden" id="pane-video">
+        <div class="setting-row">
+          <div><div class="s-name">Graphics Quality</div><div class="s-desc">Lower settings reduce glow and particle effects for smoother play on weaker devices.</div></div>
+          <div class="seg-control" id="vidQuality">
+            <button class="seg-btn" data-val="low">Low</button>
+            <button class="seg-btn" data-val="medium">Medium</button>
+            <button class="seg-btn" data-val="high">High</button>
+          </div>
+        </div>
+        <div class="setting-row">
+          <div><div class="s-name">Screen Shake</div><div class="s-desc">Camera shake on hits and impacts. Disable if it bothers you.</div></div>
+          <div class="toggle-switch" id="vidShake"><div class="knob"></div></div>
+        </div>
+      </div>
+      <div class="settings-pane hidden" id="pane-audio">
+        <div class="setting-row">
+          <div><div class="s-name">Master Volume</div><div class="s-desc">Overall volume for all in-game sound effects.</div></div>
+          <div class="slider-row"><input type="range" id="audioVolume" min="0" max="100" value="100"><span class="slider-val" id="audioVolumeVal">100</span></div>
+        </div>
+        <div class="setting-row">
+          <div><div class="s-name">Mute</div><div class="s-desc">Quickly silence all sound.</div></div>
+          <div class="toggle-switch" id="audioMuted"><div class="knob"></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="back-link" id="settingsBack">← BACK</div>
   </div>
 </div>
 
@@ -358,14 +488,22 @@ const META_UPGRADES = [
    SAVE / META STATE  (persisted via window.storage, personal & non-shared)
    ========================================================================= */
 
-const DEFAULT_SAVE = { soul:0, metaLevels:{}, lifetime:{ runs:0, kills:0, deaths:0, bestTime:0, bestLevel:0, totalGold:0, totalSoul:0 }, activeRun:null, settings:{ muted:false } };
+const DEFAULT_SAVE = { soul:0, metaLevels:{}, lifetime:{ runs:0, kills:0, deaths:0, bestTime:0, bestLevel:0, totalGold:0, totalSoul:0 }, activeRun:null,
+  settings:{ muted:false, sfxVolume:1, controlMode:'auto', joystickSide:'left', haptics:true, quality:'high', screenShake:true } };
 let save = JSON.parse(JSON.stringify(DEFAULT_SAVE));
 
 async function loadSave(){
   try{
     const r = await window.storage.get('ascension_save', false);
-    if(r && r.value){ save = Object.assign(JSON.parse(JSON.stringify(DEFAULT_SAVE)), JSON.parse(r.value)); }
+    if(r && r.value){
+      const loaded = JSON.parse(r.value);
+      save = Object.assign(JSON.parse(JSON.stringify(DEFAULT_SAVE)), loaded);
+      // Settings is a nested object — merge it field-by-field so saves made
+      // before a new setting existed still pick up that setting's default.
+      save.settings = Object.assign({}, DEFAULT_SAVE.settings, loaded.settings||{});
+    }
   }catch(e){ /* no save yet */ }
+  applySettings();
   refreshSoulBadges();
 }
 async function persistSave(){
@@ -401,6 +539,7 @@ let runTime = 0, killCount = 0, dpsWindow = [];
 let state = "menu"; // menu | playing | levelup | paused | dead | meta | stats
 let lastSpawn = 0, eliteTimer = 0;
 let keys = {};
+let touchVec = {x:0, y:0}; // filled by the virtual joystick; (0,0) when untouched or on keyboard
 let chainArcs = [], novaPulses = [];
 let spawnedBossIds = new Set();
 const AUTOSAVE_INTERVAL = 6; // seconds between full-state autosaves
@@ -538,6 +677,170 @@ function togglePause(){
 }
 
 /* =========================================================================
+   SETTINGS  (Controls / Video / Sound — all persisted in save.settings)
+   ========================================================================= */
+
+const isTouchDevice = ('ontouchstart' in window) || navigator.maxTouchPoints>0 || navigator.msMaxTouchPoints>0;
+let quality = 'high';       // 'low' | 'medium' | 'high' — read by render() / spawnParticle()
+let screenShakeOn = true;   // read wherever camera.shake is set
+let hapticsOn = true;       // read on hit / levelup / death
+
+function vibrate(ms){
+  if(hapticsOn && navigator.vibrate){ try{ navigator.vibrate(ms); }catch(e){} }
+}
+
+function shouldShowJoystick(){
+  const mode = save.settings.controlMode;
+  return mode==='joystick' || (mode==='auto' && isTouchDevice);
+}
+
+function applySettings(){
+  SFX.setMuted(!!save.settings.muted);
+  SFX.setVolume(save.settings.sfxVolume);
+  quality = save.settings.quality;
+  screenShakeOn = !!save.settings.screenShake;
+  hapticsOn = !!save.settings.haptics;
+  updateMuteButtons();
+
+  const joyZone = document.getElementById('joystickZone');
+  if(joyZone){
+    joyZone.classList.toggle('side-left', save.settings.joystickSide!=='right');
+    joyZone.classList.toggle('side-right', save.settings.joystickSide==='right');
+    const show = shouldShowJoystick();
+    joyZone.style.display = show ? 'block' : 'none';
+    joyZone.classList.toggle('enabled', show);
+    if(!show){ touchVec.x=0; touchVec.y=0; }
+  }
+}
+
+/* ---------- Virtual joystick (touch) — purely additive to `keys`, so
+   keyboard/mouse play is completely unaffected whether or not this is used. */
+(function setupJoystick(){
+  const zone = document.getElementById('joystickZone');
+  const knob = document.getElementById('joystickKnob');
+  if(!zone || !knob) return;
+  const RADIUS = 40;   // px of knob travel
+  const DEADZONE = 0.15;
+  let activeId = null;
+  let originX = 0, originY = 0;
+
+  function originFromZone(){
+    const r = zone.getBoundingClientRect();
+    originX = r.left + r.width/2;
+    originY = r.top + r.height/2;
+  }
+  function updateFromPoint(cx, cy){
+    const dx = cx-originX, dy = cy-originY;
+    const len = Math.hypot(dx,dy);
+    const travel = Math.min(len, RADIUS);
+    const nx = len>0 ? dx/len : 0, ny = len>0 ? dy/len : 0;
+    knob.style.transform = `translate(${nx*travel}px, ${ny*travel}px)`;
+    const mag = clamp(len/RADIUS, 0, 1);
+    if(mag < DEADZONE){ touchVec.x = 0; touchVec.y = 0; }
+    else{ touchVec.x = nx*mag; touchVec.y = ny*mag; }
+  }
+  function reset(){
+    activeId = null;
+    touchVec.x = 0; touchVec.y = 0;
+    knob.style.transform = 'translate(0px,0px)';
+  }
+  zone.addEventListener('touchstart', e=>{
+    if(activeId!==null) return;
+    const t = e.changedTouches[0];
+    activeId = t.identifier;
+    originFromZone();
+    updateFromPoint(t.clientX, t.clientY);
+    e.preventDefault();
+  }, {passive:false});
+  zone.addEventListener('touchmove', e=>{
+    if(activeId===null) return;
+    const t = Array.from(e.changedTouches).find(tt=>tt.identifier===activeId);
+    if(!t) return;
+    updateFromPoint(t.clientX, t.clientY);
+    e.preventDefault();
+  }, {passive:false});
+  function onEnd(e){
+    if(activeId===null) return;
+    const ended = Array.from(e.changedTouches).some(tt=>tt.identifier===activeId);
+    if(ended) reset();
+  }
+  zone.addEventListener('touchend', onEnd, {passive:true});
+  zone.addEventListener('touchcancel', onEnd, {passive:true});
+})();
+
+/* ---------- Settings screen wiring ---------- */
+function setSegActive(containerId, value){
+  document.querySelectorAll('#'+containerId+' .seg-btn').forEach(b=>{
+    b.classList.toggle('active', b.dataset.val===value);
+  });
+}
+function setToggle(id, on){
+  const el = document.getElementById(id);
+  if(el) el.classList.toggle('on', !!on);
+}
+function refreshSettingsUI(){
+  setSegActive('ctrlMode', save.settings.controlMode);
+  setSegActive('ctrlSide', save.settings.joystickSide);
+  setSegActive('vidQuality', save.settings.quality);
+  setToggle('ctrlHaptics', save.settings.haptics);
+  setToggle('vidShake', save.settings.screenShake);
+  setToggle('audioMuted', save.settings.muted);
+  const vol = Math.round(save.settings.sfxVolume*100);
+  document.getElementById('audioVolume').value = vol;
+  document.getElementById('audioVolumeVal').textContent = vol;
+}
+
+let settingsReturnTo = 'menu'; // which screen to show on "Back"
+function openSettings(returnTo){
+  settingsReturnTo = returnTo;
+  refreshSettingsUI();
+  show('screen-settings');
+}
+
+document.querySelectorAll('.settings-tab').forEach(tab=>{
+  tab.onclick = ()=>{
+    document.querySelectorAll('.settings-tab').forEach(t=>t.classList.remove('active'));
+    tab.classList.add('active');
+    document.querySelectorAll('.settings-pane').forEach(p=>p.classList.add('hidden'));
+    document.getElementById('pane-'+tab.dataset.tab).classList.remove('hidden');
+  };
+});
+document.getElementById('ctrlMode').addEventListener('click', e=>{
+  const b = e.target.closest('.seg-btn'); if(!b) return;
+  save.settings.controlMode = b.dataset.val; persistSave(); applySettings(); refreshSettingsUI();
+});
+document.getElementById('ctrlSide').addEventListener('click', e=>{
+  const b = e.target.closest('.seg-btn'); if(!b) return;
+  save.settings.joystickSide = b.dataset.val; persistSave(); applySettings(); refreshSettingsUI();
+});
+document.getElementById('vidQuality').addEventListener('click', e=>{
+  const b = e.target.closest('.seg-btn'); if(!b) return;
+  save.settings.quality = b.dataset.val; persistSave(); applySettings(); refreshSettingsUI();
+});
+document.getElementById('ctrlHaptics').onclick = ()=>{
+  save.settings.haptics = !save.settings.haptics; persistSave(); applySettings(); refreshSettingsUI(); vibrate(20);
+};
+document.getElementById('vidShake').onclick = ()=>{
+  save.settings.screenShake = !save.settings.screenShake; persistSave(); applySettings(); refreshSettingsUI();
+};
+document.getElementById('audioMuted').onclick = ()=>{
+  save.settings.muted = !save.settings.muted; persistSave(); applySettings(); refreshSettingsUI();
+};
+document.getElementById('audioVolume').addEventListener('input', e=>{
+  const v = Number(e.target.value);
+  document.getElementById('audioVolumeVal').textContent = v;
+  save.settings.sfxVolume = v/100;
+  SFX.setVolume(save.settings.sfxVolume);
+});
+document.getElementById('audioVolume').addEventListener('change', ()=>{ persistSave(); });
+document.getElementById('muteBtnMenu').onclick = toggleMute;
+document.getElementById('muteBtnHud').onclick = toggleMute;
+document.getElementById('settingsBack').onclick = ()=>{
+  if(settingsReturnTo==='pause'){ show('screen-pause'); }
+  else{ goMenu(); }
+};
+
+/* =========================================================================
    UTILITIES
    ========================================================================= */
 
@@ -567,6 +870,7 @@ function logEvent(text){
 const SFX = (()=>{
   let ctx = null;
   let muted = false;
+  let volume = 1; // 0..1 master volume, independent of the mute toggle
   let heartbeatTimer = null;
 
   function ensureCtx(){
@@ -578,8 +882,9 @@ const SFX = (()=>{
   }
 
   function tone({freq=440, dur=0.12, type='sine', gain=0.16, slideTo=null, delay=0}={}){
-    if(muted) return;
+    if(muted || volume<=0) return;
     const c = ensureCtx(); if(!c) return;
+    gain = gain*volume;
     const t0 = c.currentTime + delay;
     const osc = c.createOscillator();
     const g = c.createGain();
@@ -594,8 +899,9 @@ const SFX = (()=>{
   }
 
   function noise({dur=0.15, gain=0.15, delay=0, filterFreq=1200}={}){
-    if(muted) return;
+    if(muted || volume<=0) return;
     const c = ensureCtx(); if(!c) return;
+    gain = gain*volume;
     const t0 = c.currentTime + delay;
     const bufferSize = Math.max(1, Math.floor(c.sampleRate*dur));
     const buffer = c.createBuffer(1, bufferSize, c.sampleRate);
@@ -613,6 +919,8 @@ const SFX = (()=>{
   return {
     setMuted(v){ muted = !!v; if(!muted) ensureCtx(); },
     isMuted(){ return muted; },
+    setVolume(v){ volume = clamp(v,0,1); },
+    getVolume(){ return volume; },
     unlock(){ ensureCtx(); },
     swordSwing(){ noise({dur:0.12, gain:0.12, filterFreq:2200}); },
     bowShot(){ tone({freq:820, slideTo:420, dur:0.09, type:'triangle', gain:0.13}); },
@@ -727,6 +1035,9 @@ function updatePlayer(dt){
   if(keys['s']||keys['arrowdown']) dy+=1;
   if(keys['a']||keys['arrowleft']) dx-=1;
   if(keys['d']||keys['arrowright']) dx+=1;
+  // Virtual joystick contributes an additional (already-normalized) vector;
+  // it stays (0,0) whenever it isn't being touched, so keyboard play is unaffected.
+  dx += touchVec.x; dy += touchVec.y;
   if(dx||dy){
     const len = Math.hypot(dx,dy);
     player.x = clamp(player.x + (dx/len)*player.stats.moveSpeed*dt, player.radius, WORLD.w-player.radius);
@@ -833,8 +1144,9 @@ function updateEnemies(dt){
 function damagePlayer(amount){
   const dmg = Math.max(1, amount - player.stats.armor);
   player.hp -= dmg;
-  camera.shake = Math.min(14, (camera.shake||0)+4);
+  if(screenShakeOn){ camera.shake = Math.min(14, (camera.shake||0)+4); }
   SFX.hurt();
+  vibrate(30);
   if(player.hp<=0 && state==='playing'){ die(); }
 }
 
@@ -1145,7 +1457,9 @@ function die(){
    PARTICLES / FLOATERS (juice)
    ========================================================================= */
 
+const QUALITY_PARTICLE_MULT = { low:0.2, medium:0.55, high:1 };
 function spawnParticle(x,y,color,n=5){
+  n = Math.ceil(n * (QUALITY_PARTICLE_MULT[quality]!=null ? QUALITY_PARTICLE_MULT[quality] : 1));
   for(let i=0;i<n;i++){
     const ang = rand(0,Math.PI*2), spd = rand(40,200);
     particles.push({ x,y, vx:Math.cos(ang)*spd, vy:Math.sin(ang)*spd, life:rand(0.3,0.6), maxLife:0.6, color });
@@ -1197,6 +1511,8 @@ function refreshHud(){
    RENDER
    ========================================================================= */
 
+function glow(size){ return quality==='low' ? 0 : (quality==='medium' ? size*0.6 : size); }
+
 function render(){
   const w = canvas.width, h = canvas.height;
   ctx.fillStyle = "#08090d";
@@ -1229,7 +1545,7 @@ function render(){
   for(const o of orbs){
     ctx.beginPath();
     ctx.fillStyle = o.type==="xp" ? "#7cff6b" : "#ffb347";
-    ctx.shadowColor = ctx.fillStyle; ctx.shadowBlur = 8;
+    ctx.shadowColor = ctx.fillStyle; ctx.shadowBlur = glow(8);
     ctx.arc(o.x,o.y,o.radius,0,7); ctx.fill();
   }
   ctx.shadowBlur = 0;
@@ -1248,7 +1564,7 @@ function render(){
   if(player.weapons.laser && player.beamTarget && enemies.includes(player.beamTarget)){
     const t = player.beamTarget;
     ctx.beginPath();
-    ctx.strokeStyle = "#ff6f9c"; ctx.lineWidth = 3; ctx.shadowColor="#ff6f9c"; ctx.shadowBlur=12;
+    ctx.strokeStyle = "#ff6f9c"; ctx.lineWidth = 3; ctx.shadowColor="#ff6f9c"; ctx.shadowBlur=glow(12);
     ctx.moveTo(player.x,player.y); ctx.lineTo(t.x,t.y); ctx.stroke();
     ctx.shadowBlur = 0;
   }
@@ -1257,7 +1573,7 @@ function render(){
   for(const e of enemies){
     ctx.beginPath();
     ctx.fillStyle = e.hitFlash>0 ? "#ffffff" : e.color;
-    ctx.shadowColor = e.glow; ctx.shadowBlur = e.boss?26:(e.elite?18:10);
+    ctx.shadowColor = e.glow; ctx.shadowBlur = glow(e.boss?26:(e.elite?18:10));
     ctx.arc(e.x,e.y,e.radius,0,7); ctx.fill();
     ctx.shadowBlur = 0;
     // hp bar for elites/boss
@@ -1272,7 +1588,7 @@ function render(){
   // bullets
   for(const b of bullets){
     ctx.beginPath();
-    ctx.fillStyle = b.color; ctx.shadowColor = b.color; ctx.shadowBlur = 8;
+    ctx.fillStyle = b.color; ctx.shadowColor = b.color; ctx.shadowBlur = glow(8);
     ctx.arc(b.x,b.y,b.radius,0,7); ctx.fill();
   }
   ctx.shadowBlur = 0;
@@ -1287,7 +1603,7 @@ function render(){
 
   // player
   ctx.beginPath();
-  ctx.fillStyle = "#fff"; ctx.shadowColor = "#b98cff"; ctx.shadowBlur = 16;
+  ctx.fillStyle = "#fff"; ctx.shadowColor = "#b98cff"; ctx.shadowBlur = glow(16);
   ctx.arc(player.x,player.y,player.radius,0,7); ctx.fill();
   ctx.shadowBlur = 0;
   ctx.beginPath(); ctx.strokeStyle="#b98cff"; ctx.lineWidth=2; ctx.arc(player.x,player.y,player.radius+4,0,7); ctx.stroke();
@@ -1415,9 +1731,14 @@ function renderStatsScreen(){
 document.getElementById('btnNewRun').onclick = startRun;
 document.getElementById('btnMeta').onclick = ()=>{ setState('meta'); renderMetaScreen(); show('screen-meta'); };
 document.getElementById('btnStats').onclick = ()=>{ setState('stats'); renderStatsScreen(); show('screen-stats'); };
+document.getElementById('btnSettings').onclick = ()=>{ setState('settings'); openSettings('menu'); };
+document.getElementById('btnPauseSettings').onclick = ()=>{ openSettings('pause'); };
 document.getElementById('btnReset').onclick = ()=>{
   if(confirm("Reset all Soul and meta progression? This cannot be undone.")){
-    save = JSON.parse(JSON.stringify(DEFAULT_SAVE)); persistSave(); refreshSoulBadges();
+    const keepSettings = save.settings;
+    save = JSON.parse(JSON.stringify(DEFAULT_SAVE));
+    save.settings = keepSettings; // settings (controls/video/sound) are not part of "progression"
+    persistSave(); refreshSoulBadges();
   }
 };
 document.getElementById('metaBack').onclick = goMenu;
