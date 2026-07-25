@@ -573,9 +573,38 @@ async function loadSave(){
   applySettings();
   refreshSoulBadges();
 }
+
+// Saving is the single most important reliability path in the game (it's
+// what makes "Continue Run" possible), so it gets its own small hardening
+// layer: overlapping calls are coalesced, and a failed write is retried a
+// couple of times with a short backoff instead of silently giving up.
+let saveInFlight = null;
+let savePending = false;
 async function persistSave(){
-  try{ await window.storage.set('ascension_save', JSON.stringify(save), false); }catch(e){ console.warn("save failed", e); }
+  if(saveInFlight){ savePending = true; return saveInFlight; }
+  saveInFlight = (async ()=>{
+    const payload = JSON.stringify(save);
+    let lastErr = null;
+    for(let attempt=0; attempt<3; attempt++){
+      try{
+        if(!window.storage) throw new Error("storage unavailable");
+        await window.storage.set('ascension_save', payload, false);
+        lastErr = null;
+        break;
+      }catch(e){
+        lastErr = e;
+        await new Promise(res=>setTimeout(res, 250*(attempt+1)));
+      }
+    }
+    if(lastErr) console.warn("save failed after retries", lastErr);
+  })();
+  try{ await saveInFlight; }
+  finally{
+    saveInFlight = null;
+    if(savePending){ savePending = false; persistSave(); }
+  }
 }
+
 function metaCost(def, currentLvl){ return Math.ceil(def.baseCost * Math.pow(def.costMult, currentLvl)); }
 function refreshSoulBadges(){
   document.getElementById('menuSoul').textContent = Math.floor(save.soul);
@@ -751,9 +780,28 @@ window.addEventListener('keydown', e=>{
 window.addEventListener('keyup', e=>{ keys[e.key.toLowerCase()] = false; });
 
 function togglePause(){
-  if(state==='playing'){ setState('paused'); SFX.stopHeartbeat(); show('screen-pause'); }
+  if(state==='playing'){ setState('paused'); SFX.stopHeartbeat(); show('screen-pause'); doAutosave(false); }
   else if(state==='paused'){ hideAll(); setState('playing'); }
 }
+
+/* =========================================================================
+   RELIABLE SAVING ACROSS DEVICES/TABS  — a periodic autosave during play is
+   the main safety net (wired into the main loop below); these listeners
+   catch the moments a mobile browser can kill the page without warning:
+   switching apps, locking the screen, or closing the tab. `pagehide` and
+   `visibilitychange` are used (rather than `beforeunload`, which mobile
+   Safari/Chrome often never fire) because they're the combination recommended
+   for reliably detecting a page going away on phones and tablets.
+   ========================================================================= */
+
+function saveOnExitIfNeeded(){
+  if(state==='playing' || state==='paused'){ doAutosave(false); }
+}
+document.addEventListener('visibilitychange', ()=>{
+  if(document.visibilityState==='hidden') saveOnExitIfNeeded();
+});
+window.addEventListener('pagehide', saveOnExitIfNeeded);
+window.addEventListener('blur', saveOnExitIfNeeded); // extra safety net on older mobile browsers
 
 /* =========================================================================
    SETTINGS  (Controls / Video / Sound — all persisted in save.settings)
@@ -1021,6 +1069,16 @@ const SFX = (()=>{
     uiClick(){ tone({freq:340, dur:0.05, type:'square', gain:0.07}); },
     death(){ tone({freq:220, slideTo:40, dur:1.2, type:'sawtooth', gain:0.19}); },
     runStart(){ tone({freq:260, slideTo:520, dur:0.25, type:'triangle', gain:0.11}); },
+    achievement(){
+      // A bright, distinct fanfare — separate from the level-up chime — so an
+      // unlock actually feels like an event: a rising major arpeggio (C-E-G-C),
+      // a shimmering top note, and a little sparkle of filtered noise on top.
+      const notes = [523.25, 659.25, 783.99, 1046.5];
+      notes.forEach((f,i)=>tone({freq:f, dur:0.22, type:'triangle', gain:0.15, delay:i*0.07}));
+      tone({freq:1568, dur:0.4, type:'sine', gain:0.09, delay:0.3});
+      tone({freq:2093, dur:0.3, type:'sine', gain:0.05, delay:0.34});
+      noise({dur:0.3, gain:0.06, delay:0.06, filterFreq:5000});
+    },
     startHeartbeat(){
       if(heartbeatTimer) return;
       heartbeatTimer = setInterval(()=>{ tone({freq:70, dur:0.09, type:'sine', gain:0.09}); }, 700);
@@ -1518,7 +1576,8 @@ function showAchievementToast(a){
   layer.appendChild(el);
   setTimeout(()=>el.remove(), 4000);
   logEvent("Achievement: " + a.name);
-  SFX.uiClick();
+  SFX.achievement();
+  vibrate([0,30,60,30]);
 }
 
 /* =========================================================================
@@ -1769,6 +1828,11 @@ function loop(now){
     checkAchievements();
     updateJuice(dt);
     refreshHud();
+
+    // Periodic autosave — this is what makes "Continue Run" actually work if
+    // the tab/app is closed unexpectedly instead of via the Quit button.
+    autosaveTimer -= dt;
+    if(autosaveTimer<=0){ doAutosave(true); autosaveTimer = AUTOSAVE_INTERVAL; }
   }
   if(state==="playing" || state==="levelup" || state==="paused" || state==="dead"){
     render();
@@ -1878,6 +1942,7 @@ function renderAchievementsScreen(){
    ========================================================================= */
 
 document.getElementById('btnNewRun').onclick = startRun;
+document.getElementById('btnContinue').onclick = continueRun;
 document.getElementById('btnMeta').onclick = ()=>{ setState('meta'); renderMetaScreen(); show('screen-meta'); };
 document.getElementById('btnStats').onclick = ()=>{ setState('stats'); renderStatsScreen(); show('screen-stats'); };
 document.getElementById('btnAchievements').onclick = ()=>{ setState('achievements'); renderAchievementsScreen(); show('screen-achievements'); };
@@ -1888,7 +1953,7 @@ document.getElementById('btnReset').onclick = ()=>{
     const keepSettings = save.settings;
     save = JSON.parse(JSON.stringify(DEFAULT_SAVE));
     save.settings = keepSettings; // settings (controls/video/sound) are not part of "progression"
-    persistSave(); refreshSoulBadges();
+    persistSave(); refreshSoulBadges(); updateContinueButton();
   }
 };
 document.getElementById('metaBack').onclick = goMenu;
@@ -1896,7 +1961,7 @@ document.getElementById('statsBack').onclick = goMenu;
 document.getElementById('achBack').onclick = goMenu;
 document.getElementById('pauseBtn').onclick = togglePause;
 document.getElementById('btnResume').onclick = ()=>{ hideAll(); setState('playing'); };
-document.getElementById('btnQuitRun').onclick = goMenu;
+document.getElementById('btnQuitRun').onclick = quitRun;
 document.getElementById('btnAgain').onclick = startRun;
 document.getElementById('btnToMenu').onclick = goMenu;
 
