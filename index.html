@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#08090d">
-<title>PROJECT: ASCENSIЁN</title>
+<title>PROJECT: ASCENSION</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
 <style>
@@ -214,6 +214,22 @@
     .setting-row{padding:12px 14px;}
     .slider-row{width:150px;}
   }
+
+  /* ---------- Boss / mini-boss warning ---------- */
+  #bossWarning{position:absolute; inset:0; z-index:30; display:flex; align-items:center; justify-content:center; flex-direction:column; pointer-events:none; opacity:0;}
+  #bossWarning.show{animation: bwFade 4.2s ease forwards;}
+  #bossWarning .bw-vignette{position:absolute; inset:0; background:radial-gradient(ellipse at center, rgba(255,20,20,0) 42%, rgba(140,10,10,0.4) 100%); animation: bwPulse 0.7s ease-in-out infinite;}
+  #bossWarning .bw-text{position:relative; font-family:'JetBrains Mono',monospace; font-weight:700; font-size:15px; letter-spacing:8px; color:#ff5f6d; text-shadow:0 0 20px rgba(255,60,60,0.8); animation: bwGlitch 0.2s steps(2) infinite;}
+  #bossWarning .bw-name{position:relative; font-family:'Rajdhani',sans-serif; font-weight:700; font-size:clamp(34px,6vw,64px); letter-spacing:4px; color:#fff; text-shadow:0 0 30px rgba(255,60,60,0.9); margin-top:8px; text-align:center;}
+  @keyframes bwFade{0%{opacity:0;} 8%{opacity:1;} 85%{opacity:1;} 100%{opacity:0;}}
+  @keyframes bwPulse{0%,100%{opacity:0.5;} 50%{opacity:1;}}
+  @keyframes bwGlitch{0%{transform:translate(0,0);} 50%{transform:translate(2px,-1px);} 100%{transform:translate(-2px,1px);}}
+
+  .elite-toast{border-color:#ff8a4d !important; box-shadow:0 10px 30px rgba(0,0,0,0.5), 0 0 24px rgba(255,138,77,0.2) !important;}
+  .elite-toast .t-kicker{color:#ff8a4d !important;}
+
+  /* ---------- Victory screen ---------- */
+  #screen-victory .title{background:linear-gradient(180deg,#fff,#ffd479 140%); -webkit-background-clip:text; background-clip:text; color:transparent; text-shadow:0 0 70px rgba(255,179,71,0.35);}
 </style>
 </head>
 <body>
@@ -308,6 +324,21 @@
     </div>
   </div>
 
+  <!-- VICTORY -->
+  <div class="screen hidden" id="screen-victory">
+    <div class="veil"></div>
+    <div class="title-wrap" style="margin-bottom:8px;">
+      <div class="kicker">the machine is complete</div>
+      <div class="title" style="font-size:46px;">ASCENSION ACHIEVED</div>
+    </div>
+    <div class="stats-grid" id="victoryStats"></div>
+    <div class="soul-gain" id="victorySoulGain"></div>
+    <div class="menu-col">
+      <button class="btn primary" id="btnKeepPlaying">Keep Playing</button>
+      <button class="btn" id="btnVictoryMenu">Return to Base</button>
+    </div>
+  </div>
+
   <!-- META UPGRADES -->
   <div class="screen hidden" id="screen-meta">
     <div class="veil"></div>
@@ -393,11 +424,15 @@
       </div>
       <div class="settings-pane hidden" id="pane-audio">
         <div class="setting-row">
-          <div><div class="s-name">Master Volume</div><div class="s-desc">Overall volume for all in-game sound effects.</div></div>
+          <div><div class="s-name">SFX Volume</div><div class="s-desc">Volume for hit, weapon and UI sound effects.</div></div>
           <div class="slider-row"><input type="range" id="audioVolume" min="0" max="100" value="100"><span class="slider-val" id="audioVolumeVal">100</span></div>
         </div>
         <div class="setting-row">
-          <div><div class="s-name">Mute</div><div class="s-desc">Quickly silence all sound.</div></div>
+          <div><div class="s-name">Music Volume</div><div class="s-desc">Volume for the background music loop.</div></div>
+          <div class="slider-row"><input type="range" id="musicVolume" min="0" max="100" value="35"><span class="slider-val" id="musicVolumeVal">35</span></div>
+        </div>
+        <div class="setting-row">
+          <div><div class="s-name">Mute</div><div class="s-desc">Quickly silence all sound, including music.</div></div>
           <div class="toggle-switch" id="audioMuted"><div class="knob"></div></div>
         </div>
       </div>
@@ -407,6 +442,12 @@
 </div>
 
 <div id="achToastLayer"></div>
+
+<div id="bossWarning">
+  <div class="bw-vignette"></div>
+  <div class="bw-text">⚠ INCOMING ⚠</div>
+  <div class="bw-name" id="bossWarningName">THE DRAGON</div>
+</div>
 
 <script>
 (() => {
@@ -418,56 +459,73 @@
    ========================================================================= */
 
 const ENEMIES = {
-  slime:   { name:"Slime",   hp:18,  speed:62,  radius:13, dmg:6,  xp:3, gold:1, brain:"chase",  color:"#7cff6b", glow:"#3f8c3a" },
-  bat:     { name:"Bat",     hp:10,  speed:105, radius:9,  dmg:4,  xp:2, gold:1, brain:"chase",  color:"#c9a6ff", glow:"#6a4a9c" },
-  zombie:  { name:"Zombie",  hp:42,  speed:40,  radius:16, dmg:10, xp:5, gold:2, brain:"chase",  color:"#9bd66b", glow:"#4b6e2f" },
-  ghost:   { name:"Ghost",   hp:26,  speed:70,  radius:12, dmg:7,  xp:4, gold:2, brain:"keep_distance_shoot", color:"#8fd8ff", glow:"#3d6b82" },
-  wolf:    { name:"Wolf",    hp:22,  speed:150, radius:12, dmg:8,  xp:4, gold:2, brain:"chase",  color:"#c4c9d6", glow:"#4a4e5c" },
-  imp:     { name:"Imp",     hp:14,  speed:100, radius:9,  dmg:5,  xp:3, gold:1, brain:"chase",  splits:true, color:"#ff7a4d", glow:"#7a2f0f" },
-  wraith:  { name:"Wraith",  hp:34,  speed:90,  radius:13, dmg:9,  xp:5, gold:3, brain:"charge", color:"#7a5cff", glow:"#3a2a70" },
-  harpy:   { name:"Harpy",   hp:20,  speed:130, radius:11, dmg:6,  xp:4, gold:2, brain:"swarm",  color:"#ffe15c", glow:"#7a6a1c" },
-  witch:   { name:"Witch",   hp:48,  speed:55,  radius:14, dmg:6,  xp:8, gold:4, brain:"summon", color:"#e678ff", glow:"#6b1c82" },
-  ogre:    { name:"Ogre",    hp:260, speed:48,  radius:24, dmg:20, xp:26, gold:14, brain:"chase", elite:true, color:"#ffb347", glow:"#8a5a1c" },
-  golem:   { name:"Golem",   hp:520, speed:30,  radius:28, dmg:24, xp:34, gold:18, brain:"chase", elite:true, color:"#8a8f9e", glow:"#3a3d47" },
-  dragon:  { name:"Dragon",  hp:5200, speed:34, radius:46, dmg:34, xp:400, gold:220, brain:"boss",   boss:true, color:"#ff4d5e", glow:"#6b1c22" },
-  wyvern:  { name:"Wyvern",  hp:8200, speed:40, radius:44, dmg:38, xp:600, gold:320, brain:"wyvern", boss:true, color:"#ff9d4d", glow:"#7a3d0f" },
+  slime:    { name:"Slime",    hp:18,   speed:62,  radius:13, dmg:6,  xp:3,   gold:1,   brain:"chase",               color:"#7cff6b", glow:"#3f8c3a" },
+  bat:      { name:"Bat",      hp:10,   speed:105, radius:9,  dmg:4,  xp:2,   gold:1,   brain:"chase",               color:"#c9a6ff", glow:"#6a4a9c" },
+  spider:   { name:"Spider",   hp:9,    speed:190, radius:8,  dmg:4,  xp:2,   gold:1,   brain:"chase",               color:"#ff6ec7", glow:"#7a1c52" },
+  zombie:   { name:"Zombie",   hp:42,   speed:40,  radius:16, dmg:10, xp:5,   gold:2,   brain:"chase",               color:"#9bd66b", glow:"#4b6e2f" },
+  ghost:    { name:"Ghost",    hp:26,   speed:70,  radius:12, dmg:7,  xp:4,   gold:2,   brain:"keep_distance_shoot", color:"#8fd8ff", glow:"#3d6b82" },
+  wolf:     { name:"Wolf",     hp:22,   speed:150, radius:12, dmg:8,  xp:4,   gold:2,   brain:"chase",               color:"#c4c9d6", glow:"#4a4e5c" },
+  imp:      { name:"Imp",      hp:14,   speed:100, radius:9,  dmg:5,  xp:3,   gold:1,   brain:"chase",  splits:true, color:"#ff7a4d", glow:"#7a2f0f" },
+  wraith:   { name:"Wraith",   hp:34,   speed:90,  radius:13, dmg:9,  xp:5,   gold:3,   brain:"charge",              color:"#7a5cff", glow:"#3a2a70" },
+  harpy:    { name:"Harpy",    hp:20,   speed:130, radius:11, dmg:6,  xp:4,   gold:2,   brain:"swarm",               color:"#ffe15c", glow:"#7a6a1c" },
+  witch:    { name:"Witch",    hp:48,   speed:55,  radius:14, dmg:6,  xp:8,   gold:4,   brain:"summon",              color:"#e678ff", glow:"#6b1c82" },
+  banshee:  { name:"Banshee",  hp:30,   speed:78,  radius:12, dmg:8,  xp:5,   gold:3,   brain:"keep_distance_shoot", color:"#c9ffea", glow:"#2f7a63" },
+  revenant: { name:"Revenant", hp:64,   speed:88,  radius:15, dmg:14, xp:7,   gold:4,   brain:"charge",              color:"#ff9d9d", glow:"#7a1c1c" },
+  ogre:     { name:"Ogre",     hp:260,  speed:48,  radius:24, dmg:20, xp:26,  gold:14,  brain:"chase", elite:true,   color:"#ffb347", glow:"#8a5a1c" },
+  golem:    { name:"Golem",    hp:520,  speed:30,  radius:28, dmg:24, xp:34,  gold:18,  brain:"chase", elite:true,   color:"#8a8f9e", glow:"#3a3d47" },
+  shade:    { name:"Shade",    hp:190,  speed:135, radius:18, dmg:17, xp:30,  gold:16,  brain:"chase", elite:true,   color:"#2c2140", glow:"#8f5cff" },
+  dragon:   { name:"Dragon",   hp:5200, speed:34,  radius:46, dmg:34, xp:400, gold:220, brain:"boss",    boss:true,  color:"#ff4d5e", glow:"#6b1c22" },
+  wyvern:   { name:"Wyvern",   hp:8200, speed:40,  radius:44, dmg:38, xp:600, gold:320, brain:"wyvern",  boss:true,  color:"#ff9d4d", glow:"#7a3d0f" },
+  lich:     { name:"Lich",     hp:6800, speed:36,  radius:42, dmg:28, xp:480, gold:260, brain:"lich",    boss:true,  color:"#c86bff", glow:"#4a1c6b" },
+  overlord: { name:"Overlord", hp:16000,speed:40,  radius:52, dmg:42, xp:1000,gold:500, brain:"overlord",boss:true,  color:"#ff2d4d", glow:"#3a0a12", final:true },
 };
 
+const FINAL_BOSS_ID = "overlord"; // defeating this boss triggers win()
+
 const BOSS_INTROS = {
-  dragon: "★ THE DRAGON HAS AWOKEN ★",
-  wyvern: "★ THE WYVERN DESCENDS ★",
+  dragon:   "★ THE DRAGON HAS AWOKEN ★",
+  wyvern:   "★ THE WYVERN DESCENDS ★",
+  lich:     "★ THE LICH STIRS FROM ITS TOMB ★",
+  overlord: "★ THE OVERLORD HAS ARRIVED ★",
 };
 
 const WAVES = [
-  { t:0,   ids:["slime","bat"],                              interval:1.10, mult:1.00 },
-  { t:60,  ids:["slime","bat","zombie","wolf"],               interval:0.85, mult:1.10 },
-  { t:150, ids:["zombie","ghost","bat","wraith"],             interval:0.65, mult:1.35, elite:true, eliteIds:["ogre"], eliteEvery:35 },
-  { t:260, ids:["zombie","ghost","wraith","harpy","imp"],     interval:0.55, mult:1.55, elite:true, eliteIds:["ogre"], eliteEvery:26 },
-  { t:300, ids:["zombie","ghost","ogre","imp"],               interval:0.5,  mult:1.65, elite:true, eliteIds:["ogre"], eliteEvery:22, boss:true, bossId:"dragon", bossT:300 },
-  { t:480, ids:["ghost","ogre","zombie","witch","harpy"],     interval:0.4,  mult:2.1,  elite:true, eliteIds:["ogre","golem"], eliteEvery:16 },
-  { t:700, ids:["ghost","golem","witch","wraith","imp"],      interval:0.35, mult:2.5,  elite:true, eliteIds:["golem"], eliteEvery:14 },
-  { t:900, ids:["golem","witch","harpy","wraith","zombie"],   interval:0.3,  mult:2.9,  elite:true, eliteIds:["golem"], eliteEvery:12, boss:true, bossId:"wyvern", bossT:900 },
+  { t:0,    ids:["slime","bat"],                                            interval:1.10, mult:1.00 },
+  { t:60,   ids:["slime","bat","zombie","wolf","spider"],                   interval:0.85, mult:1.10 },
+  { t:150,  ids:["zombie","ghost","bat","wraith","spider"],                 interval:0.65, mult:1.35, elite:true, eliteIds:["ogre"],         eliteEvery:35 },
+  { t:260,  ids:["zombie","ghost","wraith","harpy","imp","banshee"],        interval:0.55, mult:1.55, elite:true, eliteIds:["ogre"],         eliteEvery:26 },
+  { t:300,  ids:["zombie","ghost","ogre","imp","banshee"],                  interval:0.5,  mult:1.65, elite:true, eliteIds:["ogre"],         eliteEvery:22, boss:true, bossId:"dragon", bossT:300 },
+  { t:480,  ids:["ghost","ogre","zombie","witch","harpy","banshee"],        interval:0.4,  mult:2.1,  elite:true, eliteIds:["ogre","golem"], eliteEvery:16 },
+  { t:650,  ids:["ghost","golem","witch","wraith","imp","revenant"],        interval:0.35, mult:2.4,  elite:true, eliteIds:["golem","shade"],eliteEvery:14, boss:true, bossId:"lich", bossT:700 },
+  { t:900,  ids:["golem","witch","harpy","wraith","zombie","revenant"],     interval:0.3,  mult:2.9,  elite:true, eliteIds:["golem","shade"],eliteEvery:12, boss:true, bossId:"wyvern", bossT:900 },
+  { t:1150, ids:["golem","witch","wraith","revenant","banshee","harpy"],    interval:0.26, mult:3.4,  elite:true, eliteIds:["golem","shade"],eliteEvery:10 },
+  { t:1400, ids:["golem","revenant","witch","shade","wraith"],              interval:0.22, mult:3.9,  elite:true, eliteIds:["golem","shade"],eliteEvery:8,  boss:true, bossId:"overlord", bossT:1500 },
 ];
 
 const PHASES = [
-  { t:0,   name:"DISCOVERY" },
-  { t:180, name:"BUILD FORMATION" },
-  { t:600, name:"POWER FANTASY" },
-  { t:1200,name:"PRESSURE" },
-  { t:1800,name:"THE TEST" },
+  { t:0,    name:"DISCOVERY" },
+  { t:180,  name:"BUILD FORMATION" },
+  { t:400,  name:"ESCALATION" },
+  { t:650,  name:"THE LICH STIRS" },
+  { t:900,  name:"POWER FANTASY" },
+  { t:1150, name:"PRESSURE" },
+  { t:1400, name:"THE OVERLORD RISES" },
+  { t:1800, name:"THE FINAL STAND" },
 ];
 
 // Weapon pipeline: Weapon -> Projectile -> Modifiers -> Events. All numeric,
 // all data. fire() below is the one generic interpreter for every weapon id.
 const WEAPONS = {
-  sword:     { name:"Sword",          icon:"⚔",  kind:"melee",     base:{dmg:14, cd:0.85, radius:74, pierce:99}, perLvl:{dmg:6, radius:5} },
-  bow:       { name:"Bow",            icon:"🏹",  kind:"projectile",base:{dmg:9,  cd:0.55, speed:520, pierce:1, count:1}, perLvl:{dmg:4, count:0.34} },
-  magic:     { name:"Orb",            icon:"🔮",  kind:"homing",    base:{dmg:7,  cd:0.9,  speed:300, pierce:3, count:1}, perLvl:{dmg:3, pierce:1} },
-  laser:     { name:"Laser",          icon:"🔺",  kind:"beam",      base:{dps:26, cd:0,    range:340, tick:0.2}, perLvl:{dps:11} },
-  chain:     { name:"Chain Lightning",icon:"⚡",  kind:"chain",     base:{dmg:10, cd:1.1,  jumps:3, jumpRange:260}, perLvl:{dmg:4, jumps:0.5} },
-  orbit:     { name:"Blade Orbit",    icon:"🗡",  kind:"orbit",     base:{dmg:9,  count:2, radius:90, speed:2.6, hitCd:0.35}, perLvl:{dmg:3, count:0.5} },
-  boomerang: { name:"Boomerang",      icon:"🪃",  kind:"boomerang", base:{dmg:13, cd:1.3,  speed:420, range:340, pierce:5}, perLvl:{dmg:5, range:22} },
-  nova:      { name:"Nova",           icon:"💠",  kind:"nova",      base:{dmg:22, cd:2.6,  radius:130}, perLvl:{dmg:9, radius:9} },
+  sword:       { name:"Sword",          icon:"⚔",  kind:"melee",     base:{dmg:14, cd:0.85, radius:74, pierce:99}, perLvl:{dmg:6, radius:5} },
+  bow:         { name:"Bow",            icon:"🏹",  kind:"projectile",base:{dmg:9,  cd:0.55, speed:520, pierce:1, count:1}, perLvl:{dmg:4, count:0.34} },
+  magic:       { name:"Orb",            icon:"🔮",  kind:"homing",    base:{dmg:7,  cd:0.9,  speed:300, pierce:3, count:1}, perLvl:{dmg:3, pierce:1} },
+  laser:       { name:"Laser",          icon:"🔺",  kind:"beam",      base:{dps:26, cd:0,    range:340, tick:0.2}, perLvl:{dps:11} },
+  chain:       { name:"Chain Lightning",icon:"⚡",  kind:"chain",     base:{dmg:10, cd:1.1,  jumps:3, jumpRange:260}, perLvl:{dmg:4, jumps:0.5} },
+  orbit:       { name:"Blade Orbit",    icon:"🗡",  kind:"orbit",     base:{dmg:9,  count:2, radius:90, speed:2.6, hitCd:0.35}, perLvl:{dmg:3, count:0.5} },
+  boomerang:   { name:"Boomerang",      icon:"🪃",  kind:"boomerang", base:{dmg:13, cd:1.3,  speed:420, range:340, pierce:5}, perLvl:{dmg:5, range:22} },
+  nova:        { name:"Nova",           icon:"💠",  kind:"nova",      base:{dmg:22, cd:2.6,  radius:130}, perLvl:{dmg:9, radius:9} },
+  flamethrower:{ name:"Flamethrower",   icon:"🔥",  kind:"cone",      base:{dps:20, cd:0, range:190, tick:0.15, coneAngle:1.05}, perLvl:{dps:9, range:12} },
+  railgun:     { name:"Railgun",        icon:"🎯",  kind:"projectile",base:{dmg:36, cd:1.6,  speed:900, pierce:6, count:1}, perLvl:{dmg:15, pierce:1} },
 };
 
 const UPGRADES = [
@@ -485,6 +543,10 @@ const UPGRADES = [
     show:(p)=>!p.weapons.boomerang, apply:(p)=>{p.weapons.boomerang=1;} },
   { id:"get_nova",   name:"Nova", icon:"💠", tag:"NEW WEAPON", desc:"Unlocks a shockwave that periodically detonates around you.",
     show:(p)=>!p.weapons.nova, apply:(p)=>{p.weapons.nova=1;} },
+  { id:"get_flamethrower", name:"Flamethrower", icon:"🔥", tag:"NEW WEAPON", desc:"Unlocks a continuous cone of fire in front of the nearest enemy.",
+    show:(p)=>!p.weapons.flamethrower, apply:(p)=>{p.weapons.flamethrower=1;} },
+  { id:"get_railgun", name:"Railgun", icon:"🎯", tag:"NEW WEAPON", desc:"Unlocks a slow, devastating shot that pierces almost everything in its path.",
+    show:(p)=>!p.weapons.railgun, apply:(p)=>{p.weapons.railgun=1;} },
   { id:"lvl_sword",  name:"Sword Mastery", icon:"⚔", tag:"WEAPON LVL", desc:"Sword deals more damage and sweeps a wider radius.",
     show:(p)=>p.weapons.sword && p.weapons.sword<8, apply:(p)=>{p.weapons.sword++;} },
   { id:"lvl_bow",    name:"Bow Mastery", icon:"🏹", tag:"WEAPON LVL", desc:"Bow hits harder and gains an extra arrow.",
@@ -501,6 +563,10 @@ const UPGRADES = [
     show:(p)=>p.weapons.boomerang && p.weapons.boomerang<8, apply:(p)=>{p.weapons.boomerang++;} },
   { id:"lvl_nova",   name:"Nova Mastery", icon:"💠", tag:"WEAPON LVL", desc:"Nova deals more damage in a wider radius.",
     show:(p)=>p.weapons.nova && p.weapons.nova<8, apply:(p)=>{p.weapons.nova++;} },
+  { id:"lvl_flamethrower", name:"Inferno Mastery", icon:"🔥", tag:"WEAPON LVL", desc:"Flamethrower burns harder and reaches further.",
+    show:(p)=>p.weapons.flamethrower && p.weapons.flamethrower<8, apply:(p)=>{p.weapons.flamethrower++;} },
+  { id:"lvl_railgun", name:"Railgun Mastery", icon:"🎯", tag:"WEAPON LVL", desc:"Railgun hits harder and pierces even more enemies.",
+    show:(p)=>p.weapons.railgun && p.weapons.railgun<8, apply:(p)=>{p.weapons.railgun++;} },
   { id:"dmg",   name:"Heavy Bullets", icon:"💥", tag:"STAT", desc:"+16% damage with all weapons.", apply:(p)=>{p.stats.dmgMult*=1.16;} },
   { id:"atkspd",name:"Rapid Fire", icon:"⚡", tag:"STAT", desc:"+14% attack speed with all weapons.", apply:(p)=>{p.stats.atkSpeedMult*=1.14;} },
   { id:"maxhp", name:"Vitality", icon:"❤", tag:"STAT", desc:"+20 max HP, heal to full.", apply:(p)=>{p.maxHp+=20; p.hp=p.maxHp;} },
@@ -509,6 +575,9 @@ const UPGRADES = [
   { id:"armor", name:"Iron Skin", icon:"🛡", tag:"STAT", desc:"-1.2 flat damage taken (min 1).", apply:(p)=>{p.stats.armor+=1.2;} },
   { id:"regen", name:"Regeneration", icon:"✚", tag:"STAT", desc:"+0.6 HP regenerated per second.", apply:(p)=>{p.stats.regen+=0.6;} },
   { id:"greed", name:"Greed", icon:"🪙", tag:"STAT", desc:"+25% gold gained this run.", apply:(p)=>{p.stats.goldMult*=1.25;} },
+  { id:"lifesteal", name:"Bloodthirst", icon:"🩸", tag:"STAT", desc:"Heal for 3% of all damage you deal.", apply:(p)=>{p.stats.lifesteal+=0.03;} },
+  { id:"fortune", name:"Fortune", icon:"🍀", tag:"STAT", desc:"+20% experience gained from orbs.", apply:(p)=>{p.stats.xpMult*=1.2;} },
+  { id:"crit", name:"Precision", icon:"🎯", tag:"STAT", desc:"+8% chance to critically strike for 80% bonus damage.", apply:(p)=>{p.stats.critChance=Math.min(0.6,p.stats.critChance+0.08);} },
 ];
 
 const META_UPGRADES = [
@@ -552,7 +621,7 @@ const ACHIEVEMENTS = [
 
 const DEFAULT_SAVE = { soul:0, metaLevels:{}, lifetime:{ runs:0, kills:0, deaths:0, bestTime:0, bestLevel:0, totalGold:0, totalSoul:0, eliteKills:0, bossKills:0 }, activeRun:null,
   achievements:{ unlocked:{} },
-  settings:{ muted:false, sfxVolume:1, controlMode:'auto', joystickSide:'left', haptics:true, quality:'high', screenShake:true } };
+  settings:{ muted:false, sfxVolume:1, musicVolume:0.35, controlMode:'auto', joystickSide:'left', haptics:true, quality:'high', screenShake:true } };
 let save = JSON.parse(JSON.stringify(DEFAULT_SAVE));
 
 async function loadSave(){
@@ -639,6 +708,7 @@ let keys = {};
 let touchVec = {x:0, y:0}; // filled by the virtual joystick; (0,0) when untouched or on keyboard
 let chainArcs = [], novaPulses = [];
 let spawnedBossIds = new Set();
+let warnedBossIds = new Set(); // tracks which bosses have already shown their pre-fight warning
 const AUTOSAVE_INTERVAL = 6; // seconds between full-state autosaves
 let autosaveTimer = AUTOSAVE_INTERVAL;
 let appliedKills = 0, appliedGold = 0; // portion of this run's kills/gold already folded into lifetime stats
@@ -646,7 +716,8 @@ let eliteKillsRun = 0, bossKilledRun = false; // this run's achievement-relevant
 let appliedEliteKills = 0, appliedBossFolded = false; // same "applied cursor" pattern as appliedKills/appliedGold
 
 function freshStats(){
-  return { dmgMult:1, atkSpeedMult:1, moveSpeed:230, pickupRadius:70, armor:0, regen:0, goldMult:1 };
+  return { dmgMult:1, atkSpeedMult:1, moveSpeed:230, pickupRadius:70, armor:0, regen:0, goldMult:1,
+    lifesteal:0, xpMult:1, critChance:0, critMult:1.8 };
 }
 
 function newPlayer(){
@@ -673,6 +744,7 @@ function startRun(){
   lastSpawn = 0; eliteTimer = 0;
   keys = {};
   spawnedBossIds = new Set();
+  warnedBossIds = new Set();
   appliedKills = 0; appliedGold = 0; autosaveTimer = AUTOSAVE_INTERVAL;
   eliteKillsRun = 0; bossKilledRun = false; appliedEliteKills = 0; appliedBossFolded = false;
   save.activeRun = null; persistSave();
@@ -681,6 +753,7 @@ function startRun(){
   document.getElementById('hud').classList.remove('hidden');
   logEvent("Run started.");
   SFX.runStart();
+  MUSIC.start();
 }
 
 function continueRun(){
@@ -700,6 +773,7 @@ function continueRun(){
   lastSpawn = 0; eliteTimer = 0;
   keys = {};
   spawnedBossIds = new Set(snap.bossesSpawned||[]);
+  warnedBossIds = new Set(snap.bossesSpawned||[]); // already-spawned bosses don't need re-warning
   appliedKills = snap.appliedKills!=null ? snap.appliedKills : killCount;
   appliedGold = snap.appliedGold!=null ? snap.appliedGold : Math.floor(player.gold);
   eliteKillsRun = snap.eliteKillsRun||0; bossKilledRun = !!snap.bossKilledRun;
@@ -710,6 +784,7 @@ function continueRun(){
   document.getElementById('hud').classList.remove('hidden');
   logEvent("Run resumed.");
   SFX.runStart();
+  MUSIC.start();
 }
 
 function quitRun(){
@@ -779,8 +854,8 @@ window.addEventListener('keydown', e=>{
 window.addEventListener('keyup', e=>{ keys[e.key.toLowerCase()] = false; });
 
 function togglePause(){
-  if(state==='playing'){ setState('paused'); SFX.stopHeartbeat(); show('screen-pause'); doAutosave(false); }
-  else if(state==='paused'){ hideAll(); setState('playing'); }
+  if(state==='playing'){ setState('paused'); SFX.stopHeartbeat(); MUSIC.stop(); show('screen-pause'); doAutosave(false); }
+  else if(state==='paused'){ hideAll(); setState('playing'); MUSIC.start(); }
 }
 
 /* =========================================================================
@@ -823,6 +898,7 @@ function shouldShowJoystick(){
 function applySettings(){
   SFX.setMuted(!!save.settings.muted);
   SFX.setVolume(save.settings.sfxVolume);
+  MUSIC.setVolume(save.settings.muted ? 0 : save.settings.musicVolume);
   quality = save.settings.quality;
   screenShakeOn = !!save.settings.screenShake;
   hapticsOn = !!save.settings.haptics;
@@ -914,6 +990,9 @@ function refreshSettingsUI(){
   const vol = Math.round(save.settings.sfxVolume*100);
   document.getElementById('audioVolume').value = vol;
   document.getElementById('audioVolumeVal').textContent = vol;
+  const mvol = Math.round(save.settings.musicVolume*100);
+  document.getElementById('musicVolume').value = mvol;
+  document.getElementById('musicVolumeVal').textContent = mvol;
 }
 
 let settingsReturnTo = 'menu'; // which screen to show on "Back"
@@ -949,9 +1028,6 @@ document.getElementById('ctrlHaptics').onclick = ()=>{
 document.getElementById('vidShake').onclick = ()=>{
   save.settings.screenShake = !save.settings.screenShake; persistSave(); applySettings(); refreshSettingsUI();
 };
-document.getElementById('audioMuted').onclick = ()=>{
-  save.settings.muted = !save.settings.muted; persistSave(); applySettings(); refreshSettingsUI();
-};
 document.getElementById('audioVolume').addEventListener('input', e=>{
   const v = Number(e.target.value);
   document.getElementById('audioVolumeVal').textContent = v;
@@ -959,6 +1035,16 @@ document.getElementById('audioVolume').addEventListener('input', e=>{
   SFX.setVolume(save.settings.sfxVolume);
 });
 document.getElementById('audioVolume').addEventListener('change', ()=>{ persistSave(); });
+document.getElementById('musicVolume').addEventListener('input', e=>{
+  const v = Number(e.target.value);
+  document.getElementById('musicVolumeVal').textContent = v;
+  save.settings.musicVolume = v/100;
+  if(!save.settings.muted) MUSIC.setVolume(save.settings.musicVolume);
+});
+document.getElementById('musicVolume').addEventListener('change', ()=>{ persistSave(); });
+document.getElementById('audioMuted').onclick = ()=>{
+  save.settings.muted = !save.settings.muted; persistSave(); applySettings(); refreshSettingsUI();
+};
 document.getElementById('muteBtnMenu').onclick = toggleMute;
 document.getElementById('muteBtnHud').onclick = toggleMute;
 document.getElementById('settingsBack').onclick = ()=>{
@@ -988,24 +1074,49 @@ function logEvent(text){
 }
 
 /* =========================================================================
+   AUDIO CORE — a single shared AudioContext + master DynamicsCompressor that
+   both SFX and MUSIC connect into. Routing everything through one compressor
+   keeps the overall mix balanced (nothing clips or gets buried) instead of
+   every synthesized sound fighting for headroom independently.
+   ========================================================================= */
+
+const AUDIO_CORE = (()=>{
+  let ctx = null, compressor = null;
+  function ensure(){
+    if(!ctx){
+      try{
+        ctx = new (window.AudioContext||window.webkitAudioContext)();
+        compressor = ctx.createDynamicsCompressor();
+        compressor.threshold.setValueAtTime(-20, ctx.currentTime);
+        compressor.knee.setValueAtTime(24, ctx.currentTime);
+        compressor.ratio.setValueAtTime(4, ctx.currentTime);
+        compressor.attack.setValueAtTime(0.003, ctx.currentTime);
+        compressor.release.setValueAtTime(0.25, ctx.currentTime);
+        compressor.connect(ctx.destination);
+      }catch(e){ ctx = null; compressor = null; }
+    }
+    if(ctx && ctx.state === 'suspended'){ ctx.resume().catch(()=>{}); }
+    return ctx;
+  }
+  return {
+    ensure(){ return ensure(); },
+    bus(){ return compressor; }, // connect any gain node here instead of ctx.destination
+    unlock(){ ensure(); },
+  };
+})();
+
+/* =========================================================================
    AUDIO — every sound is synthesized in-browser with the WebAudio API.
    No external files to load, so it works fully offline and the whole
    game stays a single self-contained document.
    ========================================================================= */
 
 const SFX = (()=>{
-  let ctx = null;
   let muted = false;
   let volume = 1; // 0..1 master volume, independent of the mute toggle
   let heartbeatTimer = null;
 
-  function ensureCtx(){
-    if(!ctx){
-      try{ ctx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ ctx = null; }
-    }
-    if(ctx && ctx.state === 'suspended'){ ctx.resume().catch(()=>{}); }
-    return ctx;
-  }
+  function ensureCtx(){ return AUDIO_CORE.ensure(); }
 
   function tone({freq=440, dur=0.12, type='sine', gain=0.16, slideTo=null, delay=0}={}){
     if(muted || volume<=0) return;
@@ -1020,7 +1131,7 @@ const SFX = (()=>{
     g.gain.setValueAtTime(0.0001, t0);
     g.gain.linearRampToValueAtTime(gain, t0+0.008);
     g.gain.exponentialRampToValueAtTime(0.0001, t0+dur);
-    osc.connect(g); g.connect(c.destination);
+    osc.connect(g); g.connect(AUDIO_CORE.bus());
     osc.start(t0); osc.stop(t0+dur+0.03);
   }
 
@@ -1038,7 +1149,7 @@ const SFX = (()=>{
     const g = c.createGain();
     g.gain.setValueAtTime(gain, t0);
     g.gain.exponentialRampToValueAtTime(0.0001, t0+dur);
-    src.connect(filt); filt.connect(g); g.connect(c.destination);
+    src.connect(filt); filt.connect(g); g.connect(AUDIO_CORE.bus());
     src.start(t0);
   }
 
@@ -1060,6 +1171,11 @@ const SFX = (()=>{
     kill(){ tone({freq:500, slideTo:150, dur:0.12, type:'sawtooth', gain:0.11}); },
     eliteKill(){ tone({freq:300, dur:0.2, type:'sawtooth', gain:0.15}); tone({freq:150, dur:0.3, type:'sine', gain:0.13, delay:0.05}); },
     bossSpawn(){ tone({freq:60, dur:0.9, type:'sawtooth', gain:0.2}); tone({freq:90, dur:0.9, type:'sine', gain:0.15, delay:0.1}); },
+    bossWarning(){
+      // A rising two-tone alarm — reads as a threat cue distinct from every other sound.
+      [0,0.5,1.0].forEach(d=>{ tone({freq:220, slideTo:440, dur:0.35, type:'sawtooth', gain:0.14, delay:d}); tone({freq:110, dur:0.35, type:'square', gain:0.1, delay:d}); });
+    },
+    eliteWarning(){ tone({freq:260, slideTo:180, dur:0.18, type:'square', gain:0.1}); tone({freq:180, slideTo:120, dur:0.22, type:'square', gain:0.08, delay:0.1}); },
     bossDeath(){ tone({freq:400, slideTo:40, dur:1.1, type:'sawtooth', gain:0.19}); },
     hurt(){ noise({dur:0.14, gain:0.15, filterFreq:600}); },
     pickupXp(){ tone({freq:700, slideTo:1000, dur:0.06, type:'sine', gain:0.07}); },
@@ -1068,6 +1184,12 @@ const SFX = (()=>{
     uiClick(){ tone({freq:340, dur:0.05, type:'square', gain:0.07}); },
     death(){ tone({freq:220, slideTo:40, dur:1.2, type:'sawtooth', gain:0.19}); },
     runStart(){ tone({freq:260, slideTo:520, dur:0.25, type:'triangle', gain:0.11}); },
+    victory(){
+      const notes = [392,523.25,659.25,783.99,1046.5,1318.5];
+      notes.forEach((f,i)=>tone({freq:f, dur:0.3, type:'triangle', gain:0.16, delay:i*0.11}));
+      tone({freq:1568, dur:0.6, type:'sine', gain:0.1, delay:notes.length*0.11});
+      noise({dur:0.4, gain:0.08, delay:0.1, filterFreq:6000});
+    },
     achievement(){
       // A bright, distinct fanfare — separate from the level-up chime — so an
       // unlock actually feels like an event: a rising major arpeggio (C-E-G-C),
@@ -1086,13 +1208,124 @@ const SFX = (()=>{
   };
 })();
 
+/* =========================================================================
+   MUSIC — a small procedurally-generated ambient/combat loop. No audio
+   files: a scheduled bass + arpeggio pattern (classic WebAudio lookahead
+   scheduler, so timing doesn't drift over a long run) that adds an extra
+   tense layer automatically while a boss is on screen. Shares AUDIO_CORE's
+   compressor with SFX so the two never fight each other for volume.
+   ========================================================================= */
+
+const MUSIC = (()=>{
+  let musicGain = null;
+  let volume = 0.35;
+  let playing = false;
+  let schedulerId = null;
+  let nextNoteTime = 0;
+  let step16 = 0;
+  let intense = false;
+
+  const TEMPO = 96; // bpm
+  const SEC_PER_16TH = 60/TEMPO/4;
+  const LOOKAHEAD_MS = 25;
+  const SCHEDULE_AHEAD = 0.15;
+  const ROOT = 55; // A1
+  // scale degrees (semitones above root) — minor pentatonic, moody but not sad
+  const SCALE = [0,3,5,7,10];
+  // bass line: scale-index per 16th step, -1 = rest
+  const BASS_PATTERN = [0,-1,-1,2, -1,-1,0,-1, 3,-1,-1,2, -1,1,-1,-1];
+  // arpeggio only plays while `intense` is true (boss on screen)
+  const ARP_PATTERN   = [4,-1,2,-1, 4,-1,3,-1, 4,-1,2,-1, 3,-1,2,-1];
+
+  function ensureGain(){
+    const c = AUDIO_CORE.ensure();
+    if(!c) return null;
+    if(!musicGain){
+      musicGain = c.createGain();
+      musicGain.gain.value = volume;
+      musicGain.connect(AUDIO_CORE.bus());
+    }
+    return c;
+  }
+
+  function degreeFreq(idx, octaveUp){
+    const deg = SCALE[idx % SCALE.length];
+    const oct = Math.floor(idx/SCALE.length) + (octaveUp?1:0);
+    return ROOT * Math.pow(2, (deg + oct*12)/12);
+  }
+
+  function playNote(c, time, freq, dur, type, peakGain){
+    const o = c.createOscillator();
+    const g = c.createGain();
+    o.type = type;
+    o.frequency.setValueAtTime(freq, time);
+    g.gain.setValueAtTime(0.0001, time);
+    g.gain.linearRampToValueAtTime(peakGain, time+0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, time+dur);
+    o.connect(g); g.connect(musicGain);
+    o.start(time); o.stop(time+dur+0.03);
+  }
+
+  function scheduleStep(c, time){
+    const bassIdx = BASS_PATTERN[step16];
+    if(bassIdx>=0) playNote(c, time, degreeFreq(bassIdx,false), SEC_PER_16TH*3.2, 'triangle', 0.55);
+    if(intense){
+      const arpIdx = ARP_PATTERN[step16];
+      if(arpIdx>=0) playNote(c, time, degreeFreq(arpIdx,true), SEC_PER_16TH*0.9, 'sine', 0.16);
+    }
+    // soft hi-hat tick every other step keeps the loop feeling alive at low volume
+    if(step16%2===0){
+      const g = c.createGain();
+      g.gain.setValueAtTime(0.05, time);
+      g.gain.exponentialRampToValueAtTime(0.0001, time+0.04);
+      const src = c.createBufferSource();
+      const buf = c.createBuffer(1, Math.floor(c.sampleRate*0.04), c.sampleRate);
+      const d = buf.getChannelData(0);
+      for(let i=0;i<d.length;i++) d[i] = Math.random()*2-1;
+      src.buffer = buf;
+      src.connect(g); g.connect(musicGain);
+      src.start(time);
+    }
+  }
+
+  function scheduler(){
+    const c = AUDIO_CORE.ensure(); if(!c) return;
+    while(nextNoteTime < c.currentTime + SCHEDULE_AHEAD){
+      scheduleStep(c, nextNoteTime);
+      nextNoteTime += SEC_PER_16TH;
+      step16 = (step16+1) % BASS_PATTERN.length;
+    }
+  }
+
+  return {
+    start(){
+      const c = ensureGain(); if(!c) return;
+      if(c.state==='suspended') c.resume().catch(()=>{});
+      if(playing) return;
+      playing = true; step16 = 0; nextNoteTime = c.currentTime + 0.1;
+      schedulerId = setInterval(scheduler, LOOKAHEAD_MS);
+    },
+    stop(){
+      playing = false;
+      if(schedulerId){ clearInterval(schedulerId); schedulerId = null; }
+    },
+    setVolume(v){
+      volume = clamp(v,0,1);
+      if(musicGain && AUDIO_CORE.ensure()){ musicGain.gain.setTargetAtTime(volume, AUDIO_CORE.ensure().currentTime, 0.08); }
+    },
+    setIntense(v){ intense = !!v; },
+    isPlaying(){ return playing; },
+  };
+})();
+
 // Browsers require a user gesture before audio can play — unlock on first input.
-window.addEventListener('pointerdown', ()=>SFX.unlock(), {once:true});
-window.addEventListener('keydown', ()=>SFX.unlock(), {once:true});
+window.addEventListener('pointerdown', ()=>{ SFX.unlock(); AUDIO_CORE.unlock(); }, {once:true});
+window.addEventListener('keydown', ()=>{ SFX.unlock(); AUDIO_CORE.unlock(); }, {once:true});
 
 function toggleMute(){
   const now = !SFX.isMuted();
   SFX.setMuted(now);
+  MUSIC.setVolume(now ? 0 : save.settings.musicVolume);
   save.settings.muted = now;
   persistSave();
   updateMuteButtons();
@@ -1138,6 +1371,8 @@ function spawnEnemy(id, forcedPos, overrides={}){
   return e;
 }
 
+const BOSS_WARNING_LEAD = 4; // seconds of warning before a boss actually spawns
+
 function updateSpawns(dt){
   const wave = currentWave();
   lastSpawn -= dt;
@@ -1149,16 +1384,46 @@ function updateSpawns(dt){
     eliteTimer -= dt;
     if(eliteTimer<=0){
       const eliteId = wave.eliteIds ? pick(wave.eliteIds) : "ogre";
-      spawnEnemy(eliteId); eliteTimer = wave.eliteEvery; logEvent("An elite draws near...");
+      spawnEnemy(eliteId); eliteTimer = wave.eliteEvery;
+      showEliteToast(eliteId);
     }
   }
-  if(wave.boss && wave.bossId && !enemies.some(e=>e.boss) && runTime>=wave.bossT && !spawnedBossIds.has(wave.bossId)){
-    spawnedBossIds.add(wave.bossId);
-    const ang = rand(0,Math.PI*2);
-    spawnEnemy(wave.bossId, { x: player.x+Math.cos(ang)*680, y: player.y+Math.sin(ang)*680 });
-    logEvent(BOSS_INTROS[wave.bossId] || `★ ${ENEMIES[wave.bossId].name.toUpperCase()} HAS AWOKEN ★`);
-    SFX.bossSpawn();
+  if(wave.boss && wave.bossId && !spawnedBossIds.has(wave.bossId)){
+    if(!warnedBossIds.has(wave.bossId) && runTime >= wave.bossT-BOSS_WARNING_LEAD){
+      warnedBossIds.add(wave.bossId);
+      showBossWarning(wave.bossId);
+    }
+    if(!enemies.some(e=>e.boss) && runTime>=wave.bossT){
+      spawnedBossIds.add(wave.bossId);
+      const ang = rand(0,Math.PI*2);
+      spawnEnemy(wave.bossId, { x: player.x+Math.cos(ang)*680, y: player.y+Math.sin(ang)*680 });
+      logEvent(BOSS_INTROS[wave.bossId] || `★ ${ENEMIES[wave.bossId].name.toUpperCase()} HAS AWOKEN ★`);
+      SFX.bossSpawn();
+    }
   }
+}
+
+function showBossWarning(bossId){
+  const overlay = document.getElementById('bossWarning');
+  document.getElementById('bossWarningName').textContent = ENEMIES[bossId].name.toUpperCase();
+  overlay.classList.remove('show');
+  void overlay.offsetWidth; // restart the CSS animation if triggered twice in a row
+  overlay.classList.add('show');
+  SFX.bossWarning();
+  vibrate([0,60,80,60,80,120]);
+  setTimeout(()=>overlay.classList.remove('show'), BOSS_WARNING_LEAD*1000+300);
+}
+
+function showEliteToast(eliteId){
+  const def = ENEMIES[eliteId];
+  const layer = document.getElementById('achToastLayer');
+  const el = document.createElement('div');
+  el.className = 'ach-toast elite-toast';
+  el.innerHTML = `<div class="t-icon">⚠</div><div><div class="t-kicker">MINI-BOSS INCOMING</div><div class="t-name">${def.name}</div></div>`;
+  layer.appendChild(el);
+  setTimeout(()=>el.remove(), 4000);
+  logEvent(`An elite ${def.name} draws near...`);
+  SFX.eliteWarning();
 }
 
 /* =========================================================================
@@ -1271,6 +1536,63 @@ function updateEnemies(dt){
         e.shootCd = 3.0;
         logEvent("Wyvern breathes fire!");
       }
+    } else if(e.brain==="lich"){
+      // Lich: keeps distance, periodically blinks away, and summons minions
+      // instead of relying on raw melee — a caster-boss, not a bruiser.
+      const desired = 340;
+      if(d<desired-20){ e.x -= (dx/d)*e.speed*dt; e.y -= (dy/d)*e.speed*dt; }
+      else if(d>desired+20){ e.x += (dx/d)*e.speed*dt; e.y += (dy/d)*e.speed*dt; }
+      e.summonCd -= dt; e.chargeCd -= dt; e.shootCd -= dt;
+      if(e.summonCd<=0 && enemies.length<160){
+        for(let i=0;i<2;i++){
+          const ang = rand(0,Math.PI*2);
+          spawnEnemy(pick(["revenant","shade"]), { x:e.x+Math.cos(ang)*50, y:e.y+Math.sin(ang)*50 });
+        }
+        e.summonCd = rand(6,8);
+        logEvent("The Lich raises the dead!");
+      }
+      if(e.chargeCd<=0){
+        // short-range teleport to break line of sight / re-establish distance
+        const ang = rand(0,Math.PI*2);
+        e.x = clamp(e.x+Math.cos(ang)*260, e.radius, WORLD.w-e.radius);
+        e.y = clamp(e.y+Math.sin(ang)*260, e.radius, WORLD.h-e.radius);
+        e.chargeCd = rand(5,7);
+        spawnParticle(e.x, e.y, e.color, 14);
+      }
+      if(e.shootCd<=0){
+        for(let a=0;a<6;a++){
+          const ang = (a/6)*Math.PI*2;
+          bullets.push({ owner:"enemy", x:e.x, y:e.y, vx:Math.cos(ang)*200, vy:Math.sin(ang)*200, dmg:e.dmg*0.65, radius:6, life:3.4, color:"#c86bff", pierce:0 });
+        }
+        e.shootCd = 2.4;
+      }
+    } else if(e.brain==="overlord"){
+      // Overlord (final boss): combines the wyvern's charge-dash with the
+      // dragon's radial burst and occasional reinforcements — a deliberate
+      // "greatest hits" finale rather than a brand new pattern to learn.
+      e.chargeCd -= dt; e.shootCd -= dt; e.summonCd -= dt;
+      if(e.chargeState==="charging"){
+        e.x += e.chargeDx*e.speed*2.6*dt; e.y += e.chargeDy*e.speed*2.6*dt;
+        if(d < e.radius+player.radius+12){ damagePlayer(e.dmg*1.3); e.chargeState="idle"; e.chargeCd=2.6; }
+        else if(e.chargeCd<=0){ e.chargeState="idle"; e.chargeCd=1.8; }
+      } else {
+        e.x += (dx/d)*e.speed*dt*0.6; e.y += (dy/d)*e.speed*dt*0.6;
+        if(e.chargeCd<=0){ e.chargeState="charging"; e.chargeDx=dx/d; e.chargeDy=dy/d; e.chargeCd=1.1; }
+      }
+      if(e.shootCd<=0){
+        for(let a=0;a<14;a++){
+          const ang = (a/14)*Math.PI*2;
+          bullets.push({ owner:"enemy", x:e.x, y:e.y, vx:Math.cos(ang)*250, vy:Math.sin(ang)*250, dmg:e.dmg*0.6, radius:7, life:3.6, color:"#ff2d4d", pierce:0 });
+        }
+        e.shootCd = 2.8;
+        logEvent("The Overlord unleashes its full wrath!");
+      }
+      if(e.summonCd<=0 && enemies.length<160){
+        const ang = rand(0,Math.PI*2);
+        spawnEnemy(pick(["shade","golem"]), { x:e.x+Math.cos(ang)*60, y:e.y+Math.sin(ang)*60 });
+        e.summonCd = rand(9,12);
+        logEvent("The Overlord calls reinforcements.");
+      }
     }
     e.x = clamp(e.x, e.radius, WORLD.w-e.radius);
     e.y = clamp(e.y, e.radius, WORLD.h-e.radius);
@@ -1314,6 +1636,36 @@ function weaponFire(wid, lvl, dt){
       }
       player.weaponTimers[wid+"_sfx"] = (player.weaponTimers[wid+"_sfx"]||0) - dt;
       if(player.weaponTimers[wid+"_sfx"]<=0){ SFX.laserHum(); player.weaponTimers[wid+"_sfx"] = 0.45; }
+    }
+    return;
+  }
+
+  if(def.kind==="cone"){
+    // Continuous cone of damage aimed at the nearest enemy — same tick
+    // rhythm as the beam, but hits everything inside an angular wedge
+    // instead of a single line, so it favours crowds over single targets.
+    const target = nearestEnemy(player.x, player.y, def.base.range);
+    player.coneAimAngle = target ? Math.atan2(target.y-player.y, target.x-player.x) : (player.coneAimAngle||0);
+    player.coneActive = !!target;
+    player.coneRange = def.base.range + (def.perLvl.range||0)*(lvl-1);
+    if(target){
+      player.weaponTimers[wid+"_tick"] = (player.weaponTimers[wid+"_tick"]||0) - dt;
+      if(player.weaponTimers[wid+"_tick"]<=0){
+        const dps = (def.base.dps + def.perLvl.dps*(lvl-1)) * player.stats.dmgMult;
+        const dmgTick = dps*def.base.tick;
+        const range = player.coneRange;
+        for(const e of enemies){
+          const edx = e.x-player.x, edy = e.y-player.y;
+          const ed = Math.hypot(edx,edy);
+          if(ed > range) continue;
+          const angTo = Math.atan2(edy,edx);
+          let diff = Math.abs(angTo - player.coneAimAngle);
+          if(diff > Math.PI) diff = Math.PI*2 - diff;
+          if(diff <= def.base.coneAngle/2){ dealDamage(e, dmgTick); }
+        }
+        player.weaponTimers[wid+"_tick"] = def.base.tick;
+        spawnParticle(player.x+Math.cos(player.coneAimAngle)*range*0.5, player.y+Math.sin(player.coneAimAngle)*range*0.5, "#ff9d4d", 2);
+      }
     }
     return;
   }
@@ -1471,9 +1823,12 @@ function updateBullets(dt){
 
 let lastHitSfxTime = -1;
 function dealDamage(enemy, dmg){
+  let crit = false;
+  if(player.stats.critChance>0 && Math.random()<player.stats.critChance){ dmg *= player.stats.critMult; crit = true; }
   enemy.hp -= dmg; enemy.hitFlash = 1;
   dpsWindow.push({ t: runTime, dmg });
-  spawnFloater(enemy.x, enemy.y-10, Math.round(dmg), enemy.elite||enemy.boss ? "#ffb347":"#fff");
+  spawnFloater(enemy.x, enemy.y-10, Math.round(dmg), crit ? "#ffe15c" : (enemy.elite||enemy.boss ? "#ffb347":"#fff"));
+  if(player.stats.lifesteal>0){ player.hp = Math.min(player.maxHp, player.hp + dmg*player.stats.lifesteal); }
   if(enemy.boss){ SFX.bossHit(); }
   else if(runTime - lastHitSfxTime > 0.04){ SFX.hit(); lastHitSfxTime = runTime; }
   if(enemy.hp<=0){ killEnemy(enemy); }
@@ -1498,6 +1853,7 @@ function killEnemy(enemy){
   if(enemy.boss){ logEvent(`★ THE ${ENEMIES[enemy.id].name.toUpperCase()} HAS FALLEN ★`); SFX.bossDeath(); }
   else if(enemy.elite){ logEvent("Elite defeated."); SFX.eliteKill(); }
   else { SFX.kill(); }
+  if(enemy.id===FINAL_BOSS_ID && state==='playing'){ setTimeout(win, 900); }
 }
 
 /* =========================================================================
@@ -1522,7 +1878,7 @@ function updateOrbs(dt){
 }
 
 function gainXp(v){
-  player.xp += v;
+  player.xp += v*player.stats.xpMult;
   while(player.xp >= player.xpNext){
     player.xp -= player.xpNext;
     player.level++;
@@ -1618,6 +1974,7 @@ function showLevelUpCards(){
 function die(){
   setState('dead');
   SFX.stopHeartbeat();
+  MUSIC.stop();
   SFX.death();
   applyRunStatsIncrement(true);
   save.activeRun = null; // run is over — nothing left to continue
@@ -1756,6 +2113,23 @@ function render(){
     ctx.shadowBlur = 0;
   }
 
+  // flamethrower cone
+  if(player.weapons.flamethrower && player.coneActive){
+    const def = WEAPONS.flamethrower;
+    const half = def.base.coneAngle/2;
+    const range = player.coneRange||def.base.range;
+    const ang = player.coneAimAngle||0;
+    ctx.beginPath();
+    ctx.moveTo(player.x, player.y);
+    ctx.arc(player.x, player.y, range, ang-half, ang+half);
+    ctx.closePath();
+    const grad = ctx.createRadialGradient(player.x,player.y,0,player.x,player.y,range);
+    grad.addColorStop(0, "rgba(255,157,77,0.45)");
+    grad.addColorStop(1, "rgba(255,77,60,0.02)");
+    ctx.fillStyle = grad;
+    ctx.fill();
+  }
+
   // enemies
   for(const e of enemies){
     ctx.beginPath();
@@ -1827,6 +2201,7 @@ function loop(now){
     checkAchievements();
     updateJuice(dt);
     refreshHud();
+    MUSIC.setIntense(enemies.some(e=>e.boss));
 
     // Periodic autosave — this is what makes "Continue Run" actually work if
     // the tab/app is closed unexpectedly instead of via the Quit button.
@@ -1852,6 +2227,7 @@ function setState(s){ state = s; if(s!=='playing' && s!=='levelup' && s!=='pause
 function goMenu(){
   setState('menu');
   SFX.stopHeartbeat();
+  MUSIC.stop();
   refreshSoulBadges();
   updateContinueButton();
   show('screen-menu');
@@ -1959,7 +2335,7 @@ document.getElementById('metaBack').onclick = goMenu;
 document.getElementById('statsBack').onclick = goMenu;
 document.getElementById('achBack').onclick = goMenu;
 document.getElementById('pauseBtn').onclick = togglePause;
-document.getElementById('btnResume').onclick = ()=>{ hideAll(); setState('playing'); };
+document.getElementById('btnResume').onclick = ()=>{ hideAll(); setState('playing'); MUSIC.start(); };
 document.getElementById('btnQuitRun').onclick = quitRun;
 document.getElementById('btnAgain').onclick = startRun;
 document.getElementById('btnToMenu').onclick = goMenu;
