@@ -68,7 +68,7 @@
 
   /* ---------- HUD ---------- */
   #hud{position:absolute; inset:0; z-index:5; pointer-events:none; font-family:'Rajdhani',sans-serif;}
-  .hud-top{position:absolute; top:0; left:0; right:0; display:flex; justify-content:space-between; align-items:flex-start; padding:16px 20px;}
+  .hud-top{position:absolute; top:0; left:0; right:0; z-index:8; display:flex; justify-content:space-between; align-items:flex-start; padding:16px 20px;}
   .hp-wrap{width:260px;}
   .bar-track{width:100%; height:16px; background:#1a1c24; border:1px solid var(--line); border-radius:3px; overflow:hidden; position:relative;}
   .bar-fill{height:100%; transition:width .12s linear;}
@@ -263,7 +263,7 @@
       <div class="timer"><span id="timerVal">00:00</span><span class="phase" id="phaseVal">DISCOVERY</span></div>
       <div style="display:flex; gap:8px;">
         <div class="pause-hint" id="fullscreenBtnHud" style="pointer-events:auto;">⛶</div>
-        <div class="pause-hint" id="pauseBtn" style="pointer-events:auto;">⏸ PAUSE (Esc)</div>
+        <div class="pause-hint" id="pauseBtn" style="pointer-events:auto;">⏸</div>
       </div>
     </div>
     <div class="event-log" id="eventLog"></div>
