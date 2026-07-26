@@ -237,6 +237,7 @@
       <button class="btn" id="btnMeta">Talent Tree</button>
       <button class="btn" id="btnStats">Statistics</button>
       <button class="btn" id="btnAchievements">Achievements <span id="achProgressChip" class="ach-chip"></span></button>
+      <button class="btn" id="btnArmory">Armory <span id="armoryChip" class="ach-chip"></span></button>
       <button class="btn" id="btnSettings">Settings</button>
       <button class="btn" id="btnReset" style="font-size:12px; opacity:0.5;">Reset Save</button>
     </div>
@@ -321,6 +322,13 @@
     <div class="back-link" id="achBack">← BACK TO BASE</div>
   </div>
 
+  <div class="screen hidden" id="screen-armory">
+    <div class="veil"></div>
+    <div class="title-wrap" style="margin-bottom:6px;"><div class="kicker">spend your artifacts</div><div class="title" style="font-size:38px;">ARMORY</div><div class="subtitle" id="armorySummary" style="margin-top:14px;"></div></div>
+    <div class="ach-wrap" id="armoryWrap"></div>
+    <div class="back-link" id="armoryBack">← BACK TO BASE</div>
+  </div>
+
   <div class="screen hidden" id="screen-event">
     <div class="veil"></div>
     <div class="title-wrap" style="margin-bottom:6px;"><div class="kicker" id="eventKicker">random event</div><div class="title" style="font-size:34px;" id="eventTitle">EVENT</div></div>
@@ -345,6 +353,8 @@
       <div class="settings-pane hidden" id="pane-video">
         <div class="setting-row"><div><div class="s-name">Graphics Quality</div><div class="s-desc">Lower settings reduce glow and particle effects.</div></div>
           <div class="seg-control" id="vidQuality"><button class="seg-btn" data-val="low">Low</button><button class="seg-btn" data-val="medium">Medium</button><button class="seg-btn" data-val="high">High</button></div></div>
+        <div class="setting-row"><div><div class="s-name">Enemy Density</div><div class="s-desc">Caps how many enemies can exist at once. Independent of graphics quality — lower this only if the game is slowing down, not for a harder/easier fight.</div></div>
+          <div class="seg-control" id="vidDensity"><button class="seg-btn" data-val="low">Low</button><button class="seg-btn" data-val="medium">Medium</button><button class="seg-btn" data-val="high">High</button></div></div>
         <div class="setting-row"><div><div class="s-name">Screen Shake</div><div class="s-desc">Camera shake on hits and impacts.</div></div><div class="toggle-switch" id="vidShake"><div class="knob"></div></div></div>
         <div class="setting-row"><div><div class="s-name">Fullscreen</div><div class="s-desc">Expand the game to fill your entire screen.</div></div><button class="buy-btn" id="fullscreenToggleBtn" style="border-color:var(--accent); color:var(--accent);">ENTER FULLSCREEN</button></div>
       </div>
@@ -470,6 +480,7 @@ const CARDS = [
 
 const PASSIVE_SLOT_TYPES = ["artifact","amulet","ring","relic"];
 const MAX_PASSIVE_SLOTS = 6;
+const MAX_PASSIVE_SLOTS_PER_TYPE = 2; // enforce PASSIVE_SLOT_TYPES: at most 2 items of the same slot type equipped at once
 const PASSIVES = [
   {id:"vampire_fang",slot:"amulet",name:"Vampire Fang",icon:"🧛",tags:["lifesteal"],desc:"+4% lifesteal.",apply:p=>p.stats.lifesteal+=0.04},
   {id:"broken_clock",slot:"relic",name:"Broken Clock",icon:"🕰",tags:["cooldown"],desc:"-20% cooldown on all weapons.",apply:p=>p.stats.cdrMult=(p.stats.cdrMult||1)*0.8},
@@ -494,14 +505,14 @@ const PASSIVES = [
 ];
 
 const SYNERGIES = [
-  {id:"inferno_build",name:"Inferno Build",requires:{fire:2},desc:"+25% burn damage, burns spread on death.",apply:p=>{p.stats.fireMult=(p.stats.fireMult||1)*1.25;p.stats.burnSpread=true;}},
+  {id:"inferno_build",name:"Inferno Build",requires:{fire:2},desc:"+25% burn damage, burns spread to nearby enemies on tick.",apply:p=>{p.stats.fireMult=(p.stats.fireMult||1)*1.25;p.stats.burnSpread=true;}},
   {id:"assassin_build",name:"Assassin Build",requires:{crit:2,speed:2},desc:"+15% crit damage, +10% move speed.",apply:p=>{p.stats.critMult+=0.15;p.stats.moveSpeed*=1.1;}},
   {id:"necromancer_build",name:"Necromancer Build",requires:{summon:2},desc:"Minions last 50% longer and inherit +15% of your damage multiplier.",apply:p=>{p.stats.summonDurationMult=(p.stats.summonDurationMult||1)*1.5;p.stats.summonInheritDmg=(p.stats.summonInheritDmg||0)+0.15;}},
   {id:"storm_build",name:"Storm Build",requires:{lightning:2,chain:1},desc:"Chain effects gain +1 jump and +15% damage.",apply:p=>{p.stats.lightningMult=(p.stats.lightningMult||1)*1.15;p.stats.extraChainChance=(p.stats.extraChainChance||0)+0.25;}},
   {id:"bulwark_build",name:"Bulwark Build",requires:{armor:2,hp:1},desc:"+15% damage reduction above 50% HP.",apply:p=>{p.stats.bulwarkDR=(p.stats.bulwarkDR||0)+0.15;}},
   {id:"vampiric_build",name:"Vampiric Build",requires:{lifesteal:3},desc:"Lifesteal grants a shield equal to 25% healed.",apply:p=>{p.stats.lifestealShield=(p.stats.lifestealShield||0)+0.25;}},
   {id:"frostbound_build",name:"Frostbound Build",requires:{frost:2},desc:"Slowed enemies take +20% damage.",apply:p=>{p.stats.dmgToSlowedMult=(p.stats.dmgToSlowedMult||1)*1.2;}},
-  {id:"plague_build",name:"Plague Build",requires:{poison:2},desc:"Poison spreads to nearby enemies.",apply:p=>{p.stats.poisonSpread=true;}},
+  {id:"plague_build",name:"Plague Build",requires:{poison:2},desc:"Poisoned enemies spread their poison to nearby foes on death.",apply:p=>{p.stats.poisonSpread=true;}},
 ];
 
 const CHARACTERS = [
@@ -653,7 +664,7 @@ const FINAL_BOSS_ID = "overlord";
 
 const EVENT_CATEGORIES = ["merchant","treasure","elite_arena","mini_boss","risk_reward","cursed_shrine"];
 const EVENTS = [
-  {id:"wandering_merchant",cat:"merchant",name:"Wandering Merchant",desc:"Offers 3 random cards for gold.",resolve:(p,i,ctx)=>ctx.openShopOffer(p,3)},
+  {id:"wandering_merchant",cat:"merchant",name:"Wandering Merchant",desc:"Offers 3 random cards for gold.",resolve:(p,i,ctx)=>{ /* handled by renderMerchantCardOffers() in triggerRandomEvent — no-op fallback */ }},
   {id:"black_market_dealer",cat:"merchant",name:"Black Market Dealer",desc:"Sells a guaranteed passive item at a premium price.",resolve:(p,i,ctx)=>ctx.offerPassiveForGold(p,ctx.randomPassive(),250)},
   {id:"reroll_gremlin",cat:"merchant",name:"Reroll Gremlin",desc:"Pay gold to reroll your next level-up choices.",resolve:(p,i,ctx)=>ctx.grantRerollCharges(p,3)},
   {id:"traveling_smith",cat:"merchant",name:"Traveling Smith",desc:"Pay gold to instantly level up one weapon.",resolve:(p,i,ctx)=>ctx.offerWeaponLevelForGold(p,180)},
@@ -677,7 +688,7 @@ const EVENTS = [
   {id:"unstable_rift",cat:"risk_reward",name:"Unstable Rift",desc:"Choice: enter for a random powerful buff or debuff.",choice:true,resolve:(p,i,ctx)=> i===0 ? ctx.rollRiftOutcome(p) : null},
   {id:"cursed_weapon",cat:"risk_reward",name:"Cursed Weapon",desc:"Choice: a weapon far above your level, but it drains HP while equipped.",choice:true,resolve:(p,i,ctx)=> i===0 ? ctx.grantCursedWeapon(p) : null},
   {id:"sacrificial_altar",cat:"risk_reward",name:"Sacrificial Altar",desc:"Choice: sacrifice a random passive for two cards.",choice:true,resolve:(p,i,ctx)=> i===0 ? ctx.sacrificePassiveForCards(p,2) : null},
-  {id:"bloodmoon_wager",cat:"risk_reward",name:"Bloodmoon Wager",desc:"Choice: double spawns for 90s for double gold/XP.",choice:true,resolve:(p,i,ctx)=> i===0 ? ctx.applyTemporaryModifier("spawnRate",2,90,{goldMult:2,xpMult:2}) : null},
+  {id:"bloodmoon_wager",cat:"risk_reward",name:"Bloodmoon Wager",desc:"Choice: double spawns for 90s for double gold/XP (both revert after 90s).",choice:true,resolve:(p,i,ctx)=> i===0 ? ctx.applyTemporaryModifier("spawnRate",2,90,{goldMult:2,xpMult:2}) : null},
   {id:"shrine_of_hunger",cat:"cursed_shrine",name:"Shrine of Hunger",desc:"Lose regen permanently for a big damage boost.",resolve:(p,i,ctx)=>{p.stats.regen=0;p.stats.dmgMult*=1.3;}},
   {id:"shrine_of_silence",cat:"cursed_shrine",name:"Shrine of Silence",desc:"Disable one random weapon, +2 passive slots.",resolve:(p,i,ctx)=>ctx.disableRandomWeapon(Infinity,{grantPassiveSlots:2})},
   {id:"shrine_of_ruin",cat:"cursed_shrine",name:"Shrine of Ruin",desc:"Enemies spawn 20% faster, gold gain +40%.",resolve:(p,i,ctx)=>{ctx.applyTemporaryModifier("spawnRate",1.2,Infinity);p.stats.goldMult*=1.4;}},
@@ -760,7 +771,7 @@ const ACHIEVEMENTS = [
   {id:"hoarder",icon:"🏦",name:"Hoarder",desc:"Accumulate 1000 lifetime Soul.",check:c=>c.lifetime.totalSoul>=1000},
   {id:"persistent",icon:"☠️",name:"Persistent",desc:"Die 10 times.",check:c=>c.lifetime.deaths>=10},
   {id:"veteran",icon:"📜",name:"Veteran",desc:"Complete 25 runs.",check:c=>c.lifetime.runs>=25},
-  {id:"ascended",icon:"👑",name:"Ascended",desc:"Max two full talent branches.",check:c=>c.meta.maxedBranches>=2},
+  {id:"talent_all_maxed",icon:"🎓",name:"Grandmaster",desc:"Max all four talent branches.",check:c=>c.meta.maxedBranches>=4},
   {id:"evolution_first",icon:"🌀",name:"Transformed",desc:"Evolve your first weapon.",check:c=>c.run.evolutionsThisRun>=1},
   {id:"evolution_all",icon:"🧬",name:"Full Metamorphosis",desc:"Evolve 3 weapons in a single run.",check:c=>c.run.evolutionsThisRun>=3},
   {id:"synergy_first",icon:"🔗",name:"Synergist",desc:"Trigger your first build synergy.",check:c=>c.run.synergiesTriggered>=1},
@@ -791,7 +802,6 @@ const ACHIEVEMENTS = [
   {id:"elite_variety",icon:"👹",name:"Elite Cataloguer",desc:"Kill 10 different elite types, lifetime.",check:c=>c.lifetime.uniqueElitesKilled>=10},
   {id:"speed_clear",icon:"⏳",name:"Speedrunner",desc:"Reach the Overlord fight in under 20 minutes.",check:c=>c.run.overlordReachedAtSeconds!=null&&c.run.overlordReachedAtSeconds<1200},
   {id:"talent_branch_maxed",icon:"🌲",name:"Specialist",desc:"Max one full talent branch.",check:c=>c.meta.maxedBranches>=1},
-  {id:"talent_all_maxed",icon:"🎓",name:"Grandmaster",desc:"Max all four talent branches.",check:c=>c.meta.maxedBranches>=4},
 ];
 
 /* =========================================================================
@@ -802,19 +812,28 @@ const WAVES = [
   {t:55,ids:["slime","bat","zombie","wolf","spider","mosquito_swarm"],interval:0.82,mult:1.1},
   {t:130,ids:["zombie","ghost","bat","wraith","spider","skeleton_archer"],interval:0.62,mult:1.3,elite:true,eliteIds:["ogre"],eliteEvery:32},
   {t:220,ids:["zombie","ghost","wraith","harpy","imp","banshee","boar"],interval:0.52,mult:1.5,elite:true,eliteIds:["ogre","shade_elite"],eliteEvery:24,boss:true,bossId:"dragon",bossT:220},
-  {t:340,ids:["ghost","witch","harpy","banshee","crypt_crawler","cultist"],interval:0.44,mult:1.75,elite:true,eliteIds:["golem","warlord"],eliteEvery:18,boss:true,bossId:"wyvern",bossT:360},
-  {t:460,ids:["ghost","witch","gargoyle","frost_sprite","myrmidon","tomb_warden"],interval:0.38,mult:2.0,elite:true,eliteIds:["golem","venom_matriarch"],eliteEvery:15,boss:true,bossId:"ancient_tree",bossT:460},
+  {t:310,ids:["ghost","harpy","banshee","boar","frost_sprite"],interval:0.46,mult:1.65,elite:true,eliteIds:["shade_elite","warlord"],eliteEvery:20,boss:true,bossId:"wyvern",bossT:320},
+  {t:340,ids:["ghost","witch","harpy","banshee","crypt_crawler","cultist"],interval:0.44,mult:1.75,elite:true,eliteIds:["golem","warlord"],eliteEvery:18,boss:true,bossId:"lich",bossT:420},
+  {t:460,ids:["ghost","witch","gargoyle","frost_sprite","myrmidon","tomb_warden"],interval:0.38,mult:2.0,elite:true,eliteIds:["golem","venom_matriarch"],eliteEvery:15,boss:true,bossId:"ancient_tree",bossT:520},
   {t:600,ids:["revenant","witch","wraith","siren","iron_hound","shadow_stalker"],interval:0.34,mult:2.3,elite:true,eliteIds:["shade_elite","phantom_duelist"],eliteEvery:13},
-  {t:760,ids:["revenant","gargoyle","bog_leech","vulture","screecher","plague_rat"],interval:0.3,mult:2.6,elite:true,eliteIds:["iron_colossus","bloated_horror"],eliteEvery:11,boss:true,bossId:"lich",bossT:760},
-  {t:930,ids:["revenant","witch","wraith","tomb_warden","myrmidon"],interval:0.27,mult:3.0,elite:true,eliteIds:["stormcaller_elite","bone_titan"],eliteEvery:10,boss:true,bossId:"void_knight",bossT:960},
-  {t:1120,ids:["revenant","witch","gargoyle","tomb_warden","crypt_crawler"],interval:0.24,mult:3.4,elite:true,eliteIds:["night_hag","crimson_reaver"],eliteEvery:9,boss:true,bossId:"machine_god",bossT:1160},
-  {t:1320,ids:["revenant","witch","tomb_warden","frost_sprite","siren"],interval:0.22,mult:3.8,elite:true,eliteIds:["glass_wraith","tar_beast"],eliteEvery:8,boss:true,bossId:"the_collector",bossT:1360},
-  {t:1520,ids:["revenant","witch","tomb_warden","gargoyle"],interval:0.2,mult:4.2,elite:true,eliteIds:["frost_sentinel","blood_priest"],eliteEvery:7,boss:true,bossId:"frost_queen",bossT:1560},
-  {t:1720,ids:["revenant","witch","wraith","wolf","iron_hound"],interval:0.18,mult:4.6,elite:true,eliteIds:["warped_ogre","soul_collector"],eliteEvery:6,boss:true,bossId:"bloodmoon_alpha",bossT:1760},
+  {t:760,ids:["revenant","gargoyle","bog_leech","vulture","screecher","plague_rat"],interval:0.3,mult:2.6,elite:true,eliteIds:["iron_colossus","bloated_horror"],eliteEvery:11,boss:true,bossId:"void_knight",bossT:820},
+  {t:930,ids:["revenant","witch","wraith","tomb_warden","myrmidon"],interval:0.27,mult:3.0,elite:true,eliteIds:["stormcaller_elite","bone_titan"],eliteEvery:10,boss:true,bossId:"machine_god",bossT:1000},
+  {t:1120,ids:["revenant","witch","gargoyle","tomb_warden","crypt_crawler"],interval:0.24,mult:3.4,elite:true,eliteIds:["night_hag","crimson_reaver"],eliteEvery:9,boss:true,bossId:"the_collector",bossT:1200},
+  {t:1320,ids:["revenant","witch","tomb_warden","frost_sprite","siren"],interval:0.22,mult:3.8,elite:true,eliteIds:["glass_wraith","tar_beast"],eliteEvery:8,boss:true,bossId:"frost_queen",bossT:1400},
+  {t:1520,ids:["revenant","witch","tomb_warden","gargoyle"],interval:0.2,mult:4.2,elite:true,eliteIds:["frost_sentinel","blood_priest"],eliteEvery:7,boss:true,bossId:"bloodmoon_alpha",bossT:1620},
+  {t:1720,ids:["revenant","witch","wraith","wolf","iron_hound"],interval:0.18,mult:4.6,elite:true,eliteIds:["warped_ogre","soul_collector"],eliteEvery:6},
   {t:1900,ids:["revenant","witch","gargoyle","tomb_warden"],interval:0.16,mult:5.0,elite:true,eliteIds:["thornback","abyssal_watcher"],eliteEvery:6,boss:true,bossId:"overlord",bossT:1960},
 ];
+// Post-Overlord "Keep Playing" endless scaling: after the last authored wave entry,
+// `wave.mult`/spawn interval no longer advance on their own (fixed at their final
+// values), which let the player's power keep compounding against a static enemy
+// floor forever. currentWave() below layers a continuing endless scale on top of
+// the final wave once runTime exceeds the last wave's timestamp.
+const ENDLESS_START_T = WAVES[WAVES.length-1].t;
+const ENDLESS_MULT_PER_MIN = 0.12; // steady continued ramp so "Keep Playing" stays a real challenge
+const ENDLESS_INTERVAL_MULT_PER_MIN = 0.985; // gently tightens spawn interval further, floor enforced below
 const PHASES = [
-  {t:0,name:"DISCOVERY"},{t:130,name:"BUILD FORMATION"},{t:340,name:"ESCALATION"},{t:600,name:"DEEPENING THREAT"},
+  {t:0,name:"DISCOVERY"},{t:130,name:"BUILD FORMATION"},{t:310,name:"WYVERN'S SHADOW"},{t:340,name:"ESCALATION"},{t:600,name:"DEEPENING THREAT"},
   {t:930,name:"THE VOID STIRS"},{t:1320,name:"MACHINE UPRISING"},{t:1720,name:"BLOODMOON"},{t:1960,name:"THE FINAL STAND"},
 ];
 const BOSS_INTROS = {
@@ -826,12 +845,28 @@ const BOSS_INTROS = {
 /* =========================================================================
    PART 4 — SAVE / META STATE
    ========================================================================= */
-const DEFAULT_SAVE = { soul:0, artifacts:0, talentLevels:{},
+const DEFAULT_SAVE = { soul:0, artifacts:0, talentLevels:{}, armoryUnlocks:{},
   lifetime:{ runs:0, kills:0, deaths:0, bestTime:0, bestLevel:0, totalGold:0, totalSoul:0, eliteKills:0, bossKills:0,
     charactersCompleted:[], uniqueBossesKilled:[], uniqueElitesKilled:[] },
   activeRun:null, achievements:{ unlocked:{} },
-  settings:{ muted:false, sfxVolume:1, musicVolume:0.35, controlMode:'auto', haptics:true, quality:'high', screenShake:true } };
+  settings:{ muted:false, sfxVolume:1, musicVolume:0.35, controlMode:'auto', haptics:true, quality:'high', enemyDensity:'high', screenShake:true } };
 let save = JSON.parse(JSON.stringify(DEFAULT_SAVE));
+
+/* ---- Armory: a real spending sink for the previously-unused `save.artifacts`
+   currency. Each unlock is a permanent, stacking meta-bonus applied in
+   newPlayer(), paid for once with Artifacts (never refunded/repeatable beyond
+   its own max level, similar in spirit to the Talent Tree but on the Artifacts
+   currency instead of Soul). ---- */
+const ARMORY_ITEMS = [
+  {id:"artifact_dmg",name:"Ancient Warblade",icon:"⚔️",desc:"+5% damage per level.",cost:3,maxLevel:5,apply:(p,lvl)=>{p.stats.dmgMult*=(1+0.05*lvl);}},
+  {id:"artifact_hp",name:"Titan's Bulwark",icon:"🛡️",desc:"+15 max HP per level.",cost:3,maxLevel:5,apply:(p,lvl)=>{p.maxHp+=15*lvl;}},
+  {id:"artifact_luck",name:"Fortune's Coin",icon:"🍀",desc:"+5% luck (rare card odds) per level.",cost:4,maxLevel:3,apply:(p,lvl)=>{p.stats.luck=(p.stats.luck||0)+0.05*lvl;}},
+  {id:"artifact_gold",name:"Midas Band",icon:"💰",desc:"+8% gold gained per level.",cost:3,maxLevel:4,apply:(p,lvl)=>{p.stats.goldMult*=(1+0.08*lvl);}},
+  {id:"artifact_start_gold",name:"Adventurer's Purse",icon:"👛",desc:"Start each run with 40 bonus gold per level.",cost:2,maxLevel:5,apply:(p,lvl)=>{p.gold+=40*lvl;}},
+  {id:"artifact_slot",name:"Void Satchel",icon:"🎒",desc:"+1 weapon slot per level.",cost:8,maxLevel:2,apply:(p,lvl)=>{p.extraWeaponSlots=(p.extraWeaponSlots||0)+lvl;}},
+];
+function armoryLevel(id){ return (save.armoryUnlocks && save.armoryUnlocks[id]) || 0; }
+function armoryCost(item, currentLevel){ return Math.ceil(item.cost*Math.pow(1.6,currentLevel)); }
 
 async function loadSave(){
   try{
@@ -844,10 +879,28 @@ async function loadSave(){
       save.achievements = Object.assign({}, DEFAULT_SAVE.achievements, loaded.achievements||{});
       save.achievements.unlocked = Object.assign({}, save.achievements.unlocked, (loaded.achievements&&loaded.achievements.unlocked)||{});
       save.talentLevels = Object.assign({}, loaded.talentLevels||{});
+      save.armoryUnlocks = Object.assign({}, loaded.armoryUnlocks||{});
     }
   }catch(e){}
+  migrateTalents();
   applySettings();
   refreshSoulBadges();
+}
+// One-time migration: refund Soul spent on talent lines that used to exist but
+// were never wired to any real effect (see REMOVED_TALENT_KEYS), so past players
+// aren't permanently punished for a designer/coder gap.
+function migrateTalents(){
+  if(save._migratedRemovedTalents) return;
+  let refund=0;
+  for(const key of REMOVED_TALENT_KEYS){
+    if(save.talentLevels[key]){
+      const lvl=save.talentLevels[key];
+      for(let l=1;l<=lvl;l++) refund += Math.ceil(8*Math.pow(1.3,l-1));
+      delete save.talentLevels[key];
+    }
+  }
+  if(refund>0){ save.soul += refund; }
+  save._migratedRemovedTalents = true;
 }
 let saveInFlight=null, savePending=false;
 async function persistSave(){
@@ -867,6 +920,8 @@ function refreshSoulBadges(){
   const metaSoulEl = document.getElementById('metaSoul'); if(metaSoulEl) metaSoulEl.textContent = Math.floor(save.soul);
   const chip = document.getElementById('achProgressChip');
   if(chip) chip.textContent = `${Object.keys(save.achievements.unlocked).length}/${ACHIEVEMENTS.length}`;
+  const armoryChip = document.getElementById('armoryChip');
+  if(armoryChip){ const owned=ARMORY_ITEMS.reduce((s,it)=>s+armoryLevel(it.id),0); const total=ARMORY_ITEMS.reduce((s,it)=>s+it.maxLevel,0); armoryChip.textContent=`${owned}/${total}`; }
 }
 function talentLevel(branch,statKey){ return save.talentLevels[branch+"_"+statKey]||0; }
 function talentCost(branch,statKey){
@@ -898,7 +953,7 @@ let appliedKills=0, appliedGold=0;
 let eliteKillsRun=0, bossKilledRun=false, appliedEliteKills=0, appliedBossFolded=false;
 let runStats = {}; // extended per-run achievement/event tracking, reset in startRun
 let selectedCharacter = "warrior";
-let eventTimer=0, activeEventDef=null, tempModifiers=[]; // {key,mult,life}
+let eventTimer=0, activeEventDef=null, tempModifiers=[]; // {key,mult,life,extra} — extra multipliers are reverted when life expires (see updateTempModifiers)
 let rerollCharges=0;
 
 function freshStats(){
@@ -912,8 +967,6 @@ function freshStats(){
     burnExplode:false, frostShatter:false, stormAvatar:false, burnSpread:false, poisonSpread:false,
     lifestealShield:0, dmgToSlowedMult:1, bulwarkDR:0, aoeRadiusMult:1, rangeMult:1,
     startWeaponBonusLvl:0, extraChainCount:0,
-    // implemented in this build: damage reduction talent, arcane (area/beam/aura/chain) damage talent,
-    // revive-chance talent, chill/burn stacking cards, summon inherited damage, pack buff from wolves
     damageReduction:0, arcaneDmgMult:1, reviveChance:0, chillCap:0.35, burnStacks:1,
     summonInheritDmg:0, packBuff:0, extraPassiveSlots:0 };
 }
@@ -930,6 +983,8 @@ function newPlayer(characterId){
     const lvl = talentLevel(branch, line.key);
     if(lvl>0) applyTalentStat(p, line.key, line.perLevel*lvl);
   }
+  // Armory: permanent meta-bonuses paid for with Artifacts (see PART 4)
+  for(const item of ARMORY_ITEMS){ const lvl=armoryLevel(item.id); if(lvl>0) item.apply(p,lvl); }
   p.hp = p.maxHp;
   p.weapons[character.startWeapon] = 1 + (p.stats.startWeaponBonusLvl||0);
   character.uniqueBonus(p);
@@ -1052,9 +1107,19 @@ function weaponFire(wid, lvl, dt){
   if(def.type==="aura"){
     if(wid==="holy_aura"){
       const radius = weaponRadius(def.base.radius);
-      const heal = (def.base.healPerSec + (def.perLevel.healPerSec||0)*(lvl-1)) * (player.stats.holyMult||1);
+      const heal = (def.base.healPerSec + (def.perLevel.healPerSec||0)*(lvl-1)) * (player.stats.holyMult||1) * (evo==="radiant_field"?1.5:1);
       player.hp = Math.min(player.maxHp, player.hp + heal*dt);
       player.auraRadius = player.auraRadius||{}; player.auraRadius[wid]=radius;
+      // Radiant Field: burns undead-tagged enemies (tank/support share no undead tag in this
+      // roster, so we treat any enemy with id containing "zombie"/"revenant"/"wraith"/"lich"-family
+      // as undead for this effect) standing in the aura.
+      if(evo==="radiant_field"){
+        player.weaponTimers[wid+"_undead"] = (player.weaponTimers[wid+"_undead"]||0)-dt;
+        if(player.weaponTimers[wid+"_undead"]<=0){
+          forEachEnemyNear(player.x,player.y,radius,e=>{ if(/zombie|revenant|wraith|skeleton|ghost|banshee|lich|golem|shade/.test(e.id)) dealDamage(e, 6*dmgMult, wid); });
+          player.weaponTimers[wid+"_undead"]=0.5;
+        }
+      }
     } else if(wid==="thorn_aura"){
       const radius = weaponRadius(def.base.radius);
       const reflectPct = def.base.reflectPct + (def.perLevel.reflectPct||0)*(lvl-1);
@@ -1062,7 +1127,7 @@ function weaponFire(wid, lvl, dt){
       player.weaponTimers[wid+"_tick"] = (player.weaponTimers[wid+"_tick"]||0) - dt;
       if(player.weaponTimers[wid+"_tick"]<=0){
         const dmg = 4 * dmgMult;
-        forEachEnemyNear(player.x,player.y,radius,e=>dealDamage(e,dmg,wid));
+        forEachEnemyNear(player.x,player.y,radius,e=>{ dealDamage(e,dmg,wid); if(evo==="bramble_god"){ e.burning=true; e.burnT=Math.max(e.burnT||0,2); e.burnDps=Math.max(e.burnDps||0,dmg*0.3); } });
         player.weaponTimers[wid+"_tick"]=0.5;
       }
       player.auraRadius = player.auraRadius||{}; player.auraRadius[wid]=radius;
@@ -1077,7 +1142,9 @@ function weaponFire(wid, lvl, dt){
     const radius = weaponRadius(def.base.radius);
     const ang = rand(0,Math.PI*2), dist=rand(60,200);
     const tx = clamp(player.x+Math.cos(ang)*dist,20,WORLD.w-20), ty=clamp(player.y+Math.sin(ang)*dist,20,WORLD.h-20);
-    zones.push({x:tx,y:ty,radius,dmg,life:6,maxLife:6,tickCd:0,tag:wid==="tesla_coil"?"lightning":"physical",ownerWeapon:wid,jumps:def.base.jumps||0});
+    // Bear Trap Array: auto-resetting traps that also root (heavy slow) enemies caught in them.
+    const rooting = evo==="bear_trap_array";
+    zones.push({x:tx,y:ty,radius,dmg,life: rooting?9999:6,maxLife: rooting?9999:6,tickCd:0,tag:wid==="tesla_coil"?"lightning":"physical",ownerWeapon:wid,jumps:def.base.jumps||0,root:rooting});
     if(wid==="tesla_coil") SFX.chainZap(); else SFX.novaBurst();
     return;
   }
@@ -1086,11 +1153,16 @@ function weaponFire(wid, lvl, dt){
     const maxM = Math.round((def.base.maxMinions + (def.perLevel.maxMinions||0)*(lvl-1)) * (player.stats.summonCountMult||1));
     const owned = minions.filter(m=>m.weaponId===wid).length;
     if(player.weaponTimers[wid]<=0 && owned<maxM){
-      const dmg = (def.base.minionDmg + (def.perLevel.minionDmg||0)*(lvl-1)) * dmgMult * (player.stats.summonDmgMult||1);
+      const dmg = (def.base.minionDmg + (def.perLevel.minionDmg||0)*(lvl-1)) * dmgMult * (player.stats.summonDmgMult||1) * (1+(player.stats.summonInheritDmg||0)*(player.stats.dmgMult-1));
       const ang = rand(0,Math.PI*2);
+      // Siege Battery: turrets become permanent (Infinity life instead of the normal 8s).
+      const permanentTurret = wid==="turret_deployer" && evo==="siege_battery";
       minions.push({ x:player.x+Math.cos(ang)*40, y:player.y+Math.sin(ang)*40, weaponId:wid, dmg, hp:30+lvl*6,
-        speed: wid==="turret_deployer"?0:200, atkCd:0, life: wid==="turret_deployer"?8*(player.stats.summonDurationMult||1):Infinity,
+        speed: wid==="turret_deployer"?0:200*(evo==="spirit_pack_alpha"?1.15:1), atkCd:0,
+        life: wid==="turret_deployer" ? (permanentTurret?Infinity:8*(player.stats.summonDurationMult||1)) : Infinity,
         radius:10, icon:def.icon });
+      // Spirit Pack Alpha: wolves buff the player's own damage while alive.
+      if(evo==="spirit_pack_alpha") player.stats.packBuff = Math.min(0.6,(minions.filter(m=>m.weaponId===wid).length)*0.06);
       player.weaponTimers[wid] = def.base.cd*cdMult;
     }
     return;
@@ -1100,7 +1172,18 @@ function weaponFire(wid, lvl, dt){
     player.weaponTimers[wid] = def.base.cd*cdMult;
     const dmg = (def.base.dmg + (def.perLevel.dmg||0)*(lvl-1)) * dmgMult;
     const radius = weaponRadius(def.base.radius);
-    forEachEnemyNear(player.x,player.y,radius,e=>dealDamage(e,dmg,wid));
+    forEachEnemyNear(player.x,player.y,radius,e=>{
+      dealDamage(e,dmg,wid);
+      if(wid==="fire_nova") applyBurn(e, dmg*0.25, 3);
+      if(wid==="frost_field"){ e.slowed=true; e.slowT=Math.max(e.slowT||0,2); }
+      if(wid==="poison_cloud") applyPoison(e, dmg*0.3, def.base.lingerLife||3);
+    });
+    // Inferno: leaves a persistent burning zone that keeps igniting anyone standing in it.
+    if(wid==="fire_nova" && evo==="inferno") zones.push({x:player.x,y:player.y,radius,dmg:dmg*0.35,life:5,maxLife:5,tickCd:0,tag:"burnzone",ownerWeapon:wid});
+    // Plague Zone: poison cloud spreads without limit (handled generically via poisonSpread-like logic on poison ticks, see applyPoison/updateEnemies)
+    if(wid==="poison_cloud" && evo==="plague_zone") player.stats.poisonSpread = true;
+    // Absolute Zero: enemies under 30% HP caught in the field are fully frozen (near-total slow).
+    if(wid==="frost_field" && evo==="absolute_zero") forEachEnemyNear(player.x,player.y,radius,e=>{ if(e.hp/e.maxHp<0.3){ e.slowed=true; e.slowT=Math.max(e.slowT||0,2.5); e.frozenSolid=true; } });
     novaPulses.push({x:player.x,y:player.y,radius,life:0.4,maxLife:0.4,
       color: wid==="fire_nova"?"#ff9d4d": wid==="frost_field"?"#8fd8ff":"#8aff6b"});
     if(wid==="fire_nova") SFX.novaBurst(); else if(wid==="poison_cloud") SFX.chainZap(); else SFX.novaBurst();
@@ -1112,13 +1195,21 @@ function weaponFire(wid, lvl, dt){
     const dmg=(def.base.dmg+(def.perLevel.dmg||0)*(lvl-1))*dmgMult;
     let jumps = Math.round(def.base.jumps+(def.perLevel.jumps||0)*(lvl-1));
     if(Math.random()<(player.stats.extraChainChance||0)) jumps++;
+    // Maelstrom of Ruin: chains never decay — every jump hits for full damage and gets bonus extra jumps.
+    const neverDecay = evo==="maelstrom_of_ruin";
+    if(neverDecay) jumps += 2;
     const hit=new Set(); const arcPoints=[{x:player.x,y:player.y}];
     let cur = nearestEnemy(player.x,player.y,def.base.jumpRange*1.4);
     for(let i=0;i<=jumps&&cur;i++){
-      dealDamage(cur, dmg*(1-i*0.1), wid); hit.add(cur); arcPoints.push({x:cur.x,y:cur.y});
+      dealDamage(cur, dmg*(neverDecay?1:(1-i*0.1)), wid); hit.add(cur); arcPoints.push({x:cur.x,y:cur.y});
       let next=null,bestD=def.base.jumpRange*def.base.jumpRange;
       forEachEnemyNear(cur.x,cur.y,def.base.jumpRange,e=>{ if(hit.has(e))return; const dd=dist2(cur.x,cur.y,e.x,e.y); if(dd<bestD){bestD=dd;next=e;} });
       cur=next;
+    }
+    // Storm Avatar (legendary card): chain can strike again starting back from the player.
+    if(player.stats.stormAvatar && hit.size>0 && Math.random()<0.35){
+      const again = nearestEnemy(player.x,player.y,def.base.jumpRange*1.4);
+      if(again && !hit.has(again)){ dealDamage(again, dmg*0.6, wid); arcPoints.push({x:player.x,y:player.y},{x:again.x,y:again.y}); }
     }
     if(arcPoints.length>1){ chainArcs.push({points:arcPoints,life:0.18,maxLife:0.18}); SFX.chainZap(); }
     return;
@@ -1128,7 +1219,16 @@ function weaponFire(wid, lvl, dt){
   if(def.type==="melee"){
     const radius = weaponRadius(def.base.radius+(def.perLevel.radius||0)*(lvl-1));
     const dmg = (def.base.dmg+(def.perLevel.dmg||0)*(lvl-1))*dmgMult;
-    forEachEnemyNear(player.x,player.y,radius,e=>dealDamage(e,dmg,wid));
+    forEachEnemyNear(player.x,player.y,radius,e=>{
+      dealDamage(e,dmg,wid);
+      // Seismic Maul: every hit staggers (uses the same staggerT field elite "stagger" uses).
+      if(wid==="warhammer" && evo==="seismic_maul") e.staggerT=Math.max(e.staggerT||0,0.5);
+      // Crimson Executioner: heals 8% of damage dealt and executes sub-15%-HP enemies outright.
+      if(wid==="blood_blade" && evo==="crimson_executioner"){
+        player.hp=Math.min(player.maxHp,player.hp+dmg*0.08);
+        if(!e.dead && e.hp>0 && e.hp/e.maxHp<0.15) dealDamage(e, e.hp+9999, wid);
+      }
+    });
     player.swordFx={r:radius,t:0.22}; SFX.swordSwing();
     return;
   }
@@ -1137,12 +1237,18 @@ function weaponFire(wid, lvl, dt){
     if(!target) return;
     const count = Math.max(1,Math.round(def.base.count+(def.perLevel.count||0)*(lvl-1))+(player.stats.bonusProjectiles||0));
     const dmg = (def.base.dmg+(def.perLevel.dmg||0)*(lvl-1))*dmgMult;
+    // Void Sniper: infinite pierce (already applied to base.pierce=99 at evolution time) + guaranteed crit.
+    // World Ender: always crits and detonates (small AoE) on impact.
+    const forceCrit = evo==="void_sniper" || evo==="world_ender";
+    const detonate = evo==="world_ender";
+    // Annihilator: uncapped fire rate — bypasses the cooldown gate entirely below via def.evoCdMult,
+    // but we also let it fire more projectiles per volley to sell "uncapped".
     const pierce = (def.base.pierce||0)+(player.stats.bonusPierce||0);
     const baseAng = Math.atan2(target.y-player.y,target.x-player.x);
     for(let i=0;i<count;i++){
       const spread=(i-(count-1)/2)*0.16, ang=baseAng+spread;
       spawnBullet({owner:"player",x:player.x,y:player.y,vx:Math.cos(ang)*def.base.speed,vy:Math.sin(ang)*def.base.speed,
-        dmg,radius:5,life:2.2,color:"#ffd479",pierce,weaponId:wid});
+        dmg,radius:5,life:2.2,color:"#ffd479",pierce,weaponId:wid,forceCrit,detonate});
     }
     SFX.bowShot();
     return;
@@ -1154,7 +1260,7 @@ let bulletPool = [];
 function spawnBullet(props){
   if(bullets.length>=MAX_BULLETS) return null;
   const b = bulletPool.pop() || {};
-  b.traveled=0; b.returning=false; b.weaponId=undefined; b.pierce=0;
+  b.traveled=0; b.returning=false; b.weaponId=undefined; b.pierce=0; b.forceCrit=false; b.detonate=false;
   Object.assign(b, props);
   if(b.owner==="player"){ if(!b.hitset) b.hitset=new Set(); else b.hitset.clear(); }
   bullets.push(b);
@@ -1163,6 +1269,27 @@ function spawnBullet(props){
 function updateWeapons(dt){
   for(const wid of Object.keys(player.weapons)) weaponFire(wid, player.weapons[wid], dt);
   if(player.swordFx){ player.swordFx.t-=dt; if(player.swordFx.t<=0) player.swordFx=null; }
+  // pack buff (Spirit Pack Alpha) decays back toward 0 if all wolves are gone this frame
+  if(player.stats.packBuff && !minions.some(m=>m.weaponId==="spirit_wolves")) player.stats.packBuff=0;
+}
+
+/* ---- Status effect helpers (burn/poison) ----------------------------------
+   Burn and poison used to be single flat flags with no stacking (the audited
+   "Chill Stacking"/"Burn Stacking" cards wrote to fields nothing read). These
+   helpers give both a proper per-enemy stack count so those two cards, the
+   Inferno/Plague evolutions, and the Inferno/Plague Build synergies all have
+   a real mechanic to plug into. */
+function applyBurn(e, dpsBase, duration){
+  if(!e || e.dead) return;
+  const maxStacks = Math.max(1, Math.round(player.stats.burnStacks||1));
+  e.burnStackCount = Math.min(maxStacks, (e.burning? (e.burnStackCount||1) : 0) + 1);
+  e.burning = true; e.burnT = Math.max(e.burnT||0, duration);
+  e.burnDps = dpsBase * (player.stats.fireMult||1) * (1 + 0.5*(e.burnStackCount-1));
+}
+function applyPoison(e, dpsBase, duration){
+  if(!e || e.dead) return;
+  e.poisoned = true; e.poisonT = Math.max(e.poisonT||0, duration);
+  e.poisonDps = dpsBase * (player.stats.poisonMult||1);
 }
 
 /* =========================================================================
@@ -1183,8 +1310,17 @@ function performEvolution(wid){
   const evo = EVOLUTIONS[evoId];
   const base = WEAPONS[wid];
   player.evolvedWeapons = player.evolvedWeapons||{};
-  player.evolvedWeapons[wid] = Object.assign({}, base, { name:evo.name, icon:evo.icon, evolved:true,
-    base: Object.assign({}, base.base, { dmg:(base.base.dmg||0)*1.7, dps:(base.base.dps||0)*1.7, cd:(base.base.cd||1)*0.8, pierce:99 }) });
+  // FIX: previously this baked a flat *1.7 into base.base.dmg (the level-1 base),
+  // which barely moved the needle once perLevel scaling from 7 extra levels was
+  // added on top (~+19% real damage instead of the advertised +70%). evoDmgMult/
+  // evoCdMult are read directly by weaponFire()'s dmgMult/cdMult calculations,
+  // so they correctly multiply the *current, fully-leveled* damage/cooldown.
+  // evoId is also now actually stored on the evolved def — several evolutions
+  // (Quantum Beam / Kaleidoscope / Void Sniper / World Ender / etc.) check for
+  // it to trigger their unique behavior in weaponFire/dealDamage.
+  player.evolvedWeapons[wid] = Object.assign({}, base, { name:evo.name, icon:evo.icon, evolved:true, evoId:evoId,
+    base: Object.assign({}, base.base, { pierce:99 }),
+    evoDmgMult:1.7, evoCdMult: (evoId==="annihilator") ? 0.35 : 0.8 });
   runStats.evolutionsThisRun = (runStats.evolutionsThisRun||0)+1;
   logEvent(`⚡ ${base.name} evolved into ${evo.name}!`);
   showAchievementLikeToast("EVOLUTION", evo.name, "🌀");
@@ -1216,8 +1352,11 @@ function checkSynergies(){
 }
 
 function equipPassive(passiveId){
-  if(player.passives.length >= MAX_PASSIVE_SLOTS){ player.gold += 60; logEvent("Passive slots full — converted to 60 gold."); return false; }
   const def = PASSIVES.find(x=>x.id===passiveId); if(!def) return false;
+  if(player.passives.length >= MAX_PASSIVE_SLOTS + (player.stats.extraPassiveSlots||0)){ player.gold += 60; logEvent("Passive slots full — converted to 60 gold."); return false; }
+  // Enforce PASSIVE_SLOT_TYPES: at most MAX_PASSIVE_SLOTS_PER_TYPE items of the same slot type.
+  const sameTypeCount = player.passives.filter(pid=>{ const d=PASSIVES.find(x=>x.id===pid); return d && d.slot===def.slot; }).length;
+  if(sameTypeCount >= MAX_PASSIVE_SLOTS_PER_TYPE){ player.gold += 60; logEvent(`All ${def.slot} slots full — converted to 60 gold.`); return false; }
   player.passives.push(passiveId); def.apply(player);
   runStats.passiveSlotsFilled = player.passives.length;
   logEvent(`Equipped passive: ${def.name}`);
@@ -1276,19 +1415,30 @@ function dealDamage(enemy, dmg, weaponId){
     if(player.stats.berserkScaling) dmg *= (1 + player.stats.berserkScaling*(100*(1-player.hp/player.maxHp)));
     if(player.momentumStacks) dmg *= (1+(player.stats.momentumPerKill||0)*player.momentumStacks);
     if(player.stats.turretMode && (touchVec.x===0&&touchVec.y===0) && !keys['w']&&!keys['a']&&!keys['s']&&!keys['d']) dmg *= 1.2;
-    if(player.stats.critChance>0 && Math.random()<player.stats.critChance){ dmg*=player.stats.critMult; crit=true; }
+    let forcedCrit=false;
+    if(weaponId){ const wdef=weaponDef(weaponId); if(wdef && wdef.evoId && (wdef.evoId==="void_sniper"||wdef.evoId==="world_ender")) forcedCrit=true; }
+    if(forcedCrit || (player.stats.critChance>0 && Math.random()<player.stats.critChance)){ dmg*=player.stats.critMult; crit=true; }
     if(enemy.special==="parryFirstHit" && !enemy.parried){ enemy.parried=true; spawnFloater(enemy.x,enemy.y-10,"PARRY","#8fd8ff"); return; }
     if(enemy.special==="stagger"){ enemy.hitCount=(enemy.hitCount||0)+1; if(enemy.hitCount%4===0){ enemy.staggerT=1.0; } }
+    if(enemy.special==="reflect" && weaponId){ const wdef=weaponDef(weaponId); if(wdef && (wdef.type==="melee")){ damagePlayer(enemy.dmg*0.2); } } // Thornback/Iron Colossus: reflects melee damage back
+    if(enemy.special==="mark" && !enemy._marked){ enemy._marked=true; } // Abyssal Watcher marks on first hit
+    if(enemy._marked) forcedCrit=true;
     if(enemy.shield>0){ const absorbed=Math.min(enemy.shield,dmg); enemy.shield-=absorbed; dmg-=absorbed; if(dmg<=0){ spawnFloater(enemy.x,enemy.y-10,"BLOCK","#7ee0ff"); return; } }
     dmg = Math.max(0, Math.min(dmg, 999999)); // sanity clamp against NaN/Infinity from broken combos
     enemy.hp -= dmg; enemy.hitFlash=1;
     dpsWindow.push({t:runTime,dmg});
     spawnFloater(enemy.x,enemy.y-10,Math.round(dmg), crit?"#ffe15c":(isEliteOrBoss?"#ffb347":"#fff"));
-    if(player.stats.lifesteal>0) player.hp=Math.min(player.maxHp,player.hp+dmg*player.stats.lifesteal);
+    if(player.stats.lifesteal>0){
+      const healed = Math.min(player.maxHp-player.hp, dmg*player.stats.lifesteal);
+      player.hp=Math.min(player.maxHp,player.hp+dmg*player.stats.lifesteal);
+      // Vampiric Build synergy: lifesteal grants a shield equal to a fraction of the healed amount.
+      if(player.stats.lifestealShield>0 && healed>0) player.shield=Math.min(player.maxHp*0.5, player.shield+healed*player.stats.lifestealShield);
+    }
     if(weaponId){
       const wtags = weaponDef(weaponId).tags||[];
       if((wtags.includes("frost")||player.stats.slowOnHit) && Math.random()<(player.stats.slowOnHit>0?1:0.4)){ enemy.slowed=true; enemy.slowT=2; }
-      if((wtags.includes("fire")||player.stats.burnOnHitChance>0) && Math.random()<(player.stats.burnOnHitChance||0.12)){ enemy.burning=true; enemy.burnT=3; enemy.burnDps=dmg*0.2*(player.stats.fireMult||1); }
+      if((wtags.includes("fire")||player.stats.burnOnHitChance>0) && Math.random()<(player.stats.burnOnHitChance||0.12)){ applyBurn(enemy, dmg*0.2, 3); }
+      if((wtags.includes("poison")) && Math.random()<0.35){ applyPoison(enemy, dmg*0.25, 3); }
       if((player.stats.chainOnHitChance||0)>0 && Math.random()<Math.min(0.9,player.stats.chainOnHitChance)){
         const nxt = nearestEnemy(enemy.x,enemy.y,240); if(nxt && nxt!==enemy && !nxt.dead) queueSecondaryDamage(nxt, dmg*0.5, null); // queued, not recursive
       }
@@ -1320,6 +1470,16 @@ function killEnemy(enemy){
   if(enemy.elite && Math.random()<0.35){ orbs.push({type:"crystal",x:enemy.x+rand(-8,8),y:enemy.y-rand(4,10),value:Math.ceil(enemy.gold*0.4),radius:5}); }
   if(enemy.elite && Math.random()<0.15){ orbs.push({type:"passive",x:enemy.x,y:enemy.y-16,radius:7}); }
   if(enemy.boss){ orbs.push({type:"passive",x:enemy.x,y:enemy.y-16,radius:8}); player.crystals += 40; }
+  // FIX: event rewards attached to a spawned enemy (_treasureGold from Ancient Vault,
+  // _miniBossReward from the 5 mini_boss events) were set but never read anywhere —
+  // the player fought a buffed enemy for a reward that could never be granted.
+  if(enemy._treasureGold){ player.gold += enemy._treasureGold; logEvent(`The guardian falls — ${enemy._treasureGold} gold spills out!`); }
+  if(enemy._miniBossReward){
+    const r = enemy._miniBossReward;
+    if(r.rewardGold) player.gold += r.rewardGold;
+    if(r.rewardPassive) equipPassive(randomPassive());
+    logEvent("Mini-boss defeated — bounty claimed!");
+  }
   if(player.stats.hpPerKill) player.hp=Math.min(player.maxHp,player.hp+player.stats.hpPerKill);
   spawnParticle(enemy.x,enemy.y,enemy.color,10);
   if(enemy.id==="imp" && !enemy.isSplit){ for(let i=0;i<2;i++){ const ang=rand(0,Math.PI*2); spawnEnemy("imp",{x:enemy.x+Math.cos(ang)*14,y:enemy.y+Math.sin(ang)*14},{isSplit:true,hpMult:0.4,radiusMult:0.65}); } }
@@ -1327,6 +1487,10 @@ function killEnemy(enemy){
   if(player.stats.raiseDeadChance>0 && Math.random()<player.stats.raiseDeadChance){ minions.push({x:enemy.x,y:enemy.y,weaponId:"raised",dmg:enemy.dmg*0.5,hp:20,speed:180,atkCd:0,life:12,radius:9,icon:"💀"}); }
   if(enemy.burning && player.stats.burnExplode){ forEachEnemyNear(enemy.x,enemy.y,80,e2=>{ if(!e2.dead){ e2.burning=true; e2.burnT=2; e2.burnDps=enemy.burnDps||4; } }); }
   if(enemy.slowed && player.stats.frostShatter){ forEachEnemyNear(enemy.x,enemy.y,90,e2=>{ if(e2!==enemy) queueSecondaryDamage(e2,20,null); }); }
+  // Inferno Build synergy: burning enemies spread their burn to nearby enemies on death.
+  if(enemy.burning && player.stats.burnSpread){ forEachEnemyNear(enemy.x,enemy.y,85,e2=>{ if(e2!==enemy && !e2.dead && !e2.burning) applyBurn(e2, enemy.burnDps||4, 2.5); }); }
+  // Plague Build synergy: poisoned enemies spread their poison to nearby enemies on death.
+  if(enemy.poisoned && player.stats.poisonSpread){ forEachEnemyNear(enemy.x,enemy.y,85,e2=>{ if(e2!==enemy && !e2.dead && !e2.poisoned) applyPoison(e2, enemy.poisonDps||3, 2.5); }); }
   if(enemy.boss){ logEvent(`★ ${enemy.name.toUpperCase()} HAS FALLEN ★`); SFX.bossDeath(); }
   else if(enemy.elite){ logEvent("Elite defeated."); SFX.eliteKill(); }
   else SFX.kill();
@@ -1337,7 +1501,18 @@ function killEnemy(enemy){
 /* =========================================================================
    PART 8 — ENEMY SPAWNING / AI (extends base chase/keep_distance/charge/swarm/summon + phaseboss + elite specials)
    ========================================================================= */
-function currentWave(){ let w=WAVES[0]; for(const ww of WAVES) if(runTime>=ww.t) w=ww; return w; }
+function currentWave(){
+  let w=WAVES[0]; for(const ww of WAVES) if(runTime>=ww.t) w=ww;
+  if(runTime>ENDLESS_START_T){
+    // Endless post-Overlord scaling: keep raising density/multiplier over time instead of
+    // freezing at the last authored wave's numbers forever (see ENDLESS_* constants above).
+    const minutesPast = (runTime-ENDLESS_START_T)/60;
+    const extraMult = minutesPast*ENDLESS_MULT_PER_MIN;
+    const intervalScale = Math.max(0.55, Math.pow(ENDLESS_INTERVAL_MULT_PER_MIN, minutesPast));
+    return Object.assign({}, w, { mult: w.mult+extraMult, interval: w.interval*intervalScale });
+  }
+  return w;
+}
 function currentPhase(){ let ph=PHASES[0]; for(const p of PHASES) if(runTime>=p.t) ph=p; return ph; }
 
 /* ---- Enemy object pool ----------------------------------------------------
@@ -1351,10 +1526,13 @@ function currentPhase(){ let ph=PHASES[0]; for(const p of PHASES) if(runTime>=p.
 let enemyPool = [];
 function acquireEnemyObject(){ return enemyPool.length ? enemyPool.pop() : {}; }
 function resetEnemyFields(o){
-  o.slowed=false; o.slowT=0; o.burning=false; o.burnT=0; o.burnDps=0; o.staggerT=0; o.hitCount=0; o.parried=false;
+  o.slowed=false; o.slowT=0; o.burning=false; o.burnT=0; o.burnDps=0; o.burnStackCount=0;
+  o.poisoned=false; o.poisonT=0; o.poisonDps=0; o.frozenSolid=false;
+  o.staggerT=0; o.hitCount=0; o.parried=false; o._marked=false;
   o.enraged=false; o.teleCd=undefined; o.sumCd=undefined; o.strikeCd=undefined; o.freezeR=undefined; o._mutated=false;
   o._justHit=false; o._lastDmgToPlayer=0; o._reassembled=false; o._chargeSpeedMult=undefined; o._chargeRecover=undefined;
   o._chargeTimer=0; o.currentPhaseId=null; o.phaseAttackCds={}; o.bossDefId=undefined; o._treasureGold=undefined; o._miniBossReward=undefined;
+  o._buffAuraApplied=false; o._sacrificeCd=undefined; o._burstArmed=false;
   o.dead=false; o.vx=0; o.vy=0;
   return o;
 }
@@ -1399,18 +1577,22 @@ function spawnBoss(bossDefId, forcedPos){
     shield:0, aiTimer:0 });
   enemies.push(e); return e;
 }
-const MAX_ENEMIES = 1200; // hard ceiling; dynamicMaxEnemies() further scales this down for lower quality settings
-function dynamicMaxEnemies(){ return quality==='low' ? 400 : quality==='medium' ? 800 : MAX_ENEMIES; }
+const MAX_ENEMIES = 1200; // hard ceiling; dynamicMaxEnemies() further scales this down per the (now separate) enemy-density setting
+// FIX: enemy density used to be tied 1:1 to graphics `quality`, so lowering
+// particle/glow detail for performance silently thinned out the game's difficulty
+// too. `enemyDensity` is now its own setting (Settings > Video > Enemy Density),
+// independent from `quality`; dynamicMaxEnemies() reads the density setting only.
+function dynamicMaxEnemies(){ return enemyDensity==='low' ? 400 : enemyDensity==='medium' ? 800 : MAX_ENEMIES; }
 const AI_TICK_INTERVAL = 0.2; // normal enemies re-run their brain logic ~5x/sec instead of 60x/sec; elites/bosses are exempt
 const BOSS_WARNING_LEAD = 4;
 function updateSpawns(dt){
   const wave = currentWave();
   const spawnMult = tempModifiers.filter(m=>m.key==="spawnRate").reduce((a,m)=>a*m.mult,1);
   lastSpawn -= dt*spawnMult;
-  if(lastSpawn<=0){ if(enemies.length<MAX_ENEMIES) spawnEnemy(pick(wave.ids)); lastSpawn = wave.interval*rand(0.85,1.15); }
+  if(lastSpawn<=0){ if(enemies.length<dynamicMaxEnemies()) spawnEnemy(pick(wave.ids)); lastSpawn = wave.interval*rand(0.85,1.15); }
   if(wave.elite){
     eliteTimer -= dt;
-    if(eliteTimer<=0){ if(enemies.length<MAX_ENEMIES){ const eid=wave.eliteIds?pick(wave.eliteIds):"ogre"; spawnEnemy(eid); showEliteToast(eid); } eliteTimer=wave.eliteEvery; }
+    if(eliteTimer<=0){ if(enemies.length<dynamicMaxEnemies()){ const eid=wave.eliteIds?pick(wave.eliteIds):"ogre"; spawnEnemy(eid); showEliteToast(eid); } eliteTimer=wave.eliteEvery; }
   }
   if(wave.boss && wave.bossId && !spawnedBossIds.has(wave.bossId)){
     if(!warnedBossIds.has(wave.bossId) && runTime>=wave.bossT-BOSS_WARNING_LEAD){ warnedBossIds.add(wave.bossId); showBossWarning(wave.bossId); }
@@ -1449,12 +1631,12 @@ function bossCtx(dt){
     dashCharge:(b,speedMult,recover)=>{
       if(b.chargeState==="idle"||!b.chargeState){ const dx=player.x-b.x,dy=player.y-b.y,d=Math.hypot(dx,dy)||1; b.chargeDx=dx/d; b.chargeDy=dy/d; b.chargeState="charging"; b._chargeSpeedMult=speedMult; b._chargeRecover=recover; }
     },
-    summon:(b,ids,count)=>{ for(let i=0;i<count;i++){ if(enemies.length<MAX_ENEMIES){ const ang=rand(0,Math.PI*2); spawnEnemy(pick(ids),{x:b.x+Math.cos(ang)*50,y:b.y+Math.sin(ang)*50}); } } },
+    summon:(b,ids,count)=>{ for(let i=0;i<count;i++){ if(enemies.length<dynamicMaxEnemies()){ const ang=rand(0,Math.PI*2); spawnEnemy(pick(ids),{x:b.x+Math.cos(ang)*50,y:b.y+Math.sin(ang)*50}); } } },
     teleportAway:(b,dist)=>{ const ang=rand(0,Math.PI*2); b.x=clamp(b.x+Math.cos(ang)*dist,b.radius,WORLD.w-b.radius); b.y=clamp(b.y+Math.sin(ang)*dist,b.radius,WORLD.h-b.radius); spawnParticle(b.x,b.y,b.color,14); },
     teleportBehindAndStrike:(b)=>{ const ang=rand(0,Math.PI*2); b.x=clamp(player.x+Math.cos(ang)*(b.radius+player.radius+20),b.radius,WORLD.w-b.radius); b.y=clamp(player.y+Math.sin(ang)*(b.radius+player.radius+20),b.radius,WORLD.h-b.radius); spawnParticle(b.x,b.y,b.color,10); damagePlayer(b.dmg*1.1); },
     zoneDenial:(b,dmgPerTick,radius,duration)=>{ zones.push({x:player.x,y:player.y,radius,dmg:dmgPerTick,life:duration,maxLife:duration,tickCd:0,tag:"boss",targetsPlayer:true}); },
     sweepLaser:(b,range)=>{ for(let a=0;a<10;a++){ const ang=(a/10)*Math.PI*2; spawnBullet({owner:"enemy",x:b.x,y:b.y,vx:Math.cos(ang)*260,vy:Math.sin(ang)*260,dmg:b.dmg*0.5,radius:6,life:range/260,color:"#8a8f9e",pierce:0}); } },
-    deployTurrets:(b,count)=>{ for(let i=0;i<count;i++){ if(enemies.length<MAX_ENEMIES){ const ang=(i/count)*Math.PI*2; const t=spawnEnemy("skeleton_archer",{x:b.x+Math.cos(ang)*70,y:b.y+Math.sin(ang)*70}); if(t){ t.speed=0; t.hp=t.maxHp=30; t.color="#8a8f9e"; } } } },
+    deployTurrets:(b,count)=>{ for(let i=0;i<count;i++){ if(enemies.length<dynamicMaxEnemies()){ const ang=(i/count)*Math.PI*2; const t=spawnEnemy("skeleton_archer",{x:b.x+Math.cos(ang)*70,y:b.y+Math.sin(ang)*70}); if(t){ t.speed=0; t.hp=t.maxHp=30; t.color="#8a8f9e"; } } } },
     grantShield:(b,amount)=>{ b.shield=(b.shield||0)+amount; },
     stealResource:(b,type,pct)=>{ if(type==="gold"){ const amt=Math.floor(player.gold*pct); player.gold-=amt; runStats.stolenByCollector=true; logEvent("The Collector steals your gold!"); } else { player.xp=Math.max(0,player.xp-player.xp*pct); runStats.stolenByCollector=true; logEvent("The Collector siphons your XP!"); } },
     disableRandomWeapon:(duration)=>{ const wids=Object.keys(player.weapons); if(!wids.length) return; const wid=pick(wids); player.disabledWeapons[wid]= duration===Infinity?Infinity:(runTime+duration); logEvent(`${WEAPONS[wid].name} has been disabled!`); },
@@ -1464,7 +1646,7 @@ function updateEliteSpecial(e,dt){
   switch(e.special){
     case 'enrage': if(e.hp/e.maxHp<0.3 && !e.enraged){ e.enraged=true; e.speed*=1.3; e.dmg*=1.15; } break;
     case 'teleport': e.teleCd=(e.teleCd??rand(3,5))-dt; if(e.teleCd<=0){ const ang=rand(0,Math.PI*2); e.x=clamp(player.x+Math.cos(ang)*250,e.radius,WORLD.w-e.radius); e.y=clamp(player.y+Math.sin(ang)*250,e.radius,WORLD.h-e.radius); e.teleCd=rand(4,6); spawnParticle(e.x,e.y,e.color,8);} break;
-    case 'summonAdds': e.sumCd=(e.sumCd??rand(4,6))-dt; if(e.sumCd<=0 && enemies.length<MAX_ENEMIES){ spawnEnemy(pick(["plague_rat","bat"]),{x:e.x+rand(-30,30),y:e.y+rand(-30,30)}); e.sumCd=rand(5,7);} break;
+    case 'summonAdds': e.sumCd=(e.sumCd??rand(4,6))-dt; if(e.sumCd<=0 && enemies.length<dynamicMaxEnemies()){ spawnEnemy(pick(["plague_rat","bat"]),{x:e.x+rand(-30,30),y:e.y+rand(-30,30)}); e.sumCd=rand(5,7);} break;
     case 'periodicStrike': e.strikeCd=(e.strikeCd??2)-dt; if(e.strikeCd<=0){ zones.push({x:player.x,y:player.y,radius:70,dmg:e.dmg*0.5,life:0.6,maxLife:0.6,tickCd:0,tag:"boss",targetsPlayer:true}); e.strikeCd=3.2;} break;
     case 'curseHeal': player._curseActive=true; break;
     case 'lifesteal': if(e._lastDmgToPlayer){ e.hp=Math.min(e.maxHp,e.hp+e._lastDmgToPlayer*0.4); e._lastDmgToPlayer=0; } break;
@@ -1472,17 +1654,43 @@ function updateEliteSpecial(e,dt){
     case 'growingFreeze': e.freezeR=(e.freezeR||60)+dt*2; break;
     case 'mutate': if(!e._mutated && Math.random()<dt*0.05){ e._mutated=true; const r=Math.random(); if(r<0.33) e.speed*=1.5; else if(r<0.66) e.dmg*=1.4; else { e.maxHp*=1.3; e.hp*=1.3; } logEvent(`${e.name} mutates!`); } break;
     case 'steal': if(e._justHit){ const amt=Math.min(player.gold,3); player.gold-=amt; e._justHit=false; } break;
+    // --- previously-missing elite specials (Warlord, Iron Colossus, Thornback, Glass Wraith, Blood Priest, Abyssal Watcher) ---
+    case 'buffAura': // Warlord: buffs nearby normal enemies' damage/speed while alive
+      if(!e._buffAuraApplied){ e._buffAuraApplied=true; }
+      forEachEnemyNear(e.x,e.y,150,other=>{ if(other!==e && !other.elite && !other.boss && !other._warlordBuffed){ other._warlordBuffed=true; other.dmg*=1.2; other.speed*=1.1; } });
+      break;
+    case 'reflect': /* Iron Colossus (tank) / Thornback (tank): melee reflect + knockback/stagger immunity is
+                        handled directly in dealDamage() (reflect branch) and by simply never applying stagger
+                        to these ids (updateEliteSpecial has no 'stagger' branch for them, so they're naturally immune). */
+      break;
+    case 'burstDamage': // Glass Wraith: low HP, but hits far harder than its role average suggests
+      if(!e._burstArmed){ e._burstArmed=true; e.dmg*=1.8; }
+      break;
+    case 'sacrificeHeal': // Blood Priest: periodically sacrifices a nearby weak normal enemy to heal itself
+      e._sacrificeCd=(e._sacrificeCd??rand(4,6))-dt;
+      if(e._sacrificeCd<=0){
+        let victim=null,bestD=200*200;
+        forEachEnemyNear(e.x,e.y,200,other=>{ if(other!==e && !other.elite && !other.boss && !other.dead){ const dd=dist2(e.x,e.y,other.x,other.y); if(dd<bestD){bestD=dd;victim=other;} } });
+        if(victim){ e.hp=Math.min(e.maxHp,e.hp+victim.maxHp*0.5); victim.dead=true; spawnParticle(victim.x,victim.y,"#8b1c2c",8); }
+        e._sacrificeCd=rand(5,7);
+      }
+      break;
+    case 'mark': /* Abyssal Watcher: marks the player — handled reactively in damagePlayer() (guaranteed crit
+                    against the player is represented as bonus incoming damage while marked) */
+      player._abyssalMarked = runTime+4;
+      break;
   }
 }
 function updateEnemies(dt){
   for(const e of enemies){
     if(e.dead) continue; // stays in the array until end-of-frame prune; never act on it again
     e.hitFlash=Math.max(0,e.hitFlash-dt*4);
-    if(e.slowed){ e.slowT-=dt; if(e.slowT<=0) e.slowed=false; }
-    if(e.burning){ e.burnT-=dt; dealDamage(e, e.burnDps*dt, null); if(e.burnT<=0) e.burning=false; if(e.dead) continue; }
+    if(e.slowed){ e.slowT-=dt; if(e.slowT<=0){ e.slowed=false; e.frozenSolid=false; } }
+    if(e.burning){ e.burnT-=dt; dealDamage(e, e.burnDps*dt, null); if(e.burnT<=0){ e.burning=false; e.burnStackCount=0; } if(e.dead) continue; }
+    if(e.poisoned){ e.poisonT-=dt; dealDamage(e, e.poisonDps*dt, null); if(e.poisonT<=0) e.poisoned=false; if(e.dead) continue; }
     if(e.staggerT>0){ e.staggerT-=dt; continue; }
     if(e.special) updateEliteSpecial(e,dt);
-    const speedMult = (e.slowed?0.5:1) * (1-(player.stats.globalSlow||0));
+    const speedMult = (e.slowed? (e.frozenSolid?0.05:0.5) : 1) * (1-Math.min(0.9,(player.stats.globalSlow||0)));
     const dx=player.x-e.x, dy=player.y-e.y, d=Math.hypot(dx,dy)||1;
 
     // AI throttling: normal fodder (chase/keep_distance/swarm) only re-picks its
@@ -1568,7 +1776,14 @@ function updateZones(dt){
     if(z.tickCd<=0){
       z.tickCd=0.5;
       if(z.targetsPlayer){ const d=Math.hypot(player.x-z.x,player.y-z.y); if(d<z.radius) damagePlayer(z.dmg*0.5); }
-      else if(!z.slowOnly){ forEachEnemyNear(z.x,z.y,z.radius,e=>{ dealDamage(e, z.dmg*player.stats.dmgMult*0.5, z.ownerWeapon); if(z.tag==="physical"||z.tag==="lightning") e.slowed=true,e.slowT=1; }); }
+      else if(z.tag==="burnzone"){ forEachEnemyNear(z.x,z.y,z.radius,e=>applyBurn(e, z.dmg*0.5, 1.2)); }
+      else if(!z.slowOnly){
+        forEachEnemyNear(z.x,z.y,z.radius,e=>{
+          dealDamage(e, z.dmg*player.stats.dmgMult*0.5, z.ownerWeapon);
+          if(z.tag==="physical"||z.tag==="lightning") e.slowed=true,e.slowT=1;
+          if(z.root){ e.slowed=true; e.slowT=Math.max(e.slowT||0,1.5); e.frozenSolid=true; } // Bear Trap Array: roots caught enemies
+        });
+      }
       if(z.slowOnly){ forEachEnemyNear(z.x,z.y,z.radius,e=>{ e.slowed=true; e.slowT=1; }); }
     }
     if(z.life<=0) zones.splice(i,1);
@@ -1620,11 +1835,14 @@ function updatePlayer(dt){
   let regen = player.stats.regen; if(player._curseActive) regen*=0.3;
   if(regen>0) player.hp=Math.min(player.maxHp,player.hp+regen*dt);
   if(player.stats.shieldCd>0){ player._shieldTimer=(player._shieldTimer??player.stats.shieldCd)-dt; if(player._shieldTimer<=0){ player.shield=Math.min(40,player.shield+30); player._shieldTimer=player.stats.shieldCd; } }
+  if(player._abyssalMarked && runTime>player._abyssalMarked) player._abyssalMarked=null;
 }
 function damagePlayer(amount){
   let armor = player.stats.armor + (player.hp/player.maxHp<0.3?(player.stats.lastStandArmor||0)*player.stats.armor:0);
   let dmg = Math.max(1, amount-armor);
   if(player.stats.bulwarkDR && player.hp/player.maxHp>0.5) dmg *= (1-player.stats.bulwarkDR);
+  if(player.stats.damageReduction) dmg *= (1-player.stats.damageReduction);
+  if(player._abyssalMarked) dmg *= 1.5; // Abyssal Watcher's mark: guaranteed-crit-equivalent bonus damage to the player
   if(player.shield>0){ const absorbed=Math.min(player.shield,dmg); player.shield-=absorbed; dmg-=absorbed; }
   if(dmg>0){
     if(player.stats.thorns>0){ const nearby=nearestEnemy(player.x,player.y,140); if(nearby) dealDamage(nearby, dmg*player.stats.thorns, null); }
@@ -1633,7 +1851,13 @@ function damagePlayer(amount){
     SFX.hurt(); vibrate(30);
   }
   if(player.hp<=0 && state==='playing'){
+    // FIX: reviveChance (Undying talent) used to be written but never read anywhere —
+    // revive was purely a boolean flag (hasRevive) from cards/passives/shop. Undying
+    // now gives a real per-death chance to trigger an emergency revive even without
+    // hasRevive being set, on top of any guaranteed revive sources.
     if((player.stats.deathDefianceCharges||0)>0){ player.stats.deathDefianceCharges--; player.hp=1; player.stats.dmgMult*=2; setTimeout(()=>player.stats.dmgMult/=2,3000); logEvent("Death defied!"); return; }
+    if(player.hasRevive){ player.hasRevive=false; player.hp=Math.floor(player.maxHp*0.5); player.gold=0; logEvent("☥ REBORN! Gold reset to 0."); SFX.levelup(); vibrate([0,50,50,50]); return; }
+    if((player.stats.reviveChance||0)>0 && Math.random()<player.stats.reviveChance){ player.hp=Math.floor(player.maxHp*0.4); logEvent("Undying talent triggers — you cling to life!"); SFX.levelup(); vibrate([0,50,50,50]); return; }
     die();
   }
 }
@@ -1652,7 +1876,7 @@ function updateOrbs(dt){
   }
 }
 function gainXp(v){
-  player.xp += v*player.stats.xpMult;
+  player.xp += v*effXpMult();
   while(player.xp>=player.xpNext){ player.xp-=player.xpNext; player.level++; player.xpNext=Math.round(10*Math.pow(1.16,player.level-1));
     if(player.stats.healOnLevelUp) player.hp=Math.min(player.maxHp,player.hp+player.maxHp*player.stats.healOnLevelUp);
     openLevelUp(); }
@@ -1666,7 +1890,16 @@ function buildCardPool(){
     if(!player.weapons[wid]){ if(Object.keys(player.weapons).length<maxWeaponSlots(player)) pool.push({kind:"unlock",wid}); }
     else if(player.weapons[wid]<WEAPONS[wid].maxLevel) pool.push({kind:"levelup",wid});
   }
-  for(const c of CARDS) pool.push({kind:"card",card:c});
+  // FIX: this used to push every card in CARDS unconditionally, so a one-shot card
+  // like Glass Cannon or a legendary like Ascendant Soul could be offered — and taken —
+  // an unlimited number of times per run, since nothing here ever checked what the
+  // player already has. Non-stackable cards are now excluded once taken; stackable
+  // cards are excluded once they hit their own maxStacks.
+  for(const c of CARDS){
+    const takenCount = player.cardsTaken.filter(id=>id===c.id).length;
+    if(c.stackable){ if(takenCount < (c.maxStacks||99)) pool.push({kind:"card",card:c}); }
+    else if(takenCount===0){ pool.push({kind:"card",card:c}); }
+  }
   return pool;
 }
 function weightedPick(pool,n){
@@ -1687,7 +1920,9 @@ function renderCardEl(entry){
   else if(entry.kind==="levelup"){ const d=WEAPONS[entry.wid]; const lvl=player.weapons[entry.wid];
     el.innerHTML=`<div class="icon">${d.icon}</div><div class="name">${d.name} +1</div><div class="desc">Level ${lvl} → ${lvl+1}.</div><div class="tag">WEAPON LVL</div>`;
     el.onclick=()=>{ SFX.uiClick(); player.weapons[entry.wid]++; logEvent(d.name+" leveled up."); performEvolution(entry.wid); afterCardPicked(); }; }
-  else { const c=entry.card; el.innerHTML=`<div class="icon">${cardIcon(c.cat)}</div><div class="name">${c.name}</div><div class="desc">${c.desc}</div><div class="tag cat-${c.cat}">${c.cat.toUpperCase().replace('_',' ')}</div>`;
+  else { const c=entry.card;
+    const stackNote = c.stackable ? ` <span style="color:var(--dim)">(${player.cardsTaken.filter(id=>id===c.id).length}/${c.maxStacks||99} taken)</span>` : "";
+    el.innerHTML=`<div class="icon">${cardIcon(c.cat)}</div><div class="name">${c.name}</div><div class="desc">${c.desc}${stackNote}</div><div class="tag cat-${c.cat}">${c.cat.toUpperCase().replace('_',' ')}</div>`;
     el.onclick=()=>{ SFX.uiClick(); c.apply(player); player.cardsTaken.push(c.id); if(c.cat==="legendary") runStats.legendaryCardsTaken=(runStats.legendaryCardsTaken||0)+1; logEvent(c.name+" acquired."); afterCardPicked(); }; }
   return el;
 }
@@ -1696,7 +1931,12 @@ function afterCardPicked(){ checkSynergies(); checkAchievements(); pendingLevelU
 function showLevelUpCards(){
   setState('levelup'); SFX.levelup();
   const pool = buildCardPool();
-  const choices = weightedPick(pool,3);
+  let n = 3;
+  // Reroll Gremlin charges: each spent charge upgrades one level-up to offer a 4th
+  // (better-odds) option instead of doing nothing, fixing the previously-dead
+  // rerollCharges counter from the "Reroll Gremlin" event.
+  if(rerollCharges>0){ rerollCharges--; n=4; logEvent("Reroll charge used — extra option offered."); }
+  const choices = weightedPick(pool,n);
   const wrap=document.getElementById('cardsWrap'); wrap.innerHTML="";
   choices.forEach(entry=>wrap.appendChild(renderCardEl(entry)));
   show('screen-levelup');
@@ -1757,7 +1997,7 @@ function renderIngameStats(){
     <div class="stat-row"><span class="k">Chill Strength / Burn Stacks</span><span>${Math.round((s.chillCap||0.35)*100)}% / ${s.burnStacks||1}</span></div>
     <div class="stat-row"><span class="k">Elite Dmg Mult</span><span>+${Math.round((s.eliteDmgMult-1)*100)}%</span></div>
     <div class="stat-row"><span class="k">Fire / Frost / Lightning / Poison</span><span>${s.fireMult.toFixed(2)} / ${s.frostMult.toFixed(2)} / ${s.lightningMult.toFixed(2)} / ${s.poisonMult.toFixed(2)}</span></div>
-    <div class="stat-row"><span class="k">Passives</span><span>${player.passives.length} / ${MAX_PASSIVE_SLOTS}</span></div>
+    <div class="stat-row"><span class="k">Passives</span><span>${player.passives.length} / ${MAX_PASSIVE_SLOTS+(s.extraPassiveSlots||0)}</span></div>
     <div class="stat-row"><span class="k">Weapon Slots</span><span>${Object.keys(player.weapons).length} / ${maxWeaponSlots(player)}</span></div>
     <div class="stat-row"><span class="k">Synergies Active</span><span>${player.synergiesActive.length}</span></div>
     <div class="stat-row"><span class="k">Revive</span><span style="color:${player.hasRevive?'var(--xp)':'var(--dim)'}">${player.hasRevive?"READY ☥":"None"}</span></div>
@@ -1770,11 +2010,18 @@ function eventCtx(){
   return {
     grantGold:(p,amt)=>{ p.gold+=amt; },
     grantSoulImmediate:(p,amt)=>{ save.soul+=amt; save.lifetime.totalSoul+=amt; persistSave(); refreshSoulBadges(); },
-    grantLegendaryCard:(p)=>{ const legendaries=CARDS.filter(c=>c.cat==="legendary"); const c=pick(legendaries); c.apply(p); p.cardsTaken.push(c.id); runStats.legendaryCardsTaken=(runStats.legendaryCardsTaken||0)+1; logEvent(`Legendary acquired: ${c.name}`); },
+    grantLegendaryCard:(p)=>{
+      // Respect the same one-per-run rule as normal card offers instead of ignoring
+      // dedup for event-granted legendaries.
+      const owned = new Set(p.cardsTaken);
+      const legendaries=CARDS.filter(c=>c.cat==="legendary" && (c.stackable ? p.cardsTaken.filter(id=>id===c.id).length<(c.maxStacks||99) : !owned.has(c.id)));
+      if(!legendaries.length){ p.gold+=200; logEvent("All legendaries already claimed — 200 gold instead."); return; }
+      const c=pick(legendaries); c.apply(p); p.cardsTaken.push(c.id); runStats.legendaryCardsTaken=(runStats.legendaryCardsTaken||0)+1; logEvent(`Legendary acquired: ${c.name}`);
+    },
     grantRandomPassive:(p)=>equipPassive(randomPassive()),
     randomPassive:()=>randomPassive(),
     offerPassiveForGold:(p,pid,cost)=>{ if(p.gold>=cost){ p.gold-=cost; equipPassive(pid); } },
-    grantRerollCharges:(p,n)=>{ rerollCharges+=n; logEvent(`Gained ${n} reroll charges.`); },
+    grantRerollCharges:(p,n)=>{ rerollCharges+=n; logEvent(`Gained ${n} reroll charges — your next level-up(s) offer an extra option.`); },
     offerWeaponLevelForGold:(p,cost)=>{ if(p.gold>=cost){ const wids=Object.keys(p.weapons).filter(w=>p.weapons[w]<WEAPONS[w].maxLevel); if(wids.length){ p.gold-=cost; const w=pick(wids); p.weapons[w]++; performEvolution(w); logEvent(`${WEAPONS[w].name} leveled via Smith.`); } } },
     convertGoldToSoul:(p,rate)=>{ const amt=Math.floor(p.gold*rate*0.1); p.gold=0; save.soul+=amt; save.lifetime.totalSoul+=amt; persistSave(); refreshSoulBadges(); logEvent(`Converted gold into ${amt} Soul.`); },
     applyHpPenalty:(p,pct)=>{ p.maxHp=Math.max(10,Math.floor(p.maxHp*(1-pct))); p.hp=Math.min(p.hp,p.maxHp); },
@@ -1796,9 +2043,52 @@ function eventCtx(){
     },
     rollRiftOutcome:(p)=>{ if(Math.random()<0.5){ p.stats.dmgMult*=1.3; logEvent("The rift empowers you!"); } else { p.maxHp=Math.max(10,Math.floor(p.maxHp*0.85)); p.hp=Math.min(p.hp,p.maxHp); logEvent("The rift weakens you!"); } },
     grantCursedWeapon:(p)=>{ const avail=Object.keys(WEAPONS).filter(w=>!p.weapons[w]); if(avail.length){ const w=pick(avail); p.weapons[w]=Math.min(WEAPONS[w].maxLevel,4); p._cursedWeapon=w; logEvent(`Cursed ${WEAPONS[w].name} acquired — it drains your HP.`); } },
-    sacrificePassiveForCards:(p,n)=>{ if(p.passives.length){ p.passives.splice((Math.random()*p.passives.length)|0,1); } for(let i=0;i<n;i++){ const c=pick(CARDS); c.apply(p); p.cardsTaken.push(c.id); } logEvent("Sacrifice complete — power gained."); },
-    applyTemporaryModifier:(key,mult,life,extra)=>{ tempModifiers.push({key,mult,life}); if(extra) Object.entries(extra).forEach(([k,v])=>{ if(player.stats[k]!=null) player.stats[k]*=v; }); },
+    sacrificePassiveForCards:(p,n)=>{ if(p.passives.length){ p.passives.splice((Math.random()*p.passives.length)|0,1); } for(let i=0;i<n;i++){ const pool=buildCardPool().filter(e=>e.kind==="card"); if(!pool.length) break; const entry=pick(pool); entry.card.apply(p); p.cardsTaken.push(entry.card.id); } logEvent("Sacrifice complete — power gained."); },
+    applyTemporaryModifier:(key,mult,life,extra)=>{
+      // FIX: this used to apply `extra` multipliers (e.g. goldMult/xpMult *2 from
+      // Bloodmoon Wager) directly and permanently — they never reverted when `life`
+      // ran out, silently turning a "90 second buff" into a permanent one. The extra
+      // multipliers are now stored on the modifier and reverted by updateTempModifiers()
+      // once `life` elapses.
+      const mod = {key,mult,life,extra:extra||null,_appliedExtra:false};
+      tempModifiers.push(mod);
+      if(extra){ Object.entries(extra).forEach(([k,v])=>{ if(player.stats[k]!=null) player.stats[k]*=v; }); mod._appliedExtra=true; }
+    },
   };
+}
+// Wandering Merchant is rendered specially (see triggerRandomEvent/renderMerchantCardOffers)
+// rather than through def.resolve, since it needs its own purchase UI rather than a
+// single Continue/Accept-Decline button. This fixes the previous crash where
+// def.resolve called ctx.openShopOffer(), a method that never existed anywhere in
+// eventCtx() — triggering the event threw an exception, leaving the event screen
+// stuck open (a softlock) instead of returning to the run.
+function renderMerchantCardOffers(){
+  const wrap=document.getElementById('eventChoices'); wrap.innerHTML="";
+  const pool = buildCardPool().filter(e=>e.kind==='card');
+  const offers = weightedPick(pool,3);
+  const costFor = c => ({offensive:120,defensive:120,utility:100,elemental:140,build_defining:180,legendary:260}[c.cat]||120);
+  if(!offers.length){
+    const none=document.createElement('div'); none.className='card';
+    none.innerHTML=`<div class="icon">🚪</div><div class="name">Nothing to Sell</div><div class="desc">You've already taken every card the merchant carries.</div>`;
+    none.onclick=()=>{ SFX.uiClick(); closeEvent(); };
+    wrap.appendChild(none); return;
+  }
+  offers.forEach(entry=>{
+    const c = entry.card; const cost=costFor(c);
+    const el=document.createElement('div'); el.className='card shop-card';
+    el.innerHTML=`<div class="icon">${cardIcon(c.cat)}</div><div class="name">${c.name}</div><div class="desc">${c.desc}</div><div class="price">${cost} GOLD</div><button class="buy-btn" ${player.gold<cost?'disabled':''}>BUY</button>`;
+    el.querySelector('.buy-btn').onclick=()=>{
+      if(player.gold<cost) return; player.gold-=cost; c.apply(player); player.cardsTaken.push(c.id);
+      if(c.cat==='legendary') runStats.legendaryCardsTaken=(runStats.legendaryCardsTaken||0)+1;
+      SFX.uiClick(); SFX.pickupGold(); logEvent(`Bought ${c.name} from the merchant.`);
+      checkSynergies(); checkAchievements(); closeEvent();
+    };
+    wrap.appendChild(el);
+  });
+  const leave=document.createElement('div'); leave.className='card';
+  leave.innerHTML=`<div class="icon">🚪</div><div class="name">Leave</div><div class="desc">Walk away without buying.</div>`;
+  leave.onclick=()=>{ SFX.uiClick(); closeEvent(); };
+  wrap.appendChild(leave);
 }
 function triggerRandomEvent(){
   const def = pick(EVENTS); activeEventDef=def;
@@ -1810,6 +2100,7 @@ function triggerRandomEvent(){
   document.getElementById('eventTitle').textContent = def.name;
   document.getElementById('eventDesc').textContent = def.desc;
   const wrap=document.getElementById('eventChoices'); wrap.innerHTML="";
+  if(def.id==="wandering_merchant"){ renderMerchantCardOffers(); show('screen-event'); return; }
   const c = eventCtx();
   if(def.choice){
     const accept=document.createElement('div'); accept.className='card';
@@ -1827,9 +2118,28 @@ function triggerRandomEvent(){
   }
   show('screen-event');
 }
-function closeEvent(){ activeEventDef=null; checkAchievements(); checkSynergies(); hideAll(); setState('playing'); MUSIC.start(); }
+function closeEvent(){
+  // FIX: Shrine of Silence promised "+2 passive slots" but disableRandomWeapon()
+  // only ever accepted a duration argument — the second `grantPassiveSlots` option
+  // was silently dropped. Applying it here (once, when the event that requested it
+  // closes) makes the promised bonus slots real; extraPassiveSlots is read by
+  // equipPassive()'s capacity check and shown in the in-game stats screen.
+  if(activeEventDef && activeEventDef.id==="shrine_of_silence"){ player.stats.extraPassiveSlots=(player.stats.extraPassiveSlots||0)+2; logEvent("+2 passive slots granted."); }
+  activeEventDef=null; checkAchievements(); checkSynergies(); hideAll(); setState('playing'); MUSIC.start();
+}
 function updateTempModifiers(dt){
-  for(let i=tempModifiers.length-1;i>=0;i--){ const m=tempModifiers[i]; if(m.life!==Infinity){ m.life-=dt; if(m.life<=0) tempModifiers.splice(i,1); } }
+  for(let i=tempModifiers.length-1;i>=0;i--){
+    const m=tempModifiers[i];
+    if(m.life!==Infinity){
+      m.life-=dt;
+      if(m.life<=0){
+        // Revert any `extra` stat multipliers this modifier temporarily applied
+        // (see eventCtx().applyTemporaryModifier) before removing it.
+        if(m.extra && m._appliedExtra && player){ Object.entries(m.extra).forEach(([k,v])=>{ if(player.stats[k]!=null && v!==0) player.stats[k]/=v; }); }
+        tempModifiers.splice(i,1);
+      }
+    }
+  }
 }
 
 /* =========================================================================
@@ -1899,7 +2209,6 @@ document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState=
 window.addEventListener('pagehide', saveOnExitIfNeeded); window.addEventListener('blur', saveOnExitIfNeeded);
 
 function die(){
-  if(player.hasRevive){ player.hasRevive=false; player.hp=Math.floor(player.maxHp*0.5); player.gold=0; logEvent("☥ REBORN! Gold reset to 0."); SFX.levelup(); vibrate([0,50,50,50]); return; }
   setState('dead'); SFX.stopHeartbeat(); MUSIC.stop(); SFX.death();
   applyRunStatsIncrement(true); save.activeRun=null;
   const soulMult = player.stats.soulMult||1;
@@ -2006,7 +2315,7 @@ function render(){
   const grid=80, startX=Math.floor(camera.x/grid)*grid, endX=camera.x+w+grid, startY=Math.floor(camera.y/grid)*grid, endY=camera.y+h+grid;
   ctx2d.beginPath(); for(let x=startX;x<endX;x+=grid){ctx2d.moveTo(x,startY);ctx2d.lineTo(x,endY);} for(let y=startY;y<endY;y+=grid){ctx2d.moveTo(startX,y);ctx2d.lineTo(endX,y);} ctx2d.stroke();
   ctx2d.strokeStyle="rgba(185,140,255,0.25)"; ctx2d.lineWidth=4; ctx2d.strokeRect(0,0,WORLD.w,WORLD.h);
-  for(const z of zones){ ctx2d.beginPath(); ctx2d.fillStyle= z.tag==="lightning"?"rgba(255,224,92,0.18)": z.tag==="boss"?"rgba(255,77,94,0.15)": z.slowOnly?"rgba(140,80,40,0.15)":"rgba(140,255,120,0.14)"; ctx2d.arc(z.x,z.y,z.radius,0,7); ctx2d.fill(); }
+  for(const z of zones){ ctx2d.beginPath(); ctx2d.fillStyle= z.tag==="lightning"?"rgba(255,224,92,0.18)": z.tag==="boss"?"rgba(255,77,94,0.15)": z.tag==="burnzone"?"rgba(255,120,60,0.18)": z.slowOnly?"rgba(140,80,40,0.15)":"rgba(140,255,120,0.14)"; ctx2d.arc(z.x,z.y,z.radius,0,7); ctx2d.fill(); }
   for(const o of orbs){ ctx2d.beginPath(); ctx2d.fillStyle = o.type==="xp"?"#7cff6b": o.type==="gold"?"#ffb347": o.type==="crystal"?"#7ee0ff":"#ff9ecb"; ctx2d.shadowColor=ctx2d.fillStyle; ctx2d.shadowBlur=glow(8); ctx2d.arc(o.x,o.y,o.radius,0,7); ctx2d.fill(); }
   ctx2d.shadowBlur=0;
   if(player.swordFx){ const alpha=player.swordFx.t/0.22; ctx2d.beginPath(); ctx2d.strokeStyle=`rgba(185,140,255,${alpha*0.7})`; ctx2d.lineWidth=6; ctx2d.arc(player.x,player.y,player.swordFx.r,0,Math.PI*2); ctx2d.stroke(); }
@@ -2067,7 +2376,10 @@ function updateBullets(dt){
     if(b.owner==="player"){
       let removed=false;
       forEachEnemyNear(b.x,b.y,b.radius+60,e=>{ if(removed||b.hitset.has(e)) return;
-        if(dist2(b.x,b.y,e.x,e.y)<(b.radius+e.radius)*(b.radius+e.radius)){ dealDamage(e,b.dmg,b.weaponId); b.hitset.add(e);
+        if(dist2(b.x,b.y,e.x,e.y)<(b.radius+e.radius)*(b.radius+e.radius)){
+          dealDamage(e,b.dmg,b.weaponId); b.hitset.add(e);
+          // World Ender: detonates on impact (small extra AoE around the hit target).
+          if(b.detonate && !e.dead) forEachEnemyNear(e.x,e.y,70,other=>{ if(other!==e) queueSecondaryDamage(other,b.dmg*0.4,b.weaponId); });
           if(b.pierce<=0){ bullets.splice(i,1); removed=true; } else b.pierce--; } });
       if(removed) continue;
     } else {
@@ -2159,12 +2471,12 @@ function updateMuteButtons(){ const label=SFX.isMuted()?'🔇 SOUND':'🔊 SOUND
    PART 16 — SETTINGS / FULLSCREEN / JOYSTICK (unchanged from base prototype)
    ========================================================================= */
 const isTouchDevice=('ontouchstart' in window)||navigator.maxTouchPoints>0||navigator.msMaxTouchPoints>0;
-let quality='high', screenShakeOn=true, hapticsOn=true;
+let quality='high', enemyDensity='high', screenShakeOn=true, hapticsOn=true;
 function vibrate(ms){ if(hapticsOn && navigator.vibrate){ try{ navigator.vibrate(ms); }catch(e){} } }
 function shouldShowJoystick(){ const mode=save.settings.controlMode; return mode==='joystick'||(mode==='auto'&&isTouchDevice); }
 function applySettings(){
   SFX.setMuted(!!save.settings.muted); SFX.setVolume(save.settings.sfxVolume); MUSIC.setVolume(save.settings.muted?0:save.settings.musicVolume);
-  quality=save.settings.quality; screenShakeOn=!!save.settings.screenShake; hapticsOn=!!save.settings.haptics; updateMuteButtons();
+  quality=save.settings.quality; enemyDensity=save.settings.enemyDensity||save.settings.quality||'high'; screenShakeOn=!!save.settings.screenShake; hapticsOn=!!save.settings.haptics; updateMuteButtons();
   const joyCapture=document.getElementById('joystickCapture');
   if(joyCapture){ const show=shouldShowJoystick(); joyCapture.style.pointerEvents=show?'auto':'none'; if(!show){ touchVec.x=0; touchVec.y=0; const zone=document.getElementById('joystickZone'); if(zone) zone.style.display='none'; } }
 }
@@ -2192,7 +2504,7 @@ document.getElementById('fullscreenToggleBtn').onclick=()=>{ SFX.uiClick(); togg
 if(!fullscreenSupported()){ const toggleBtn=document.getElementById('fullscreenToggleBtn'); if(toggleBtn){ toggleBtn.disabled=true; toggleBtn.textContent="UNAVAILABLE"; } const hudBtn=document.getElementById('fullscreenBtnHud'); if(hudBtn) hudBtn.style.opacity='0.35'; }
 function setSegActive(containerId,value){ document.querySelectorAll('#'+containerId+' .seg-btn').forEach(b=>b.classList.toggle('active',b.dataset.val===value)); }
 function setToggle(id,on){ const el=document.getElementById(id); if(el) el.classList.toggle('on',!!on); }
-function refreshSettingsUI(){ setSegActive('ctrlMode',save.settings.controlMode); setSegActive('vidQuality',save.settings.quality); setToggle('ctrlHaptics',save.settings.haptics); setToggle('vidShake',save.settings.screenShake); setToggle('audioMuted',save.settings.muted); updateFullscreenButtons();
+function refreshSettingsUI(){ setSegActive('ctrlMode',save.settings.controlMode); setSegActive('vidQuality',save.settings.quality); setSegActive('vidDensity',save.settings.enemyDensity||'high'); setToggle('ctrlHaptics',save.settings.haptics); setToggle('vidShake',save.settings.screenShake); setToggle('audioMuted',save.settings.muted); updateFullscreenButtons();
   const vol=Math.round(save.settings.sfxVolume*100); document.getElementById('audioVolume').value=vol; document.getElementById('audioVolumeVal').textContent=vol;
   const mvol=Math.round(save.settings.musicVolume*100); document.getElementById('musicVolume').value=mvol; document.getElementById('musicVolumeVal').textContent=mvol; }
 let settingsReturnTo='menu';
@@ -2200,6 +2512,7 @@ function openSettings(returnTo){ settingsReturnTo=returnTo; refreshSettingsUI();
 document.querySelectorAll('.settings-tab').forEach(tab=>{ tab.onclick=()=>{ document.querySelectorAll('.settings-tab').forEach(t=>t.classList.remove('active')); tab.classList.add('active'); document.querySelectorAll('.settings-pane').forEach(p=>p.classList.add('hidden')); document.getElementById('pane-'+tab.dataset.tab).classList.remove('hidden'); }; });
 document.getElementById('ctrlMode').addEventListener('click',e=>{ const b=e.target.closest('.seg-btn'); if(!b) return; save.settings.controlMode=b.dataset.val; persistSave(); applySettings(); refreshSettingsUI(); });
 document.getElementById('vidQuality').addEventListener('click',e=>{ const b=e.target.closest('.seg-btn'); if(!b) return; save.settings.quality=b.dataset.val; persistSave(); applySettings(); refreshSettingsUI(); });
+document.getElementById('vidDensity').addEventListener('click',e=>{ const b=e.target.closest('.seg-btn'); if(!b) return; save.settings.enemyDensity=b.dataset.val; persistSave(); applySettings(); refreshSettingsUI(); });
 document.getElementById('ctrlHaptics').onclick=()=>{ save.settings.haptics=!save.settings.haptics; persistSave(); applySettings(); refreshSettingsUI(); vibrate(20); };
 document.getElementById('vidShake').onclick=()=>{ save.settings.screenShake=!save.settings.screenShake; persistSave(); applySettings(); refreshSettingsUI(); };
 document.getElementById('audioVolume').addEventListener('input',e=>{ const v=Number(e.target.value); document.getElementById('audioVolumeVal').textContent=v; save.settings.sfxVolume=v/100; SFX.setVolume(save.settings.sfxVolume); });
@@ -2272,7 +2585,7 @@ function renderTalentTree(activeBranch){
   for(const line of TALENT_STAT_LINES[activeBranch]){
     const lvl=talentLevel(activeBranch,line.key); const maxed=lvl>=5; const cost=talentCost(activeBranch,line.key);
     const el=document.createElement('div'); el.className='meta-item';
-    el.innerHTML=`<div><div class="m-name">${line.label}</div><div class="m-desc">+${line.perLevel} ${line.key} per tier.</div><div class="m-level">TIER ${lvl} / 5</div></div>`;
+    el.innerHTML=`<div><div class="m-name">${line.label}</div><div class="m-desc">${TALENT_LINE_DESCS[line.key]||`+${line.perLevel} ${line.key} per tier.`}</div><div class="m-level">TIER ${lvl} / 5</div></div>`;
     const btn=document.createElement('button'); btn.className='buy-btn'; btn.textContent=maxed?"MAXED":`${cost} SOUL`; btn.disabled=maxed||save.soul<cost;
     btn.onclick=()=>{ if(maxed||save.soul<cost) return; save.soul-=cost; save.talentLevels[activeBranch+"_"+line.key]=lvl+1; persistSave(); refreshSoulBadges(); renderTalentTree(activeBranch); };
     el.appendChild(btn); wrap.appendChild(el);
@@ -2310,9 +2623,25 @@ function renderAchievementsScreen(){
 }
 document.getElementById('btnAchievements').onclick=()=>{ setState('achievements'); renderAchievementsScreen(); show('screen-achievements'); };
 document.getElementById('achBack').onclick=goMenu;
+
+function renderArmoryScreen(){
+  document.getElementById('armorySummary').textContent = `Artifacts: ${Math.floor(save.artifacts)}`;
+  const wrap=document.getElementById('armoryWrap'); wrap.innerHTML="";
+  for(const item of ARMORY_ITEMS){
+    const lvl=armoryLevel(item.id); const maxed=lvl>=item.maxLevel; const cost=armoryCost(item,lvl);
+    const el=document.createElement('div'); el.className='ach-card unlocked';
+    el.innerHTML=`<div class="ach-icon">${item.icon}</div><div style="flex:1"><div class="ach-name">${item.name} <span class="ach-chip">${lvl}/${item.maxLevel}</span></div><div class="ach-desc">${item.desc}</div></div>`;
+    const btn=document.createElement('button'); btn.className='buy-btn'; btn.style.marginLeft='10px'; btn.textContent=maxed?"MAXED":`${cost} 🎗️`;
+    btn.disabled=maxed||save.artifacts<cost;
+    btn.onclick=()=>{ if(maxed||save.artifacts<cost) return; save.artifacts-=cost; save.armoryUnlocks[item.id]=lvl+1; persistSave(); refreshSoulBadges(); renderArmoryScreen(); };
+    el.appendChild(btn); wrap.appendChild(el);
+  }
+}
+document.getElementById('btnArmory').onclick=()=>{ setState('armory'); renderArmoryScreen(); show('screen-armory'); };
+document.getElementById('armoryBack').onclick=goMenu;
 document.getElementById('btnSettings').onclick=()=>{ setState('settings'); openSettings('menu'); };
 document.getElementById('btnPauseSettings').onclick=()=>{ openSettings('pause'); };
-document.getElementById('btnReset').onclick=()=>{ if(confirm("Reset all Soul, artifacts, and talent progression? This cannot be undone.")){ const keepSettings=save.settings; save=JSON.parse(JSON.stringify(DEFAULT_SAVE)); save.settings=keepSettings; persistSave(); refreshSoulBadges(); updateContinueButton(); } };
+document.getElementById('btnReset').onclick=()=>{ if(confirm("Reset all Soul, artifacts, and talent progression? This cannot be undone.")){ const keepSettings=save.settings; save=JSON.parse(JSON.stringify(DEFAULT_SAVE)); save.settings=keepSettings; save._migratedRemovedTalents=true; persistSave(); refreshSoulBadges(); updateContinueButton(); } };
 document.getElementById('pauseBtn').onclick=togglePause;
 document.getElementById('btnResume').onclick=()=>{ hideAll(); setState('playing'); MUSIC.start(); };
 document.getElementById('btnQuitRun').onclick=quitRun;
