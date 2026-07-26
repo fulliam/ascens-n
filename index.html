@@ -1086,14 +1086,25 @@ function weaponFire(wid, lvl, dt){
     const baseAng = Math.atan2(target.y-player.y,target.x-player.x);
     for(let i=0;i<count;i++){
       const spread=(i-(count-1)/2)*0.16, ang=baseAng+spread;
-      bullets.push({owner:"player",x:player.x,y:player.y,vx:Math.cos(ang)*def.base.speed,vy:Math.sin(ang)*def.base.speed,
-        dmg,radius:5,life:2.2,color:"#ffd479",pierce,hitset:new Set(),weaponId:wid});
+      spawnBullet({owner:"player",x:player.x,y:player.y,vx:Math.cos(ang)*def.base.speed,vy:Math.sin(ang)*def.base.speed,
+        dmg,radius:5,life:2.2,color:"#ffd479",pierce,weaponId:wid});
     }
     SFX.bowShot();
     return;
   }
 }
 
+const MAX_BULLETS = 900; // hard ceiling — a runaway projectile-count build can't create unbounded bullets
+let bulletPool = [];
+function spawnBullet(props){
+  if(bullets.length>=MAX_BULLETS) return null;
+  const b = bulletPool.pop() || {};
+  b.traveled=0; b.returning=false; b.weaponId=undefined; b.pierce=0;
+  Object.assign(b, props);
+  if(b.owner==="player"){ if(!b.hitset) b.hitset=new Set(); else b.hitset.clear(); }
+  bullets.push(b);
+  return b;
+}
 function updateWeapons(dt){
   for(const wid of Object.keys(player.weapons)) weaponFire(wid, player.weapons[wid], dt);
   if(player.swordFx){ player.swordFx.t-=dt; if(player.swordFx.t<=0) player.swordFx=null; }
@@ -1163,40 +1174,88 @@ function randomPassive(excludeOwned=true){
   return (pool.length?pool:PASSIVES)[(Math.random()*(pool.length||PASSIVES.length))|0].id;
 }
 
+/* ---- Combat Event Queue --------------------------------------------------
+   Root-cause fix for the "Maximum call stack size exceeded" crash: dealDamage()
+   and killEnemy() used to call each other (and themselves) directly and
+   synchronously whenever an effect (frostShatter, chain-on-hit, burn spread)
+   touched more enemies — e.g. dealDamage -> killEnemy -> dealDamage -> killEnemy.
+   Combined with the spatial grid not being rebuilt mid-frame, a dead enemy
+   object could even be re-found and re-processed, making the cycle unbounded.
+
+   Fix: every enemy carries an explicit lifecycle flag (`dead`), checked at the
+   top of both dealDamage() and killEnemy() so a dead enemy can never be
+   re-entered. Any damage that would normally be triggered *from inside*
+   dealDamage/killEnemy (chain-on-hit, frost-shatter splash) is no longer a
+   direct recursive call — it's pushed onto secondaryDamageQueue and drained
+   in a flat, bounded loop once the top-level call has fully unwound
+   (combatDepth back to 0). This turns unbounded call-stack recursion into a
+   bounded iterative queue, with a hard MAX_QUEUE_ITER safety cap so even a
+   pathological build (100% chain chance, etc.) can never hang or crash. ---- */
+let combatDepth = 0;
+let secondaryDamageQueue = [];
+const MAX_QUEUE_ITER = 4000;
+function queueSecondaryDamage(targetEnemy, dmg, weaponId){
+  if(!targetEnemy || targetEnemy.dead) return;
+  secondaryDamageQueue.push({enemy:targetEnemy, dmg, weaponId});
+}
+function drainSecondaryDamageQueue(){
+  let iterations=0;
+  while(secondaryDamageQueue.length && iterations<MAX_QUEUE_ITER){
+    iterations++;
+    const item = secondaryDamageQueue.shift();
+    if(item.enemy && !item.enemy.dead) dealDamage(item.enemy, item.dmg, item.weaponId);
+  }
+  if(iterations>=MAX_QUEUE_ITER){ console.warn("[combat] secondaryDamageQueue safety cap hit — dropping", secondaryDamageQueue.length, "pending events"); secondaryDamageQueue.length=0; }
+}
+
 let lastHitSfxTime=-1;
 function dealDamage(enemy, dmg, weaponId){
-  let crit=false;
-  const isEliteOrBoss = enemy.elite||enemy.boss;
-  if(isEliteOrBoss) dmg *= (player.stats.eliteDmgMult||1);
-  if(enemy.slowed) dmg *= (player.stats.dmgToSlowedMult||1);
-  if(enemy.hp/enemy.maxHp < 0.2) dmg *= (1+(player.stats.executeBonus||0));
-  if(player.stats.berserkScaling) dmg *= (1 + player.stats.berserkScaling*(100*(1-player.hp/player.maxHp)));
-  if(player.momentumStacks) dmg *= (1+(player.stats.momentumPerKill||0)*player.momentumStacks);
-  if(player.stats.turretMode && (touchVec.x===0&&touchVec.y===0) && !keys['w']&&!keys['a']&&!keys['s']&&!keys['d']) dmg *= 1.2;
-  if(player.stats.critChance>0 && Math.random()<player.stats.critChance){ dmg*=player.stats.critMult; crit=true; }
-  if(enemy.special==="parryFirstHit" && !enemy.parried){ enemy.parried=true; spawnFloater(enemy.x,enemy.y-10,"PARRY","#8fd8ff"); return; }
-  if(enemy.special==="stagger"){ enemy.hitCount=(enemy.hitCount||0)+1; if(enemy.hitCount%4===0){ enemy.staggerT=1.0; } }
-  if(enemy.shield>0){ const absorbed=Math.min(enemy.shield,dmg); enemy.shield-=absorbed; dmg-=absorbed; if(dmg<=0){ spawnFloater(enemy.x,enemy.y-10,"BLOCK","#7ee0ff"); return; } }
-  enemy.hp -= dmg; enemy.hitFlash=1;
-  dpsWindow.push({t:runTime,dmg});
-  spawnFloater(enemy.x,enemy.y-10,Math.round(dmg), crit?"#ffe15c":(isEliteOrBoss?"#ffb347":"#fff"));
-  if(player.stats.lifesteal>0) player.hp=Math.min(player.maxHp,player.hp+dmg*player.stats.lifesteal);
-  if(player.stats.thorns) enemy._thornsSource=true;
-  if(weaponId){
-    const wtags = weaponDef(weaponId).tags||[];
-    if((wtags.includes("frost")||player.stats.slowOnHit) && Math.random()<(player.stats.slowOnHit>0?1:0.4)){ enemy.slowed=true; enemy.slowT=2; }
-    if((wtags.includes("fire")||player.stats.burnOnHitChance>0) && Math.random()<(player.stats.burnOnHitChance||0.12)){ enemy.burning=true; enemy.burnT=3; enemy.burnDps=dmg*0.2*(player.stats.fireMult||1); }
-    if((player.stats.chainOnHitChance||0)>0 && Math.random()<player.stats.chainOnHitChance){
-      const nxt = nearestEnemy(enemy.x,enemy.y,240); if(nxt && nxt!==enemy) dealDamage(nxt, dmg*0.5, null);
+  if(!enemy || enemy.dead) return; // guard: a dead/removed enemy can never be re-processed
+  combatDepth++;
+  try{
+    let crit=false;
+    const isEliteOrBoss = enemy.elite||enemy.boss;
+    if(isEliteOrBoss) dmg *= (player.stats.eliteDmgMult||1);
+    if(enemy.slowed) dmg *= (player.stats.dmgToSlowedMult||1);
+    if(enemy.hp/enemy.maxHp < 0.2) dmg *= (1+(player.stats.executeBonus||0));
+    if(player.stats.berserkScaling) dmg *= (1 + player.stats.berserkScaling*(100*(1-player.hp/player.maxHp)));
+    if(player.momentumStacks) dmg *= (1+(player.stats.momentumPerKill||0)*player.momentumStacks);
+    if(player.stats.turretMode && (touchVec.x===0&&touchVec.y===0) && !keys['w']&&!keys['a']&&!keys['s']&&!keys['d']) dmg *= 1.2;
+    if(player.stats.critChance>0 && Math.random()<player.stats.critChance){ dmg*=player.stats.critMult; crit=true; }
+    if(enemy.special==="parryFirstHit" && !enemy.parried){ enemy.parried=true; spawnFloater(enemy.x,enemy.y-10,"PARRY","#8fd8ff"); return; }
+    if(enemy.special==="stagger"){ enemy.hitCount=(enemy.hitCount||0)+1; if(enemy.hitCount%4===0){ enemy.staggerT=1.0; } }
+    if(enemy.shield>0){ const absorbed=Math.min(enemy.shield,dmg); enemy.shield-=absorbed; dmg-=absorbed; if(dmg<=0){ spawnFloater(enemy.x,enemy.y-10,"BLOCK","#7ee0ff"); return; } }
+    dmg = Math.max(0, Math.min(dmg, 999999)); // sanity clamp against NaN/Infinity from broken combos
+    enemy.hp -= dmg; enemy.hitFlash=1;
+    dpsWindow.push({t:runTime,dmg});
+    spawnFloater(enemy.x,enemy.y-10,Math.round(dmg), crit?"#ffe15c":(isEliteOrBoss?"#ffb347":"#fff"));
+    if(player.stats.lifesteal>0) player.hp=Math.min(player.maxHp,player.hp+dmg*player.stats.lifesteal);
+    if(weaponId){
+      const wtags = weaponDef(weaponId).tags||[];
+      if((wtags.includes("frost")||player.stats.slowOnHit) && Math.random()<(player.stats.slowOnHit>0?1:0.4)){ enemy.slowed=true; enemy.slowT=2; }
+      if((wtags.includes("fire")||player.stats.burnOnHitChance>0) && Math.random()<(player.stats.burnOnHitChance||0.12)){ enemy.burning=true; enemy.burnT=3; enemy.burnDps=dmg*0.2*(player.stats.fireMult||1); }
+      if((player.stats.chainOnHitChance||0)>0 && Math.random()<Math.min(0.9,player.stats.chainOnHitChance)){
+        const nxt = nearestEnemy(enemy.x,enemy.y,240); if(nxt && nxt!==enemy && !nxt.dead) queueSecondaryDamage(nxt, dmg*0.5, null); // queued, not recursive
+      }
     }
+    if(enemy.boss) SFX.bossHit(); else if(runTime-lastHitSfxTime>0.04){ SFX.hit(); lastHitSfxTime=runTime; }
+    if(enemy.hp<=0) killEnemy(enemy);
+  } finally {
+    combatDepth--;
+    if(combatDepth===0) drainSecondaryDamageQueue(); // flat, bounded processing instead of stack recursion
   }
-  if(enemy.boss) SFX.bossHit(); else if(runTime-lastHitSfxTime>0.04){ SFX.hit(); lastHitSfxTime=runTime; }
-  if(enemy.hp<=0) killEnemy(enemy);
 }
 
 function killEnemy(enemy){
+  if(enemy.dead) return; // guard: never run death side-effects twice for the same enemy
   if(enemy.special==="reassemble" && !enemy._reassembled){ enemy._reassembled=true; enemy.hp=enemy.maxHp*0.5; spawnParticle(enemy.x,enemy.y,"#fff",16); logEvent(`${enemy.name||"The enemy"} reassembles!`); return; }
-  const idx=enemies.indexOf(enemy); if(idx>=0) enemies.splice(idx,1);
+  // Mark dead but DO NOT splice out of `enemies` here: this can run mid-iteration
+  // (updateEnemies' burn-tick, or a weapon hitting several enemies in one pass),
+  // and mutating the array's length while a for-of loop walks it shifts every
+  // later index by one — the classic "skips the next enemy" bug. Actual removal
+  // (and pooling) happens once per frame in pruneDeadEnemies(), after all systems
+  // that read `enemies` this frame have already run.
+  enemy.dead = true;
   killCount++; player.momentumStacks=(player.momentumStacks||0)+1;
   if(enemy.elite){ eliteKillsRun++; save.lifetime.uniqueElitesKilled = Array.from(new Set([...(save.lifetime.uniqueElitesKilled||[]),enemy.id])); }
   if(enemy.boss){ bossKilledRun=true; runStats.bossesKilledIds.push(enemy.bossDefId); save.lifetime.uniqueBossesKilled = Array.from(new Set([...(save.lifetime.uniqueBossesKilled||[]),enemy.bossDefId])); }
@@ -1211,8 +1270,8 @@ function killEnemy(enemy){
   if(enemy.id==="imp" && !enemy.isSplit){ for(let i=0;i<2;i++){ const ang=rand(0,Math.PI*2); spawnEnemy("imp",{x:enemy.x+Math.cos(ang)*14,y:enemy.y+Math.sin(ang)*14},{isSplit:true,hpMult:0.4,radiusMult:0.65}); } }
   if(enemy.special==="explodeOnDeath"){ for(let i=0;i<4;i++){ const ang=(i/4)*Math.PI*2; spawnEnemy("rat_swarm",{x:enemy.x+Math.cos(ang)*30,y:enemy.y+Math.sin(ang)*30}); } logEvent("It explodes into a swarm!"); }
   if(player.stats.raiseDeadChance>0 && Math.random()<player.stats.raiseDeadChance){ minions.push({x:enemy.x,y:enemy.y,weaponId:"raised",dmg:enemy.dmg*0.5,hp:20,speed:180,atkCd:0,life:12,radius:9,icon:"💀"}); }
-  if(enemy.burning && player.stats.burnExplode){ forEachEnemyNear(enemy.x,enemy.y,80,e2=>{ e2.burning=true; e2.burnT=2; e2.burnDps=enemy.burnDps||4; }); }
-  if(enemy.slowed && player.stats.frostShatter){ forEachEnemyNear(enemy.x,enemy.y,90,e2=>dealDamage(e2,20,null)); }
+  if(enemy.burning && player.stats.burnExplode){ forEachEnemyNear(enemy.x,enemy.y,80,e2=>{ if(!e2.dead){ e2.burning=true; e2.burnT=2; e2.burnDps=enemy.burnDps||4; } }); }
+  if(enemy.slowed && player.stats.frostShatter){ forEachEnemyNear(enemy.x,enemy.y,90,e2=>{ if(e2!==enemy) queueSecondaryDamage(e2,20,null); }); }
   if(enemy.boss){ logEvent(`★ ${enemy.name.toUpperCase()} HAS FALLEN ★`); SFX.bossDeath(); }
   else if(enemy.elite){ logEvent("Elite defeated."); SFX.eliteKill(); }
   else SFX.kill();
@@ -1226,20 +1285,51 @@ function killEnemy(enemy){
 function currentWave(){ let w=WAVES[0]; for(const ww of WAVES) if(runTime>=ww.t) w=ww; return w; }
 function currentPhase(){ let ph=PHASES[0]; for(const p of PHASES) if(runTime>=p.t) ph=p; return ph; }
 
+/* ---- Enemy object pool ----------------------------------------------------
+   1000+ concurrent enemies means potentially thousands of allocations per
+   minute if every spawn/death pair is a fresh object + GC sweep. Pooling
+   reuses the same objects: killEnemy() only flags `dead`, pruneDeadEnemies()
+   (called once at the end of each frame) recycles them, and spawnEnemy/
+   spawnBoss pull from the pool first. resetEnemyFields() explicitly clears
+   every mutable runtime field a previous life could have set (status effects,
+   AI sub-state, boss phase state) so nothing ever leaks between lives. */
+let enemyPool = [];
+function acquireEnemyObject(){ return enemyPool.length ? enemyPool.pop() : {}; }
+function resetEnemyFields(o){
+  o.slowed=false; o.slowT=0; o.burning=false; o.burnT=0; o.burnDps=0; o.staggerT=0; o.hitCount=0; o.parried=false;
+  o.enraged=false; o.teleCd=undefined; o.sumCd=undefined; o.strikeCd=undefined; o.freezeR=undefined; o._mutated=false;
+  o._justHit=false; o._lastDmgToPlayer=0; o._reassembled=false; o._chargeSpeedMult=undefined; o._chargeRecover=undefined;
+  o._chargeTimer=0; o.currentPhaseId=null; o.phaseAttackCds={}; o.bossDefId=undefined; o._treasureGold=undefined; o._miniBossReward=undefined;
+  o.dead=false; o.vx=0; o.vy=0;
+  return o;
+}
+function pruneDeadEnemies(){
+  let write=0;
+  for(let read=0; read<enemies.length; read++){
+    const e = enemies[read];
+    if(e.dead){ enemyPool.push(e); continue; }
+    enemies[write++] = e;
+  }
+  enemies.length = write;
+}
+
 function spawnEnemy(id, forcedPos, overrides={}){
   const def = ENEMIES[id]; if(!def) return null;
   const wave = currentWave();
+  if(enemies.length>=dynamicMaxEnemies()) return null; // hard cap enforced at the single creation point
   let x,y;
   if(forcedPos){ x=forcedPos.x; y=forcedPos.y; }
   else{ const ang=rand(0,Math.PI*2), r=rand(520,660); x=clamp(player.x+Math.cos(ang)*r,40,WORLD.w-40); y=clamp(player.y+Math.sin(ang)*r,40,WORLD.h-40); }
   const scale = overrides.scale!=null?overrides.scale:wave.mult;
   const hpMult = overrides.hpMult!=null?overrides.hpMult:1;
   const radiusMult = overrides.radiusMult!=null?overrides.radiusMult:1;
-  const e = { id, name:def.name, x,y, hp:def.hp*scale*hpMult, maxHp:def.hp*scale*hpMult, speed:def.speed,
+  const e = resetEnemyFields(acquireEnemyObject());
+  Object.assign(e, { id, name:def.name, x,y, hp:def.hp*scale*hpMult, maxHp:def.hp*scale*hpMult, speed:def.speed,
     radius:def.radius*radiusMult, dmg:def.dmg*Math.min(scale,2.4), xp:def.xp, gold:def.gold, brain:def.brain,
     color:def.color, glow:def.glow, elite:!!def.elite, boss:false, special:def.special||null,
     isSplit:!!overrides.isSplit, atkCd:0, shootCd:rand(0,1), hitFlash:0,
-    chargeCd:rand(1,2.4), chargeState:"idle", chargeDx:0, chargeDy:0, summonCd:rand(2.5,4), swarmPhase:rand(0,Math.PI*2), shield:0 };
+    chargeCd:rand(1,2.4), chargeState:"idle", chargeDx:0, chargeDy:0, summonCd:rand(2.5,4), swarmPhase:rand(0,Math.PI*2), shield:0,
+    aiTimer:rand(0,AI_TICK_INTERVAL) });
   enemies.push(e); return e;
 }
 function spawnBoss(bossDefId, forcedPos){
@@ -1247,13 +1337,16 @@ function spawnBoss(bossDefId, forcedPos){
   const wave = currentWave(); const scale = wave.mult*0.85;
   let x,y;
   if(forcedPos){x=forcedPos.x;y=forcedPos.y;} else { const ang=rand(0,Math.PI*2); x=clamp(player.x+Math.cos(ang)*680,40,WORLD.w-40); y=clamp(player.y+Math.sin(ang)*680,40,WORLD.h-40); }
-  const e = { id:bossDefId, bossDefId, name:def.name, x,y, hp:def.hp*scale, maxHp:def.hp*scale, speed:def.speed, radius:def.radius,
+  const e = resetEnemyFields(acquireEnemyObject());
+  Object.assign(e, { id:bossDefId, bossDefId, name:def.name, x,y, hp:def.hp*scale, maxHp:def.hp*scale, speed:def.speed, radius:def.radius,
     dmg:def.dmg*Math.min(scale,3), xp:def.hp/13, gold:def.hp/25, brain:"phaseboss", color:def.color, glow:def.glow,
     elite:false, boss:true, isSplit:false, atkCd:0, shootCd:0, hitFlash:0, chargeCd:1.5, chargeState:"idle", chargeDx:0,chargeDy:0,
-    currentPhaseId:null, phaseAttackCds:{}, shield:0 };
+    shield:0, aiTimer:0 });
   enemies.push(e); return e;
 }
-const MAX_ENEMIES = 260;
+const MAX_ENEMIES = 1200; // hard ceiling; dynamicMaxEnemies() further scales this down for lower quality settings
+function dynamicMaxEnemies(){ return quality==='low' ? 400 : quality==='medium' ? 800 : MAX_ENEMIES; }
+const AI_TICK_INTERVAL = 0.2; // normal enemies re-run their brain logic ~5x/sec instead of 60x/sec; elites/bosses are exempt
 const BOSS_WARNING_LEAD = 4;
 function updateSpawns(dt){
   const wave = currentWave();
@@ -1296,7 +1389,7 @@ function bossCtx(dt){
   return {
     dt,
     log:(t)=>logEvent(t),
-    radialBurst:(b,count,speed,dmgFactor)=>{ for(let a=0;a<count;a++){ const ang=(a/count)*Math.PI*2; bullets.push({owner:"enemy",x:b.x,y:b.y,vx:Math.cos(ang)*speed,vy:Math.sin(ang)*speed,dmg:b.dmg*dmgFactor,radius:7,life:3.4,color:b.color,pierce:0}); } },
+    radialBurst:(b,count,speed,dmgFactor)=>{ for(let a=0;a<count;a++){ const ang=(a/count)*Math.PI*2; spawnBullet({owner:"enemy",x:b.x,y:b.y,vx:Math.cos(ang)*speed,vy:Math.sin(ang)*speed,dmg:b.dmg*dmgFactor,radius:7,life:3.4,color:b.color,pierce:0}); } },
     chaseAttack:(b)=>{ const dx=player.x-b.x,dy=player.y-b.y,d=Math.hypot(dx,dy)||1; if(d<b.radius+player.radius+10) damagePlayer(b.dmg); },
     dashCharge:(b,speedMult,recover)=>{
       if(b.chargeState==="idle"||!b.chargeState){ const dx=player.x-b.x,dy=player.y-b.y,d=Math.hypot(dx,dy)||1; b.chargeDx=dx/d; b.chargeDy=dy/d; b.chargeState="charging"; b._chargeSpeedMult=speedMult; b._chargeRecover=recover; }
@@ -1305,7 +1398,7 @@ function bossCtx(dt){
     teleportAway:(b,dist)=>{ const ang=rand(0,Math.PI*2); b.x=clamp(b.x+Math.cos(ang)*dist,b.radius,WORLD.w-b.radius); b.y=clamp(b.y+Math.sin(ang)*dist,b.radius,WORLD.h-b.radius); spawnParticle(b.x,b.y,b.color,14); },
     teleportBehindAndStrike:(b)=>{ const ang=rand(0,Math.PI*2); b.x=clamp(player.x+Math.cos(ang)*(b.radius+player.radius+20),b.radius,WORLD.w-b.radius); b.y=clamp(player.y+Math.sin(ang)*(b.radius+player.radius+20),b.radius,WORLD.h-b.radius); spawnParticle(b.x,b.y,b.color,10); damagePlayer(b.dmg*1.1); },
     zoneDenial:(b,dmgPerTick,radius,duration)=>{ zones.push({x:player.x,y:player.y,radius,dmg:dmgPerTick,life:duration,maxLife:duration,tickCd:0,tag:"boss",targetsPlayer:true}); },
-    sweepLaser:(b,range)=>{ for(let a=0;a<10;a++){ const ang=(a/10)*Math.PI*2; bullets.push({owner:"enemy",x:b.x,y:b.y,vx:Math.cos(ang)*260,vy:Math.sin(ang)*260,dmg:b.dmg*0.5,radius:6,life:range/260,color:"#8a8f9e",pierce:0}); } },
+    sweepLaser:(b,range)=>{ for(let a=0;a<10;a++){ const ang=(a/10)*Math.PI*2; spawnBullet({owner:"enemy",x:b.x,y:b.y,vx:Math.cos(ang)*260,vy:Math.sin(ang)*260,dmg:b.dmg*0.5,radius:6,life:range/260,color:"#8a8f9e",pierce:0}); } },
     deployTurrets:(b,count)=>{ for(let i=0;i<count;i++){ if(enemies.length<MAX_ENEMIES){ const ang=(i/count)*Math.PI*2; const t=spawnEnemy("skeleton_archer",{x:b.x+Math.cos(ang)*70,y:b.y+Math.sin(ang)*70}); if(t){ t.speed=0; t.hp=t.maxHp=30; t.color="#8a8f9e"; } } } },
     grantShield:(b,amount)=>{ b.shield=(b.shield||0)+amount; },
     stealResource:(b,type,pct)=>{ if(type==="gold"){ const amt=Math.floor(player.gold*pct); player.gold-=amt; runStats.stolenByCollector=true; logEvent("The Collector steals your gold!"); } else { player.xp=Math.max(0,player.xp-player.xp*pct); runStats.stolenByCollector=true; logEvent("The Collector siphons your XP!"); } },
@@ -1328,13 +1421,26 @@ function updateEliteSpecial(e,dt){
 }
 function updateEnemies(dt){
   for(const e of enemies){
+    if(e.dead) continue; // stays in the array until end-of-frame prune; never act on it again
     e.hitFlash=Math.max(0,e.hitFlash-dt*4);
     if(e.slowed){ e.slowT-=dt; if(e.slowT<=0) e.slowed=false; }
-    if(e.burning){ e.burnT-=dt; dealDamage(e, e.burnDps*dt, null); if(e.burnT<=0) e.burning=false; if(e.hp<=0) continue; }
+    if(e.burning){ e.burnT-=dt; dealDamage(e, e.burnDps*dt, null); if(e.burnT<=0) e.burning=false; if(e.dead) continue; }
     if(e.staggerT>0){ e.staggerT-=dt; continue; }
     if(e.special) updateEliteSpecial(e,dt);
     const speedMult = (e.slowed?0.5:1) * (1-(player.stats.globalSlow||0));
     const dx=player.x-e.x, dy=player.y-e.y, d=Math.hypot(dx,dy)||1;
+
+    // AI throttling: normal fodder (chase/keep_distance/swarm) only re-picks its
+    // movement direction a few times per second — the cached e.vx/e.vy is applied
+    // every frame in between so motion still looks smooth. Bosses, elites, and the
+    // state-machine-driven charge/summon brains always tick at full rate since
+    // their timing is combat-critical and their population is small.
+    let doTick = true;
+    if(!e.boss && !e.elite && (e.brain==="chase"||e.brain==="keep_distance_shoot"||e.brain==="swarm")){
+      e.aiTimer -= dt;
+      doTick = e.aiTimer<=0;
+      if(doTick) e.aiTimer = AI_TICK_INTERVAL*rand(0.85,1.15);
+    }
 
     if(e.brain==="phaseboss"){
       const defs = BOSSES[e.bossDefId];
@@ -1349,13 +1455,17 @@ function updateEnemies(dt){
         updateBossPhase(e, defs, bossCtx(dt));
       }
     } else if(e.brain==="chase"){
-      e.x += (dx/d)*e.speed*dt*speedMult; e.y += (dy/d)*e.speed*dt*speedMult;
+      if(doTick){ e.vx=(dx/d)*e.speed; e.vy=(dy/d)*e.speed; }
+      e.x += e.vx*dt*speedMult; e.y += e.vy*dt*speedMult;
       e.atkCd -= dt;
       if(d < e.radius+player.radius+6 && e.atkCd<=0){ damagePlayer(e.dmg); e.atkCd=0.6; }
     } else if(e.brain==="keep_distance_shoot"){
-      const desired=260;
-      if(d<desired-20){ e.x -= (dx/d)*e.speed*dt*speedMult; e.y -= (dy/d)*e.speed*dt*speedMult; }
-      else if(d>desired+20){ e.x += (dx/d)*e.speed*dt*speedMult; e.y += (dy/d)*e.speed*dt*speedMult; }
+      if(doTick){
+        const desired=260; let mx=0,my=0;
+        if(d<desired-20){ mx=-(dx/d); my=-(dy/d); } else if(d>desired+20){ mx=(dx/d); my=(dy/d); }
+        e.vx=mx*e.speed; e.vy=my*e.speed;
+      }
+      e.x += e.vx*dt*speedMult; e.y += e.vy*dt*speedMult;
       e.shootCd -= dt;
       if(e.shootCd<=0){ bullets.push({owner:"enemy",x:e.x,y:e.y,vx:(dx/d)*260,vy:(dy/d)*260,dmg:e.dmg,radius:5,life:3,color:"#8fd8ff",pierce:0}); e.shootCd=1.6; }
     } else if(e.brain==="charge"){
@@ -1365,15 +1475,19 @@ function updateEnemies(dt){
         if(d<e.radius+player.radius+8){ damagePlayer(e.dmg*1.4); e.chargeState="cooldown"; e.chargeCd=1.4; } else if(e.chargeCd<=0){ e.chargeState="cooldown"; e.chargeCd=1.0; } }
       else { if(e.chargeCd<=0){ e.chargeState="idle"; e.chargeCd=rand(1.4,2.4); } }
     } else if(e.brain==="swarm"){
-      e.swarmPhase += dt*3; const orbitR=90+Math.sin(e.swarmPhase*0.6)*40;
-      const tx=player.x+Math.cos(e.swarmPhase)*orbitR, ty=player.y+Math.sin(e.swarmPhase)*orbitR;
-      const ddx=tx-e.x,ddy=ty-e.y,dd=Math.hypot(ddx,ddy)||1;
-      e.x+=(ddx/dd)*e.speed*dt*speedMult; e.y+=(ddy/dd)*e.speed*dt*speedMult;
+      e.swarmPhase += dt*3;
+      if(doTick){
+        const orbitR=90+Math.sin(e.swarmPhase*0.6)*40;
+        const tx=player.x+Math.cos(e.swarmPhase)*orbitR, ty=player.y+Math.sin(e.swarmPhase)*orbitR;
+        const ddx=tx-e.x,ddy=ty-e.y,dd=Math.hypot(ddx,ddy)||1;
+        e.vx=(ddx/dd)*e.speed; e.vy=(ddy/dd)*e.speed;
+      }
+      e.x+=e.vx*dt*speedMult; e.y+=e.vy*dt*speedMult;
       e.atkCd-=dt; if(d<e.radius+player.radius+6 && e.atkCd<=0){ damagePlayer(e.dmg); e.atkCd=0.5; }
     } else if(e.brain==="summon"){
       const desired=300;
       if(d<desired-20){ e.x-=(dx/d)*e.speed*dt*speedMult; e.y-=(dy/d)*e.speed*dt*speedMult; } else if(d>desired+20){ e.x+=(dx/d)*e.speed*dt*speedMult; e.y+=(dy/d)*e.speed*dt*speedMult; }
-      e.summonCd-=dt; if(e.summonCd<=0 && enemies.length<160){ const ang=rand(0,Math.PI*2); spawnEnemy(pick(["bat","rat_swarm"]),{x:e.x+Math.cos(ang)*40,y:e.y+Math.sin(ang)*40}); e.summonCd=rand(3.5,5.5); }
+      e.summonCd-=dt; if(e.summonCd<=0 && enemies.length<dynamicMaxEnemies()){ const ang=rand(0,Math.PI*2); spawnEnemy(pick(["bat","rat_swarm"]),{x:e.x+Math.cos(ang)*40,y:e.y+Math.sin(ang)*40}); e.summonCd=rand(3.5,5.5); }
     }
     e.x=clamp(e.x,e.radius,WORLD.w-e.radius); e.y=clamp(e.y,e.radius,WORLD.h-e.radius);
   }
@@ -1409,7 +1523,39 @@ function updateZones(dt){
 /* =========================================================================
    PART 9 — PLAYER / DAMAGE / PICKUPS / LEVEL-UP CARDS / SHOP / EVENTS
    ========================================================================= */
+/* ---- Anti-broken-build guardrails -----------------------------------------
+   Cards, passives, talents and synergies all multiply the same handful of
+   stats, so stacking enough of them (e.g. multiple elemental cards + Ascendant
+   Soul + talent lines) can push a value to a degenerate extreme — 100%+ chain
+   chance, near-zero cooldowns, thousands of projectiles. Enforced every frame
+   rather than at each mutation site, so it's a single source of truth and
+   self-heals if a bad number ever slips through (e.g. from a future card). */
+const STAT_CAPS = {
+  dmgMult:[0,50], atkSpeedMult:[0.1,10], cdrMult:[0.08,3], critChance:[0,0.9], critMult:[1,6],
+  moveSpeed:[40,900], pickupRadius:[20,2000], armor:[0,80], regen:[0,50], goldMult:[0,10], xpMult:[0,10],
+  lifesteal:[0,0.6], chainOnHitChance:[0,0.9], burnOnHitChance:[0,0.9], extraChainChance:[0,0.9],
+  eliteDmgMult:[0,10], soulMult:[0,10], thorns:[0,1], bonusPierce:[0,50], bonusProjectiles:[0,20],
+  aoeRadiusMult:[0.2,5], rangeMult:[0.2,5], summonDmgMult:[0,10], summonCountMult:[0,5], fireMult:[0,10],
+  frostMult:[0,10], lightningMult:[0,10], poisonMult:[0,10], holyMult:[0,10],
+};
+function clampPlayerStats(){
+  if(!player) return;
+  const s = player.stats;
+  for(const key in STAT_CAPS){
+    const v = s[key];
+    if(typeof v!=="number" || !isFinite(v)) { s[key] = STAT_CAPS[key][0]; continue; }
+    const [lo,hi] = STAT_CAPS[key];
+    s[key] = clamp(v, lo, hi);
+  }
+  if(!isFinite(player.hp)) player.hp = 1;
+  if(!isFinite(player.maxHp) || player.maxHp<=0) player.maxHp = 10;
+  player.maxHp = Math.min(player.maxHp, 100000);
+  player.hp = clamp(player.hp, 0, player.maxHp);
+  if(Object.keys(player.weapons).length > MAX_WEAPON_SLOTS_BASE+10) { /* safety valve, should never trigger via normal play */ }
+}
+
 function updatePlayer(dt){
+  clampPlayerStats();
   let dx=0,dy=0;
   if(keys['w']||keys['arrowup']) dy-=1; if(keys['s']||keys['arrowdown']) dy+=1;
   if(keys['a']||keys['arrowleft']) dx-=1; if(keys['d']||keys['arrowright']) dx+=1;
@@ -1731,11 +1877,33 @@ function win(){
    PART 12 — JUICE / HUD / RENDER
    ========================================================================= */
 const QUALITY_PARTICLE_MULT={low:0.2,medium:0.55,high:1};
-function spawnParticle(x,y,color,n=5){ n=Math.ceil(n*(QUALITY_PARTICLE_MULT[quality]??1)); for(let i=0;i<n;i++){ const ang=rand(0,Math.PI*2),spd=rand(40,200); particles.push({x,y,vx:Math.cos(ang)*spd,vy:Math.sin(ang)*spd,life:rand(0.3,0.6),maxLife:0.6,color}); } }
-function spawnFloater(x,y,text,color){ floaters.push({x,y,text,color,life:0.6,vy:-40}); }
+const MAX_PARTICLES=600, MAX_FLOATERS=150; // hard ceilings so a huge kill cluster can't create unbounded objects in one frame
+let particlePool=[], floaterPool=[];
+function spawnParticle(x,y,color,n=5){
+  n=Math.ceil(n*(QUALITY_PARTICLE_MULT[quality]??1));
+  for(let i=0;i<n;i++){
+    if(particles.length>=MAX_PARTICLES) break;
+    const ang=rand(0,Math.PI*2),spd=rand(40,200);
+    const p = particlePool.pop() || {};
+    p.x=x; p.y=y; p.vx=Math.cos(ang)*spd; p.vy=Math.sin(ang)*spd; p.life=rand(0.3,0.6); p.maxLife=0.6; p.color=color;
+    particles.push(p);
+  }
+}
+function spawnFloater(x,y,text,color){
+  if(floaters.length>=MAX_FLOATERS) return;
+  const f = floaterPool.pop() || {};
+  f.x=x; f.y=y; f.text=text; f.color=color; f.life=0.6; f.vy=-40;
+  floaters.push(f);
+}
 function updateJuice(dt){
-  for(let i=particles.length-1;i>=0;i--){ const p=particles[i]; p.x+=p.vx*dt; p.y+=p.vy*dt; p.vx*=0.9; p.vy*=0.9; p.life-=dt; if(p.life<=0) particles.splice(i,1); }
-  for(let i=floaters.length-1;i>=0;i--){ const f=floaters[i]; f.y+=f.vy*dt; f.life-=dt; if(f.life<=0) floaters.splice(i,1); }
+  let pw=0;
+  for(let i=0;i<particles.length;i++){ const p=particles[i]; p.x+=p.vx*dt; p.y+=p.vy*dt; p.vx*=0.9; p.vy*=0.9; p.life-=dt;
+    if(p.life<=0){ particlePool.push(p); continue; } particles[pw++]=p; }
+  particles.length=pw;
+  let fw=0;
+  for(let i=0;i<floaters.length;i++){ const f=floaters[i]; f.y+=f.vy*dt; f.life-=dt;
+    if(f.life<=0){ floaterPool.push(f); continue; } floaters[fw++]=f; }
+  floaters.length=fw;
   if(camera.shake) camera.shake=Math.max(0,camera.shake-dt*20);
 }
 function refreshHud(){
@@ -1813,6 +1981,7 @@ function loop(now){
     updateSpawns(dt); updatePlayer(dt); updateEnemies(dt); rebuildSpatialGrid();
     updateWeapons(dt); updateBullets(dt); updateMinions(dt); updateZones(dt); updateOrbs(dt);
     updateTempModifiers(dt);
+    pruneDeadEnemies(); // single end-of-frame removal pass (also returns objects to the enemy pool)
     eventTimer-=dt; if(eventTimer<=0){ triggerRandomEvent(); eventTimer=rand(90,140); }
     checkAchievements(); updateJuice(dt); refreshHud();
     MUSIC.setIntense(enemies.some(e=>e.boss));
@@ -1829,7 +1998,7 @@ const GRID_CELL=160; const spatialGrid=new Map();
 function gridKey(cx,cy){ return cx+','+cy; }
 function rebuildSpatialGrid(){ spatialGrid.clear(); for(const e of enemies){ const cx=Math.floor(e.x/GRID_CELL),cy=Math.floor(e.y/GRID_CELL); const key=gridKey(cx,cy); let b=spatialGrid.get(key); if(!b){b=[];spatialGrid.set(key,b);} b.push(e); } }
 function forEachEnemyNear(x,y,radius,fn){ const minCx=Math.floor((x-radius)/GRID_CELL),maxCx=Math.floor((x+radius)/GRID_CELL),minCy=Math.floor((y-radius)/GRID_CELL),maxCy=Math.floor((y+radius)/GRID_CELL);
-  for(let cx=minCx;cx<=maxCx;cx++) for(let cy=minCy;cy<=maxCy;cy++){ const b=spatialGrid.get(gridKey(cx,cy)); if(!b) continue; for(const e of b) fn(e); } }
+  for(let cx=minCx;cx<=maxCx;cx++) for(let cy=minCy;cy<=maxCy;cy++){ const b=spatialGrid.get(gridKey(cx,cy)); if(!b) continue; for(const e of b){ if(!e.dead) fn(e); } } }
 function updateBullets(dt){
   for(let i=bullets.length-1;i>=0;i--){
     const b=bullets[i]; b.x+=b.vx*dt; b.y+=b.vy*dt; b.life-=dt;
