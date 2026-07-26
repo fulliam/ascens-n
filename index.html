@@ -381,12 +381,12 @@ const WEAPONS = {
   prism_beam:{name:"Prism Beam",icon:"🌈",type:"beam",tags:["elemental","split"],base:{dps:18,range:300,tick:0.2},perLevel:{dps:8},maxLevel:8,evolvesInto:"kaleidoscope"},
   fire_nova:{name:"Fire Nova",icon:"🔥",type:"area",tags:["fire","burn"],base:{dmg:22,cd:2.6,radius:130},perLevel:{dmg:9,radius:9},maxLevel:8,evolvesInto:"inferno"},
   frost_field:{name:"Frost Field",icon:"❄",type:"area",tags:["frost","slow"],base:{dmg:8,cd:1.6,radius:150},perLevel:{dmg:3,radius:8},maxLevel:8,evolvesInto:"absolute_zero"},
-  poison_cloud:{name:"Poison Cloud",icon:"☠",type:"area",tags:["poison","dot"],base:{dmg:6,cd:1.2,radius:140},perLevel:{dmg:2,radius:6},maxLevel:8,evolvesInto:"plague_zone"},
+  poison_cloud:{name:"Poison Cloud",icon:"☠",type:"area",tags:["poison","dot"],base:{dmg:8,cd:1.2,radius:140,lingerLife:3},perLevel:{dmg:3,radius:6},maxLevel:8,evolvesInto:"plague_zone"},
   necro_staff:{name:"Necro Staff",icon:"💀",type:"summon",tags:["summon","undead"],base:{minionDmg:8,cd:6,maxMinions:2},perLevel:{minionDmg:3,maxMinions:0.25},maxLevel:8,evolvesInto:"lich_court"},
   spirit_wolves:{name:"Spirit Wolves",icon:"🐺",type:"summon",tags:["summon","beast","speed"],base:{minionDmg:6,cd:8,maxMinions:2},perLevel:{minionDmg:2.5,maxMinions:0.2},maxLevel:8,evolvesInto:"spirit_pack_alpha"},
   turret_deployer:{name:"Turret Deployer",icon:"🗿",type:"summon",tags:["summon","stationary","physical"],base:{minionDmg:10,cd:10,maxMinions:2},perLevel:{minionDmg:4},maxLevel:8,evolvesInto:"siege_battery"},
   spike_trap:{name:"Spike Trap",icon:"🔺",type:"trap",tags:["physical","ambush"],base:{dmg:26,cd:3,radius:60},perLevel:{dmg:10},maxLevel:8,evolvesInto:"bear_trap_array"},
-  tesla_coil:{name:"Tesla Coil",icon:"⚡",type:"trap",tags:["lightning","chain"],base:{dmg:14,cd:4,radius:100},perLevel:{dmg:6},maxLevel:8,evolvesInto:"storm_pylon"},
+  tesla_coil:{name:"Tesla Coil",icon:"⚡",type:"trap",tags:["lightning","chain"],base:{dmg:20,cd:3.2,radius:110,jumps:2,jumpRange:200},perLevel:{dmg:8,jumps:0.25},maxLevel:8,evolvesInto:"storm_pylon"},
   holy_aura:{name:"Holy Aura",icon:"✨",type:"aura",tags:["holy","support"],base:{healPerSec:1.2,radius:110},perLevel:{healPerSec:0.4},maxLevel:8,evolvesInto:"radiant_field"},
   thorn_aura:{name:"Thorn Aura",icon:"🌵",type:"aura",tags:["reflect","poison"],base:{reflectPct:0.25,radius:90},perLevel:{reflectPct:0.03},maxLevel:8,evolvesInto:"bramble_god"},
   chain_lightning:{name:"Chain Lightning",icon:"⚡",type:"chain",tags:["lightning","crowd"],base:{dmg:10,cd:1.1,jumps:3,jumpRange:260},perLevel:{dmg:4,jumps:0.5},maxLevel:8,evolvesInto:"maelstrom_of_ruin"},
@@ -416,40 +416,40 @@ const EVOLUTIONS = {
 };
 
 const CARDS = [
-  {id:"heavy_bullets",cat:"offensive",name:"Heavy Bullets",tags:["damage"],desc:"+16% damage with all weapons.",apply:p=>p.stats.dmgMult*=1.16},
-  {id:"rapid_fire",cat:"offensive",name:"Rapid Fire",tags:["speed"],desc:"+14% attack speed.",apply:p=>p.stats.atkSpeedMult*=1.14},
-  {id:"precision",cat:"offensive",name:"Precision",tags:["crit"],desc:"+8% crit chance.",apply:p=>p.stats.critChance=Math.min(0.6,p.stats.critChance+0.08)},
+  {id:"heavy_bullets",cat:"offensive",name:"Heavy Bullets",tags:["damage"],stackable:true,maxStacks:5,desc:"+16% damage with all weapons.",apply:p=>p.stats.dmgMult*=1.16},
+  {id:"rapid_fire",cat:"offensive",name:"Rapid Fire",tags:["speed"],stackable:true,maxStacks:5,desc:"+14% attack speed.",apply:p=>p.stats.atkSpeedMult*=1.14},
+  {id:"precision",cat:"offensive",name:"Precision",tags:["crit"],stackable:true,maxStacks:4,desc:"+8% crit chance.",apply:p=>p.stats.critChance=Math.min(0.6,p.stats.critChance+0.08)},
   {id:"glass_cannon",cat:"offensive",name:"Glass Cannon",tags:["damage","risk"],desc:"+50% damage, -40% max HP.",apply:p=>{p.stats.dmgMult*=1.5;p.maxHp=Math.max(10,Math.floor(p.maxHp*0.6));p.hp=Math.min(p.hp,p.maxHp);}},
   {id:"berserk",cat:"offensive",name:"Berserk",tags:["damage","risk"],desc:"+1% damage per 1% HP missing.",apply:p=>p.stats.berserkScaling=(p.stats.berserkScaling||0)+0.01},
   {id:"executioner",cat:"offensive",name:"Executioner",tags:["crit"],desc:"+40% damage to enemies below 20% HP.",apply:p=>p.stats.executeBonus=(p.stats.executeBonus||0)+0.4},
   {id:"overcharge",cat:"offensive",name:"Overcharge",tags:["speed","risk"],desc:"+25% attack speed.",apply:p=>p.stats.atkSpeedMult*=1.25},
   {id:"momentum",cat:"offensive",name:"Momentum",tags:["speed","damage"],desc:"+1% damage per kill this run (resets on death).",apply:p=>p.stats.momentumPerKill=(p.stats.momentumPerKill||0)+0.01},
-  {id:"bloodlust",cat:"offensive",name:"Bloodlust",tags:["lifesteal","damage"],desc:"+10% damage, +2% lifesteal.",apply:p=>{p.stats.dmgMult*=1.1;p.stats.lifesteal+=0.02;}},
-  {id:"iron_skin",cat:"defensive",name:"Iron Skin",tags:["armor"],desc:"-1.2 flat damage taken.",apply:p=>p.stats.armor+=1.2},
-  {id:"regeneration",cat:"defensive",name:"Regeneration",tags:["regen"],desc:"+0.6 HP/s.",apply:p=>p.stats.regen+=0.6},
+  {id:"bloodlust",cat:"offensive",name:"Bloodlust",tags:["lifesteal","damage"],stackable:true,maxStacks:3,desc:"+10% damage, +2% lifesteal.",apply:p=>{p.stats.dmgMult*=1.1;p.stats.lifesteal+=0.02;}},
+  {id:"iron_skin",cat:"defensive",name:"Iron Skin",tags:["armor"],stackable:true,maxStacks:5,desc:"-1.2 flat damage taken.",apply:p=>p.stats.armor+=1.2},
+  {id:"regeneration",cat:"defensive",name:"Regeneration",tags:["regen"],stackable:true,maxStacks:5,desc:"+0.6 HP/s.",apply:p=>p.stats.regen+=0.6},
   {id:"shield_generator",cat:"defensive",name:"Shield Generator",tags:["shield"],desc:"Every 20s, gain a shield absorbing 30 damage.",apply:p=>p.stats.shieldCd=20},
   {id:"phoenix",cat:"defensive",name:"Phoenix",tags:["revive"],desc:"Revive once per run at 50% HP.",apply:p=>p.hasRevive=true},
   {id:"last_stand",cat:"defensive",name:"Last Stand",tags:["armor","risk"],desc:"+40% armor while below 30% HP.",apply:p=>p.stats.lastStandArmor=(p.stats.lastStandArmor||0)+0.4},
-  {id:"thorns",cat:"defensive",name:"Thorns",tags:["reflect"],desc:"Reflect 15% of damage taken.",apply:p=>p.stats.thorns=(p.stats.thorns||0)+0.15},
-  {id:"fortify",cat:"defensive",name:"Fortify",tags:["hp"],desc:"+20 max HP, heal to full.",apply:p=>{p.maxHp+=20;p.hp=p.maxHp;}},
+  {id:"thorns",cat:"defensive",name:"Thorns",tags:["reflect"],stackable:true,maxStacks:3,desc:"Reflect 15% of damage taken.",apply:p=>p.stats.thorns=(p.stats.thorns||0)+0.15},
+  {id:"fortify",cat:"defensive",name:"Fortify",tags:["hp"],stackable:true,maxStacks:8,desc:"+20 max HP, heal to full.",apply:p=>{p.maxHp+=20;p.hp=p.maxHp;}},
   {id:"second_wind",cat:"defensive",name:"Second Wind",tags:["regen","risk"],desc:"Heal 20% max HP on level-up.",apply:p=>p.stats.healOnLevelUp=(p.stats.healOnLevelUp||0)+0.2},
-  {id:"magnetism",cat:"utility",name:"Magnetism",tags:["pickup"],desc:"+30% pickup radius.",apply:p=>p.stats.pickupRadius*=1.3},
-  {id:"greed",cat:"utility",name:"Greed",tags:["gold"],desc:"+25% gold gained.",apply:p=>p.stats.goldMult*=1.25},
-  {id:"fortune",cat:"utility",name:"Fortune",tags:["xp"],desc:"+20% XP gained.",apply:p=>p.stats.xpMult*=1.2},
-  {id:"time_warp",cat:"utility",name:"Time Warp",tags:["control"],desc:"Enemies move 8% slower globally.",apply:p=>p.stats.globalSlow=(p.stats.globalSlow||0)+0.08},
+  {id:"magnetism",cat:"utility",name:"Magnetism",tags:["pickup"],stackable:true,maxStacks:3,desc:"+30% pickup radius.",apply:p=>p.stats.pickupRadius*=1.3},
+  {id:"greed",cat:"utility",name:"Greed",tags:["gold"],stackable:true,maxStacks:3,desc:"+25% gold gained.",apply:p=>p.stats.goldMult*=1.25},
+  {id:"fortune",cat:"utility",name:"Fortune",tags:["xp"],stackable:true,maxStacks:3,desc:"+20% XP gained.",apply:p=>p.stats.xpMult*=1.2},
+  {id:"time_warp",cat:"utility",name:"Time Warp",tags:["control"],stackable:true,maxStacks:3,desc:"Enemies move 8% slower globally.",apply:p=>p.stats.globalSlow=(p.stats.globalSlow||0)+0.08},
   {id:"collector",cat:"utility",name:"Collector",tags:["pickup"],desc:"XP orbs pulled from anywhere on screen.",apply:p=>p.stats.xpAutoPull=true},
-  {id:"swift_boots",cat:"utility",name:"Swift Boots",tags:["speed"],desc:"+9% movement speed.",apply:p=>p.stats.moveSpeed*=1.09},
-  {id:"lucky_charm",cat:"utility",name:"Lucky Charm",tags:["luck"],desc:"+15% chance for rare card options.",apply:p=>p.stats.luck=(p.stats.luck||0)+0.15},
-  {id:"quick_hands",cat:"utility",name:"Quick Hands",tags:["cooldown"],desc:"-8% all weapon cooldowns.",apply:p=>p.stats.cdrMult=(p.stats.cdrMult||1)*0.92},
-  {id:"fire_mastery",cat:"elemental",name:"Fire Mastery",tags:["fire"],desc:"+30% to fire/burn effects.",apply:p=>p.stats.fireMult=(p.stats.fireMult||1)*1.3},
-  {id:"frost_mastery",cat:"elemental",name:"Frost Mastery",tags:["frost"],desc:"+30% to frost/slow effects.",apply:p=>p.stats.frostMult=(p.stats.frostMult||1)*1.3},
-  {id:"lightning_mastery",cat:"elemental",name:"Lightning Mastery",tags:["lightning"],desc:"+30% to lightning/chain effects.",apply:p=>p.stats.lightningMult=(p.stats.lightningMult||1)*1.3},
-  {id:"poison_mastery",cat:"elemental",name:"Poison Mastery",tags:["poison"],desc:"+30% to poison/DoT effects.",apply:p=>p.stats.poisonMult=(p.stats.poisonMult||1)*1.3},
-  {id:"holy_mastery",cat:"elemental",name:"Holy Mastery",tags:["holy"],desc:"+30% to holy/heal effects.",apply:p=>p.stats.holyMult=(p.stats.holyMult||1)*1.3},
-  {id:"elemental_overload",cat:"elemental",name:"Elemental Overload",tags:["fire","frost","lightning","poison"],desc:"+10% to every elemental type at once.",apply:p=>["fireMult","frostMult","lightningMult","poisonMult"].forEach(k=>p.stats[k]=(p.stats[k]||1)*1.1)},
-  {id:"burn_stacking",cat:"elemental",name:"Burn Stacking",tags:["fire"],desc:"Burn effects stack up to 3 times.",apply:p=>p.stats.burnStacks=(p.stats.burnStacks||1)+1},
-  {id:"chill_stacking",cat:"elemental",name:"Chill Stacking",tags:["frost"],desc:"Slow stacks additively up to 60%.",apply:p=>p.stats.chillCap=Math.min(0.6,(p.stats.chillCap||0.35)+0.1)},
-  {id:"storm_caller",cat:"elemental",name:"Storm Caller",tags:["lightning"],desc:"+20% chance any hit chains an extra jump.",apply:p=>p.stats.extraChainChance=(p.stats.extraChainChance||0)+0.2},
+  {id:"swift_boots",cat:"utility",name:"Swift Boots",tags:["speed"],stackable:true,maxStacks:4,desc:"+9% movement speed.",apply:p=>p.stats.moveSpeed*=1.09},
+  {id:"lucky_charm",cat:"utility",name:"Lucky Charm",tags:["luck"],stackable:true,maxStacks:3,desc:"+15% chance for rare card options.",apply:p=>p.stats.luck=(p.stats.luck||0)+0.15},
+  {id:"quick_hands",cat:"utility",name:"Quick Hands",tags:["cooldown"],stackable:true,maxStacks:4,desc:"-8% all weapon cooldowns.",apply:p=>p.stats.cdrMult=(p.stats.cdrMult||1)*0.92},
+  {id:"fire_mastery",cat:"elemental",name:"Fire Mastery",tags:["fire"],stackable:true,maxStacks:3,desc:"+30% to fire/burn effects.",apply:p=>p.stats.fireMult=(p.stats.fireMult||1)*1.3},
+  {id:"frost_mastery",cat:"elemental",name:"Frost Mastery",tags:["frost"],stackable:true,maxStacks:3,desc:"+30% to frost/slow effects.",apply:p=>p.stats.frostMult=(p.stats.frostMult||1)*1.3},
+  {id:"lightning_mastery",cat:"elemental",name:"Lightning Mastery",tags:["lightning"],stackable:true,maxStacks:3,desc:"+30% to lightning/chain effects.",apply:p=>p.stats.lightningMult=(p.stats.lightningMult||1)*1.3},
+  {id:"poison_mastery",cat:"elemental",name:"Poison Mastery",tags:["poison"],stackable:true,maxStacks:3,desc:"+30% to poison/DoT effects.",apply:p=>p.stats.poisonMult=(p.stats.poisonMult||1)*1.3},
+  {id:"holy_mastery",cat:"elemental",name:"Holy Mastery",tags:["holy"],stackable:true,maxStacks:3,desc:"+30% to holy/heal effects.",apply:p=>p.stats.holyMult=(p.stats.holyMult||1)*1.3},
+  {id:"elemental_overload",cat:"elemental",name:"Elemental Overload",tags:["fire","frost","lightning","poison"],stackable:true,maxStacks:2,desc:"+10% to every elemental type at once.",apply:p=>["fireMult","frostMult","lightningMult","poisonMult"].forEach(k=>p.stats[k]=(p.stats[k]||1)*1.1)},
+  {id:"burn_stacking",cat:"elemental",name:"Burn Stacking",tags:["fire"],stackable:true,maxStacks:2,desc:"Burn can stack one extra time on the same enemy (+50% burn DPS per stack).",apply:p=>p.stats.burnStacks=(p.stats.burnStacks||1)+1},
+  {id:"chill_stacking",cat:"elemental",name:"Chill Stacking",tags:["frost"],stackable:true,maxStacks:3,desc:"Slow stacks additively, up to a 60% slow cap.",apply:p=>p.stats.chillCap=Math.min(0.6,(p.stats.chillCap||0.35)+0.1)},
+  {id:"storm_caller",cat:"elemental",name:"Storm Caller",tags:["lightning"],stackable:true,maxStacks:2,desc:"+20% chance any hit chains an extra jump.",apply:p=>p.stats.extraChainChance=(p.stats.extraChainChance||0)+0.2},
   {id:"summoner",cat:"build_defining",name:"Summoner",tags:["summon"],desc:"+25% damage and count for summons.",apply:p=>{p.stats.summonDmgMult=(p.stats.summonDmgMult||1)*1.25;p.stats.summonCountMult=(p.stats.summonCountMult||1)*1.25;}},
   {id:"assassin",cat:"build_defining",name:"Assassin",tags:["crit","speed"],desc:"+15% crit, +15% move speed, -10% max HP.",apply:p=>{p.stats.critChance=Math.min(0.75,p.stats.critChance+0.15);p.stats.moveSpeed*=1.15;p.maxHp=Math.floor(p.maxHp*0.9);}},
   {id:"tank_build",cat:"build_defining",name:"Tank Build",tags:["armor","hp"],desc:"+40 max HP, +2 armor, -10% move speed.",apply:p=>{p.maxHp+=40;p.stats.armor+=2;p.stats.moveSpeed*=0.9;}},
@@ -458,8 +458,8 @@ const CARDS = [
   {id:"pyromancer",cat:"build_defining",name:"Pyromancer",tags:["fire"],desc:"20% chance any hit also applies burn.",apply:p=>p.stats.burnOnHitChance=(p.stats.burnOnHitChance||0)+0.2},
   {id:"necromancers_pact",cat:"build_defining",name:"Necromancer's Pact",tags:["summon"],desc:"10% chance killed enemies rise as a minion.",apply:p=>p.stats.raiseDeadChance=(p.stats.raiseDeadChance||0)+0.1},
   {id:"speed_demon",cat:"build_defining",name:"Speed Demon",tags:["speed"],desc:"+20% move+attack speed, -1 armor.",apply:p=>{p.stats.moveSpeed*=1.2;p.stats.atkSpeedMult*=1.2;p.stats.armor=Math.max(0,p.stats.armor-1);}},
-  {id:"one_with_death",cat:"legendary",name:"One With Death",tags:["risk","damage"],desc:"Once per run, survive lethal damage at 1HP and deal +100% damage for 3s.",apply:p=>p.stats.deathDefianceCharges=(p.stats.deathDefianceCharges||0)+1},
-  {id:"infinite_arsenal",cat:"legendary",name:"Infinite Arsenal",tags:["weapon_slot"],desc:"+1 weapon slot.",apply:p=>p.extraWeaponSlots=(p.extraWeaponSlots||0)+1},
+  {id:"one_with_death",cat:"legendary",name:"One With Death",tags:["risk","damage"],stackable:true,maxStacks:3,desc:"Survive lethal damage at 1HP and deal +100% damage for 3s (one charge per copy).",apply:p=>p.stats.deathDefianceCharges=(p.stats.deathDefianceCharges||0)+1},
+  {id:"infinite_arsenal",cat:"legendary",name:"Infinite Arsenal",tags:["weapon_slot"],stackable:true,maxStacks:2,desc:"+1 weapon slot.",apply:p=>p.extraWeaponSlots=(p.extraWeaponSlots||0)+1},
   {id:"godslayer",cat:"legendary",name:"Godslayer",tags:["boss","damage"],desc:"+40% damage against elites and bosses.",apply:p=>p.stats.eliteDmgMult=(p.stats.eliteDmgMult||1)*1.4},
   {id:"reapers_bargain",cat:"legendary",name:"Reaper's Bargain",tags:["risk","gold"],desc:"+60% gold and soul gain, -20% max HP.",apply:p=>{p.stats.goldMult*=1.6;p.stats.soulMult=(p.stats.soulMult||1)*1.6;p.maxHp=Math.floor(p.maxHp*0.8);}},
   {id:"eternal_flame",cat:"legendary",name:"Eternal Flame",tags:["fire"],desc:"Burning enemies that die explode and ignite nearby foes.",apply:p=>p.stats.burnExplode=true},
@@ -496,7 +496,7 @@ const PASSIVES = [
 const SYNERGIES = [
   {id:"inferno_build",name:"Inferno Build",requires:{fire:2},desc:"+25% burn damage, burns spread on death.",apply:p=>{p.stats.fireMult=(p.stats.fireMult||1)*1.25;p.stats.burnSpread=true;}},
   {id:"assassin_build",name:"Assassin Build",requires:{crit:2,speed:2},desc:"+15% crit damage, +10% move speed.",apply:p=>{p.stats.critMult+=0.15;p.stats.moveSpeed*=1.1;}},
-  {id:"necromancer_build",name:"Necromancer Build",requires:{summon:2},desc:"Minions last 50% longer, +15% inherited damage.",apply:p=>{p.stats.summonDurationMult=(p.stats.summonDurationMult||1)*1.5;p.stats.summonInheritDmg=(p.stats.summonInheritDmg||0)+0.15;}},
+  {id:"necromancer_build",name:"Necromancer Build",requires:{summon:2},desc:"Minions last 50% longer and inherit +15% of your damage multiplier.",apply:p=>{p.stats.summonDurationMult=(p.stats.summonDurationMult||1)*1.5;p.stats.summonInheritDmg=(p.stats.summonInheritDmg||0)+0.15;}},
   {id:"storm_build",name:"Storm Build",requires:{lightning:2,chain:1},desc:"Chain effects gain +1 jump and +15% damage.",apply:p=>{p.stats.lightningMult=(p.stats.lightningMult||1)*1.15;p.stats.extraChainChance=(p.stats.extraChainChance||0)+0.25;}},
   {id:"bulwark_build",name:"Bulwark Build",requires:{armor:2,hp:1},desc:"+15% damage reduction above 50% HP.",apply:p=>{p.stats.bulwarkDR=(p.stats.bulwarkDR||0)+0.15;}},
   {id:"vampiric_build",name:"Vampiric Build",requires:{lifesteal:3},desc:"Lifesteal grants a shield equal to 25% healed.",apply:p=>{p.stats.lifestealShield=(p.stats.lifestealShield||0)+0.25;}},
@@ -687,10 +687,23 @@ const EVENTS = [
 
 const TALENT_BRANCHES = ["warrior","mage","hunter","survivor"];
 const TALENT_STAT_LINES = {
-  warrior:[{key:"maxHp",label:"Vitality",perLevel:12},{key:"armor",label:"Iron Hide",perLevel:0.6},{key:"meleeDmg",label:"Might",perLevel:0.05},{key:"knockbackRes",label:"Steadfast",perLevel:0.1},{key:"startWeaponLvl",label:"Veteran's Edge",perLevel:1}],
-  mage:[{key:"elementalMult",label:"Arcane Focus",perLevel:0.04},{key:"cdr",label:"Flow State",perLevel:0.02},{key:"aoeRadius",label:"Expanded Mind",perLevel:0.03},{key:"manaEfficiency",label:"Ley Attunement",perLevel:0.03},{key:"critElemental",label:"Volatile Casting",perLevel:0.02}],
+  warrior:[{key:"maxHp",label:"Vitality",perLevel:12},{key:"armor",label:"Iron Hide",perLevel:0.6},{key:"meleeDmg",label:"Might",perLevel:0.05},{key:"dmgReduction",label:"Steadfast",perLevel:0.02},{key:"startWeaponLvl",label:"Veteran's Edge",perLevel:1}],
+  mage:[{key:"elementalMult",label:"Arcane Focus",perLevel:0.04},{key:"cdr",label:"Flow State",perLevel:0.02},{key:"aoeRadius",label:"Expanded Mind",perLevel:0.03},{key:"arcaneDmg",label:"Ley Attunement",perLevel:0.04},{key:"critDamage",label:"Volatile Casting",perLevel:0.06}],
   hunter:[{key:"critChance",label:"Deadeye",perLevel:0.015},{key:"moveSpeed",label:"Fleet Foot",perLevel:0.02},{key:"pierce",label:"Penetrating Shot",perLevel:1},{key:"range",label:"Eagle Eye",perLevel:0.03},{key:"eliteDmg",label:"Big Game Hunter",perLevel:0.02}],
-  survivor:[{key:"goldMult",label:"Scavenger",perLevel:0.02},{key:"soulMult",label:"Soulbound",perLevel:0.02},{key:"regen",label:"Grit",perLevel:0.1},{key:"xpMult",label:"Quick Study",perLevel:0.02},{key:"reviveChance",label:"Undying",perLevel:0.02}],
+  survivor:[{key:"goldMult",label:"Scavenger",perLevel:0.02},{key:"soulMult",label:"Soulbound",perLevel:0.02},{key:"regen",label:"Grit",perLevel:0.1},{key:"xpMult",label:"Quick Study",perLevel:0.02},{key:"reviveChance",label:"Undying",perLevel:0.04}],
+};
+// Talent lines that existed in older builds but had no implemented effect. Their
+// Soul cost is refunded once on load (see migrateTalents) instead of silently lost.
+const REMOVED_TALENT_KEYS = ["warrior_knockbackRes","mage_manaEfficiency","mage_critElemental","survivor_reviveChanceOld"];
+const TALENT_LINE_DESCS = {
+  maxHp:"+12 max HP per tier.", armor:"+0.6 flat armor per tier.", meleeDmg:"+5% weapon damage per tier.",
+  dmgReduction:"-2% incoming damage per tier.", startWeaponLvl:"Start with your weapon +1 level per tier.",
+  elementalMult:"+4% to every elemental multiplier per tier.", cdr:"-2% weapon cooldowns per tier.",
+  aoeRadius:"+3% area radius per tier.", arcaneDmg:"+4% damage for area/beam/aura/chain weapons per tier.",
+  critDamage:"+6% crit damage per tier.", critChance:"+1.5% crit chance per tier.", moveSpeed:"+2% move speed per tier.",
+  pierce:"+1 pierce per tier.", range:"+3% weapon range per tier.", eliteDmg:"+2% damage vs elites/bosses per tier.",
+  goldMult:"+2% gold per tier.", soulMult:"+2% Soul per tier.", regen:"+0.1 HP/s per tier.", xpMult:"+2% XP per tier.",
+  reviveChance:"+4% chance to cheat death once per run, per tier.",
 };
 function buildTalentTree(){
   const nodes=[];
@@ -708,13 +721,13 @@ function applyTalentStat(p, statKey, totalPerLevelSum){
     case "maxHp": p.maxHp+=v; break;
     case "armor": p.stats.armor+=v; break;
     case "meleeDmg": p.stats.dmgMult*=(1+v); break;
-    case "knockbackRes": p.stats.knockbackRes=(p.stats.knockbackRes||0)+v; break;
+    case "dmgReduction": p.stats.damageReduction=Math.min(0.6,(p.stats.damageReduction||0)+v); break;
     case "startWeaponLvl": p.stats.startWeaponBonusLvl=(p.stats.startWeaponBonusLvl||0)+Math.round(v); break;
     case "elementalMult": ["fireMult","frostMult","lightningMult","poisonMult","holyMult"].forEach(k=>p.stats[k]=(p.stats[k]||1)*(1+v)); break;
     case "cdr": p.stats.cdrMult=(p.stats.cdrMult||1)*(1-v); break;
     case "aoeRadius": p.stats.aoeRadiusMult=(p.stats.aoeRadiusMult||1)*(1+v); break;
-    case "manaEfficiency": p.stats.abilityCostMult=(p.stats.abilityCostMult||1)*(1-v); break;
-    case "critElemental": p.stats.critChance=Math.min(0.85,p.stats.critChance+v); break;
+    case "arcaneDmg": p.stats.arcaneDmgMult=(p.stats.arcaneDmgMult||1)*(1+v); break;
+    case "critDamage": p.stats.critMult+=v; break;
     case "critChance": p.stats.critChance=Math.min(0.85,p.stats.critChance+v); break;
     case "moveSpeed": p.stats.moveSpeed*=(1+v); break;
     case "pierce": p.stats.bonusPierce=(p.stats.bonusPierce||0)+Math.round(v); break;
@@ -724,7 +737,7 @@ function applyTalentStat(p, statKey, totalPerLevelSum){
     case "soulMult": p.stats.soulMult=(p.stats.soulMult||1)*(1+v); break;
     case "regen": p.stats.regen+=v; break;
     case "xpMult": p.stats.xpMult*=(1+v); break;
-    case "reviveChance": p.stats.reviveChanceBonus=(p.stats.reviveChanceBonus||0)+v; break;
+    case "reviveChance": p.stats.reviveChance=Math.min(0.5,(p.stats.reviveChance||0)+v); break;
   }
 }
 
@@ -747,7 +760,7 @@ const ACHIEVEMENTS = [
   {id:"hoarder",icon:"🏦",name:"Hoarder",desc:"Accumulate 1000 lifetime Soul.",check:c=>c.lifetime.totalSoul>=1000},
   {id:"persistent",icon:"☠️",name:"Persistent",desc:"Die 10 times.",check:c=>c.lifetime.deaths>=10},
   {id:"veteran",icon:"📜",name:"Veteran",desc:"Complete 25 runs.",check:c=>c.lifetime.runs>=25},
-  {id:"ascended",icon:"👑",name:"Ascended",desc:"Max out every branch's tier-5 node.",check:c=>c.meta.maxedBranches>=4},
+  {id:"ascended",icon:"👑",name:"Ascended",desc:"Max two full talent branches.",check:c=>c.meta.maxedBranches>=2},
   {id:"evolution_first",icon:"🌀",name:"Transformed",desc:"Evolve your first weapon.",check:c=>c.run.evolutionsThisRun>=1},
   {id:"evolution_all",icon:"🧬",name:"Full Metamorphosis",desc:"Evolve 3 weapons in a single run.",check:c=>c.run.evolutionsThisRun>=3},
   {id:"synergy_first",icon:"🔗",name:"Synergist",desc:"Trigger your first build synergy.",check:c=>c.run.synergiesTriggered>=1},
@@ -773,6 +786,7 @@ const ACHIEVEMENTS = [
   {id:"boss_collector",icon:"🃏",name:"Uncollected",desc:"Defeat The Collector without it stealing from you.",check:c=>c.run.bossesKilledIds?.includes("the_collector")&&!c.run.stolenByCollector},
   {id:"boss_frost_queen",icon:"❄️",name:"Thawed",desc:"Defeat the Frost Queen.",check:c=>c.run.bossesKilledIds?.includes("frost_queen")},
   {id:"boss_bloodmoon",icon:"🐺",name:"Alpha Slain",desc:"Defeat Bloodmoon Alpha.",check:c=>c.run.bossesKilledIds?.includes("bloodmoon_alpha")},
+  {id:"boss_wyvern",icon:"🦅",name:"Skybreaker",desc:"Defeat the Wyvern.",check:c=>c.run.bossesKilledIds?.includes("wyvern")},
   {id:"all_bosses_once",icon:"🏆",name:"Bane of All Bosses",desc:"Defeat every boss at least once, lifetime.",check:c=>c.lifetime.uniqueBossesKilled>=10},
   {id:"elite_variety",icon:"👹",name:"Elite Cataloguer",desc:"Kill 10 different elite types, lifetime.",check:c=>c.lifetime.uniqueElitesKilled>=10},
   {id:"speed_clear",icon:"⏳",name:"Speedrunner",desc:"Reach the Overlord fight in under 20 minutes.",check:c=>c.run.overlordReachedAtSeconds!=null&&c.run.overlordReachedAtSeconds<1200},
@@ -788,7 +802,7 @@ const WAVES = [
   {t:55,ids:["slime","bat","zombie","wolf","spider","mosquito_swarm"],interval:0.82,mult:1.1},
   {t:130,ids:["zombie","ghost","bat","wraith","spider","skeleton_archer"],interval:0.62,mult:1.3,elite:true,eliteIds:["ogre"],eliteEvery:32},
   {t:220,ids:["zombie","ghost","wraith","harpy","imp","banshee","boar"],interval:0.52,mult:1.5,elite:true,eliteIds:["ogre","shade_elite"],eliteEvery:24,boss:true,bossId:"dragon",bossT:220},
-  {t:340,ids:["ghost","witch","harpy","banshee","crypt_crawler","cultist"],interval:0.44,mult:1.75,elite:true,eliteIds:["golem","warlord"],eliteEvery:18},
+  {t:340,ids:["ghost","witch","harpy","banshee","crypt_crawler","cultist"],interval:0.44,mult:1.75,elite:true,eliteIds:["golem","warlord"],eliteEvery:18,boss:true,bossId:"wyvern",bossT:360},
   {t:460,ids:["ghost","witch","gargoyle","frost_sprite","myrmidon","tomb_warden"],interval:0.38,mult:2.0,elite:true,eliteIds:["golem","venom_matriarch"],eliteEvery:15,boss:true,bossId:"ancient_tree",bossT:460},
   {t:600,ids:["revenant","witch","wraith","siren","iron_hound","shadow_stalker"],interval:0.34,mult:2.3,elite:true,eliteIds:["shade_elite","phantom_duelist"],eliteEvery:13},
   {t:760,ids:["revenant","gargoyle","bog_leech","vulture","screecher","plague_rat"],interval:0.3,mult:2.6,elite:true,eliteIds:["iron_colossus","bloated_horror"],eliteEvery:11,boss:true,bossId:"lich",bossT:760},
@@ -896,8 +910,12 @@ function freshStats(){
     berserkScaling:0, executeBonus:0, momentumPerKill:0, luck:0, globalSlow:0, xpAutoPull:false,
     lastStandArmor:0, healOnLevelUp:0, turretMode:false, raiseDeadChance:0, deathDefianceCharges:0,
     burnExplode:false, frostShatter:false, stormAvatar:false, burnSpread:false, poisonSpread:false,
-    lifestealShield:0, dmgToSlowedMult:1, bulwarkDR:0, aoeRadiusMult:1, rangeMult:1, abilityCostMult:1,
-    knockbackRes:0, startWeaponBonusLvl:0, reviveChanceBonus:0, extraChainCount:0 };
+    lifestealShield:0, dmgToSlowedMult:1, bulwarkDR:0, aoeRadiusMult:1, rangeMult:1,
+    startWeaponBonusLvl:0, extraChainCount:0,
+    // implemented in this build: damage reduction talent, arcane (area/beam/aura/chain) damage talent,
+    // revive-chance talent, chill/burn stacking cards, summon inherited damage, pack buff from wolves
+    damageReduction:0, arcaneDmgMult:1, reviveChance:0, chillCap:0.35, burnStacks:1,
+    summonInheritDmg:0, packBuff:0, extraPassiveSlots:0 };
 }
 
 function newPlayer(characterId){
@@ -969,13 +987,37 @@ function elementalMultForTags(tags){
 function weaponDef(wid){
   return player.evolvedWeapons && player.evolvedWeapons[wid] ? player.evolvedWeapons[wid] : WEAPONS[wid];
 }
+function weaponEvo(wid){ const d=weaponDef(wid); return (d && d.evoId) ? d.evoId : null; }
+
+/* ---- Diminishing returns ---------------------------------------------------
+   STAT_CAPS are only a NaN/Infinity guard, not a balance tool, so every
+   multiplicative source used to compound without limit. These curves keep the
+   first few upgrades fully linear and then soften anything beyond `softStart`
+   toward an asymptote, so a long run keeps improving without the DPS/economy
+   snowball outrunning the enemy power curve. */
+function softMult(v, softStart, k){
+  if(typeof v!=="number" || !isFinite(v)) return softStart;
+  if(v<=softStart) return v;
+  const over = v - softStart;
+  return softStart + (over/(1+over/k));
+}
+function effDmgMult(){ return softMult(player.stats.dmgMult, 3, 7); }        // linear to +200%, asymptote ~x10
+function effAtkSpeedMult(){ return softMult(player.stats.atkSpeedMult, 2, 1.6); }
+function effGoldMult(){ return softMult(player.stats.goldMult||1, 2.5, 2.5); }
+function effXpMult(){ return softMult(player.stats.xpMult||1, 2.5, 2.5); }
+// area / beam / aura / chain / trap weapons are the "arcane" family the mage
+// Ley Attunement talent boosts (previously a dead stat).
+const ARCANE_TYPES = new Set(["area","beam","aura","chain","trap"]);
+function typeDmgMult(def){ return ARCANE_TYPES.has(def.type) ? (player.stats.arcaneDmgMult||1) : 1; }
 
 function weaponFire(wid, lvl, dt){
   if(player.disabledWeapons[wid] && (player.disabledWeapons[wid]===Infinity || runTime<player.disabledWeapons[wid])) return;
   const def = weaponDef(wid);
-  const dmgMult = player.stats.dmgMult * elementalMultForTags(def.tags||[]);
+  const evo = def.evoId || null;
+  const dmgMult = effDmgMult() * elementalMultForTags(def.tags||[]) * (def.evoDmgMult||1)
+    * typeDmgMult(def) * (1+(player.stats.packBuff||0));
   player.weaponTimers[wid] = (player.weaponTimers[wid]||0) - dt;
-  const cdMult = (player.stats.cdrMult||1) / player.stats.atkSpeedMult;
+  const cdMult = ((player.stats.cdrMult||1) / effAtkSpeedMult()) * (def.evoCdMult||1);
 
   if(def.type==="beam"){
     const range = weaponRange(def.base.range);
@@ -986,6 +1028,19 @@ function weaponFire(wid, lvl, dt){
       if(player.weaponTimers[wid+"_tick"]<=0){
         const dps = (def.base.dps + (def.perLevel.dps||0)*(lvl-1)) * dmgMult;
         dealDamage(target, dps*def.base.tick, wid);
+        // Quantum Beam sweeps continuously (extra targets), Kaleidoscope splits into
+        // elemental beams (extra targets, each carrying every elemental multiplier).
+        const extraBeams = evo==="quantum_beam" ? 2 : evo==="kaleidoscope" ? 3 : 0;
+        if(extraBeams){
+          const elemental = evo==="kaleidoscope"
+            ? (player.stats.fireMult*player.stats.frostMult*player.stats.lightningMult*player.stats.poisonMult)**0.25
+            : 1;
+          const hit=new Set([target]);
+          forEachEnemyNear(player.x,player.y,range,e=>{
+            if(hit.size>extraBeams || hit.has(e)) return;
+            hit.add(e); dealDamage(e, dps*def.base.tick*0.6*elemental, wid); spawnParticle(e.x,e.y,"#ffd479",2);
+          });
+        }
         player.weaponTimers[wid+"_tick"] = def.base.tick;
         spawnParticle(target.x,target.y,"#ff6f9c");
       }
@@ -1532,6 +1587,7 @@ function updateZones(dt){
    self-heals if a bad number ever slips through (e.g. from a future card). */
 const STAT_CAPS = {
   dmgMult:[0,50], atkSpeedMult:[0.1,10], cdrMult:[0.08,3], critChance:[0,0.9], critMult:[1,6],
+  damageReduction:[0,0.6], arcaneDmgMult:[0.2,5], reviveChance:[0,0.5], chillCap:[0.1,0.6], burnStacks:[1,4],
   moveSpeed:[40,900], pickupRadius:[20,2000], armor:[0,80], regen:[0,50], goldMult:[0,10], xpMult:[0,10],
   lifesteal:[0,0.6], chainOnHitChance:[0,0.9], burnOnHitChance:[0,0.9], extraChainChance:[0,0.9],
   eliteDmgMult:[0,10], soulMult:[0,10], thorns:[0,1], bonusPierce:[0,50], bonusProjectiles:[0,20],
@@ -1694,6 +1750,11 @@ function renderIngameStats(){
     <div class="stat-row"><span class="k">Gold Mult</span><span>+${Math.round((s.goldMult-1)*100)}%</span></div>
     <div class="stat-row"><span class="k">Lifesteal</span><span>+${Math.round(s.lifesteal*100)}%</span></div>
     <div class="stat-row"><span class="k">Crit Chance</span><span>${Math.round(s.critChance*100)}%</span></div>
+    <div class="stat-row"><span class="k">Crit Damage</span><span>x${s.critMult.toFixed(2)}</span></div>
+    <div class="stat-row"><span class="k">Damage Reduction</span><span>${Math.round((s.damageReduction||0)*100)}%</span></div>
+    <div class="stat-row"><span class="k">Arcane Dmg (area/beam/chain)</span><span>+${Math.round(((s.arcaneDmgMult||1)-1)*100)}%</span></div>
+    <div class="stat-row"><span class="k">Revive Chance</span><span>${Math.round((s.reviveChance||0)*100)}%</span></div>
+    <div class="stat-row"><span class="k">Chill Strength / Burn Stacks</span><span>${Math.round((s.chillCap||0.35)*100)}% / ${s.burnStacks||1}</span></div>
     <div class="stat-row"><span class="k">Elite Dmg Mult</span><span>+${Math.round((s.eliteDmgMult-1)*100)}%</span></div>
     <div class="stat-row"><span class="k">Fire / Frost / Lightning / Poison</span><span>${s.fireMult.toFixed(2)} / ${s.frostMult.toFixed(2)} / ${s.lightningMult.toFixed(2)} / ${s.poisonMult.toFixed(2)}</span></div>
     <div class="stat-row"><span class="k">Passives</span><span>${player.passives.length} / ${MAX_PASSIVE_SLOTS}</span></div>
