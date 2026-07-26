@@ -95,22 +95,38 @@
   @keyframes login{to{opacity:1;}}
   @keyframes logout{to{opacity:0;}}
 
-  .pause-hint{position:absolute; top:22px; right:26px; font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--dim); pointer-events:auto; cursor:pointer; border:1px solid var(--line); background:var(--panel); padding:6px 10px; border-radius:2px;}
+  .pause-hint{display:flex; align-items:center; justify-content:center; font-family:'JetBrains Mono',monospace; font-size:14px; color:var(--dim); pointer-events:auto; cursor:pointer; border:1px solid var(--line); background:var(--panel); padding:6px 10px; border-radius:2px;}
   .pause-hint:hover{color:var(--text); border-color:var(--accent);}
 
-  /* ---------- Level up cards ---------- */
+  /* ---------- Level up / Shop cards ---------- */
   .cards-wrap{display:flex; flex-wrap:wrap; align-items:stretch; justify-content:center; gap:18px; z-index:2; width:min(90vw,760px);}
-  .card{width:230px; background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:20px 16px; cursor:pointer; transition:transform .15s, border-color .15s, box-shadow .15s;}
+  .card{width:230px; background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:20px 16px; cursor:pointer; transition:transform .15s, border-color .15s, box-shadow .15s; display:flex; flex-direction:column;}
   .card:hover{transform:translateY(-6px); border-color:var(--accent); box-shadow:0 12px 30px rgba(185,140,255,0.15);}
   .card .icon{font-size:30px; margin-bottom:14px;}
   .card .name{font-family:'Rajdhani',sans-serif; font-weight:700; font-size:19px; letter-spacing:0.5px; margin-bottom:6px;}
-  .card .desc{font-size:12.5px; color:var(--dim); line-height:1.5;}
-  .card .tag{display:inline-block; margin-top:12px; font-family:'JetBrains Mono',monospace; font-size:9.5px; letter-spacing:1.5px; color:var(--accent); border:1px solid var(--accent); padding:2px 6px; border-radius:2px;}
+  .card .desc{font-size:12.5px; color:var(--dim); line-height:1.5; flex:1;}
+  .card .tag{display:inline-block; margin-top:12px; font-family:'JetBrains Mono',monospace; font-size:9.5px; letter-spacing:1.5px; color:var(--accent); border:1px solid var(--accent); padding:2px 6px; border-radius:2px; text-align:center;}
+  
+  .shop-card { padding:10px 9px; width:100%; }
+  .shop-card:hover:not(:disabled) { transform: none !important; }
+  .shop-card .icon { font-size:18px; margin-bottom:4px; }
+  .shop-card .name { font-family:'Rajdhani',sans-serif; font-weight:700; font-size:13px; margin-bottom:2px; line-height:1.1; }
+  .shop-card .desc { font-size:10px; line-height:1.3; color:var(--dim); display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  .shop-card .price { font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--gold); margin-top:6px; font-weight:700; }
+  .shop-card .buy-btn { width:fit-content; border:1px solid var(--gold); color:var(--gold); background:transparent; padding:5px; border-radius:2px; cursor:pointer; font-family:'JetBrains Mono',monospace; font-size:10px; font-weight:700; transition:all .15s; text-transform:uppercase; letter-spacing:0.5px; margin-top:5px; }
+  .shop-card .buy-btn:hover:not(:disabled) { background:rgba(255,179,71,0.15); }
+  .shop-card .buy-btn:active:not(:disabled) { transform:scale(0.97); }
+  .shop-card .buy-btn:disabled { opacity:0.3; cursor:not-allowed; border-color:var(--dim); color:var(--dim); }
+  #screen-shop .cards-wrap { display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; width:min(640px,94vw); max-height:62vh; overflow-y:auto; padding:4px 6px 4px 2px; }
+  #screen-shop .cards-wrap::-webkit-scrollbar { width:5px; }
+  #screen-shop .cards-wrap::-webkit-scrollbar-thumb { background:var(--line); border-radius:3px; }
 
-  /* ---------- Death screen ---------- */
+  /* ---------- Stats screen ---------- */
   .stats-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px 40px; width:420px; margin:26px 0; z-index:2;}
   .stat-row{display:flex; justify-content:space-between; font-family:'JetBrains Mono',monospace; font-size:14px; border-bottom:1px solid var(--line); padding-bottom:6px;}
   .stat-row .k{color:var(--dim);}
+
+  /* ---------- Death screen ---------- */
   .soul-gain{font-family:'JetBrains Mono',monospace; color:var(--soul); font-size:15px; margin-bottom:18px; z-index:2;}
 
   /* ---------- Meta upgrade screen ---------- */
@@ -198,8 +214,8 @@
     .subtitle{font-size:11.5px; max-width:86vw;}
     .menu-col{width:min(300px,84vw);}
     .btn{padding:15px 18px; font-size:16px;}
-    .meta-wrap, .settings-wrap{width:94vw;}
-    .stats-grid{width:90vw; grid-template-columns:1fr 1fr; gap:8px 18px;}
+    .meta-wrap, .settings-wrap, .stats-grid{width:94vw;}
+    .stats-grid{grid-template-columns:1fr 1fr; gap:8px 18px;}
     .hud-top{padding:calc(10px + env(safe-area-inset-top,0px)) 12px 10px;}
     .hp-wrap{width:180px;}
     .resource-row{gap:8px; font-size:11px;}
@@ -212,10 +228,7 @@
     .setting-row{padding:12px 14px;}
     .slider-row{width:150px;}
 
-    /* level-up cards: single column, full width so they always fit */
-    #screen-levelup{overflow-y:auto; padding:24px 0; justify-content:flex-start;}
-    .cards-wrap{flex-direction:column; width:min(92vw,360px); gap:12px; margin-top:8px;}
-    .card{width:100%;}
+    #screen-shop .cards-wrap { grid-template-columns:repeat(2, 1fr); }
   }
   @media (max-width:520px){
     .cards-wrap{width:94vw;}
@@ -261,9 +274,11 @@
         </div>
       </div>
       <div class="timer"><span id="timerVal">00:00</span><span class="phase" id="phaseVal">DISCOVERY</span></div>
-      <div style="display:flex; gap:8px;">
-        <div class="pause-hint" id="fullscreenBtnHud" style="pointer-events:auto;">⛶</div>
-        <div class="pause-hint" id="pauseBtn" style="pointer-events:auto; right: 62px">⏸</div>
+      <div style="display:flex; flex-direction:column; gap:8px;">
+        <div class="pause-hint" id="fullscreenBtnHud" style="pointer-events:auto;" title="Fullscreen">⛶</div>
+        <div class="pause-hint" id="pauseBtn" style="pointer-events:auto;" title="Pause">⏸</div>
+        <div class="pause-hint" id="statsBtnHud" style="pointer-events:auto;" title="Character Stats">📊</div>
+        <div class="pause-hint" id="shopBtnHud" style="pointer-events:auto;" title="In-Game Shop">🛒</div>
       </div>
     </div>
     <div class="event-log" id="eventLog"></div>
@@ -305,12 +320,36 @@
     <div class="cards-wrap" id="cardsWrap"></div>
   </div>
 
+  <!-- IN-GAME SHOP -->
+  <div class="screen hidden" id="screen-shop">
+    <div class="veil"></div>
+    <div class="title-wrap" style="margin-bottom:26px;">
+      <div class="kicker">spend your gold</div>
+      <div class="title" style="font-size:38px;">RUNE SHOP</div>
+      <div class="subtitle" style="margin-top:8px;">Current Gold: <span id="shopGoldDisplay" style="color:var(--gold); font-weight:700;">0</span></div>
+    </div>
+    <div class="cards-wrap" id="shopWrap"></div>
+    <div class="back-link" id="shopBack" style="margin-top:24px;">← RESUME RUN</div>
+  </div>
+
+  <!-- IN-GAME STATS -->
+  <div class="screen hidden" id="screen-ingame-stats">
+    <div class="veil"></div>
+    <div class="title-wrap" style="margin-bottom:26px;">
+      <div class="kicker">current build</div>
+      <div class="title" style="font-size:38px;">CHARACTER STATS</div>
+    </div>
+    <div class="stats-grid" id="ingameStatsGrid"></div>
+    <div class="back-link" id="statsBack" style="margin-top:24px;">← RESUME RUN</div>
+  </div>
+
   <!-- PAUSE -->
   <div class="screen hidden" id="screen-pause">
     <div class="veil"></div>
     <div class="title-wrap"><div class="title" style="font-size:44px;">PAUSED</div></div>
     <div class="menu-col">
       <button class="btn primary" id="btnResume">Resume</button>
+      <button class="btn" id="btnPauseShop">Open Shop</button>
       <button class="btn" id="btnPauseSettings">Settings</button>
       <button class="btn" id="btnQuitRun">Quit Run</button>
     </div>
@@ -396,7 +435,7 @@
     <div class="settings-wrap">
       <div class="settings-pane" id="pane-controls">
         <div class="setting-row">
-          <div><div class="s-name">Movement Input</div><div class="s-desc">Auto uses a floating touch joystick on phones/tablets and keyboard (WASD / arrows) elsewhere. The joystick appears wherever you place your thumb.</div></div>
+          <div><div class="s-name">Movement Input</div><div class="s-desc">Auto uses a floating touch joystick on phones/tablets and keyboard (WASD / arrows) elsewhere.</div></div>
           <div class="seg-control" id="ctrlMode">
             <button class="seg-btn" data-val="auto">Auto</button>
             <button class="seg-btn" data-val="joystick">Joystick</button>
@@ -404,13 +443,13 @@
           </div>
         </div>
         <div class="setting-row">
-          <div><div class="s-name">Vibration</div><div class="s-desc">Short haptic pulse on hits, level-ups and death (supported devices only).</div></div>
+          <div><div class="s-name">Vibration</div><div class="s-desc">Short haptic pulse on hits, level-ups and death.</div></div>
           <div class="toggle-switch" id="ctrlHaptics"><div class="knob"></div></div>
         </div>
       </div>
       <div class="settings-pane hidden" id="pane-video">
         <div class="setting-row">
-          <div><div class="s-name">Graphics Quality</div><div class="s-desc">Lower settings reduce glow and particle effects for smoother play on weaker devices.</div></div>
+          <div><div class="s-name">Graphics Quality</div><div class="s-desc">Lower settings reduce glow and particle effects.</div></div>
           <div class="seg-control" id="vidQuality">
             <button class="seg-btn" data-val="low">Low</button>
             <button class="seg-btn" data-val="medium">Medium</button>
@@ -418,11 +457,11 @@
           </div>
         </div>
         <div class="setting-row">
-          <div><div class="s-name">Screen Shake</div><div class="s-desc">Camera shake on hits and impacts. Disable if it bothers you.</div></div>
+          <div><div class="s-name">Screen Shake</div><div class="s-desc">Camera shake on hits and impacts.</div></div>
           <div class="toggle-switch" id="vidShake"><div class="knob"></div></div>
         </div>
         <div class="setting-row">
-          <div><div class="s-name">Fullscreen</div><div class="s-desc">Expand the game to fill your entire screen. Also available via the ⛶ button during a run.</div></div>
+          <div><div class="s-name">Fullscreen</div><div class="s-desc">Expand the game to fill your entire screen.</div></div>
           <button class="buy-btn" id="fullscreenToggleBtn" style="border-color:var(--accent); color:var(--accent);">ENTER FULLSCREEN</button>
         </div>
       </div>
@@ -620,9 +659,23 @@ const ACHIEVEMENTS = [
 ];
 
 /* =========================================================================
+   IN-GAME SHOP DATABASE
+   ========================================================================= */
+const SHOP_ITEMS = [
+  { id:"shop_heal", name:"Health Potion", icon:"🧪", desc:"Restore 40% of Max HP.", cost:50, max:99, apply:(p)=>{ p.hp = Math.min(p.maxHp, p.hp + p.maxHp * 0.4); } },
+  { id:"shop_maxhp", name:"Vitality Elixir", icon:"❤️", desc:"+25 Max HP and heal to full.", cost:120, max:5, apply:(p)=>{ p.maxHp += 25; p.hp = p.maxHp; } },
+  { id:"shop_dmg", name:"Sharpening Stone", icon:"⚔️", desc:"+12% Damage multiplier.", cost:150, max:5, apply:(p)=>{ p.stats.dmgMult += 0.12; } },
+  { id:"shop_atkspd", name:"Haste Rune", icon:"⚡", desc:"+12% Attack Speed.", cost:150, max:5, apply:(p)=>{ p.stats.atkSpeedMult += 0.12; } },
+  { id:"shop_armor", name:"Iron Plating", icon:"🛡️", desc:"+2 Flat Armor.", cost:200, max:5, apply:(p)=>{ p.stats.armor += 2; } },
+  { id:"shop_regen", name:"Regen Charm", icon:"✚", desc:"+1.0 HP regenerated per second.", cost:180, max:5, apply:(p)=>{ p.stats.regen += 1.0; } },
+  { id:"shop_lifesteal", name:"Vampiric Touch", icon:"🩸", desc:"+3% Lifesteal.", cost:300, max:3, apply:(p)=>{ p.stats.lifesteal += 0.03; } },
+  { id:"shop_crit", name:"Precision Scope", icon:"🎯", desc:"+5% Crit Chance (max 75%).", cost:250, max:5, apply:(p)=>{ p.stats.critChance = Math.min(0.75, p.stats.critChance + 0.05); } },
+  { id:"shop_revive", name:"Ankh of Rebirth", icon:"☥", desc:"Upon death, resurrect with 50% HP. Gold resets to 0. (One-time use)", cost:600, max:1, apply:(p)=>{ p.hasRevive = true; } },
+];
+
+/* =========================================================================
    SAVE / META STATE  (persisted via local storage, personal & non-shared)
    ========================================================================= */
-
 const DEFAULT_SAVE = { soul:0, metaLevels:{}, lifetime:{ runs:0, kills:0, deaths:0, bestTime:0, bestLevel:0, totalGold:0, totalSoul:0, eliteKills:0, bossKills:0 }, activeRun:null,
   achievements:{ unlocked:{} },
   settings:{ muted:false, sfxVolume:1, musicVolume:0.35, controlMode:'auto', haptics:true, quality:'high', screenShake:true } };
@@ -729,6 +782,8 @@ function newPlayer(){
     x: WORLD.w/2, y: WORLD.h/2, radius:15,
     hp:100, maxHp:100, level:1, xp:0, xpNext:10,
     gold:0, weapons:{ sword:1 }, weaponTimers:{}, stats: freshStats(),
+    shopPurchases: {},
+    hasRevive: false,
   };
   // apply meta upgrades
   for(const def of META_UPGRADES){
@@ -770,6 +825,8 @@ function continueRun(){
     xp: snap.player.xp, xpNext: snap.player.xpNext, gold: snap.player.gold,
     weapons: Object.assign({}, snap.player.weapons), weaponTimers: {},
     stats: Object.assign(freshStats(), snap.player.stats),
+    shopPurchases: Object.assign({}, snap.player.shopPurchases||{}),
+    hasRevive: !!snap.player.hasRevive,
   };
   enemies = []; bullets = []; orbs = []; particles = []; floaters = [];
   chainArcs = []; novaPulses = [];
@@ -822,6 +879,8 @@ function snapshotPlayer(p){
     x:p.x, y:p.y, radius:p.radius, hp:p.hp, maxHp:p.maxHp, level:p.level,
     xp:p.xp, xpNext:p.xpNext, gold:p.gold,
     weapons:Object.assign({},p.weapons), stats:Object.assign({},p.stats),
+    shopPurchases: Object.assign({}, p.shopPurchases),
+    hasRevive: p.hasRevive,
   };
 }
 
@@ -853,7 +912,10 @@ function flashSavedIndicator(){
 
 window.addEventListener('keydown', e=>{
   keys[e.key.toLowerCase()] = true;
-  if(e.key === 'Escape' && (state==='playing'||state==='paused')){ togglePause(); }
+  if(e.key === 'Escape' && (state==='playing'||state==='paused'||state==='shop'||state==='ingame-stats')){ 
+    if(state==='shop' || state==='ingame-stats') { hideAll(); setState('playing'); MUSIC.start(); }
+    else { togglePause(); }
+  }
 });
 window.addEventListener('keyup', e=>{ keys[e.key.toLowerCase()] = false; });
 
@@ -879,7 +941,7 @@ document.addEventListener('visibilitychange', ()=>{
   if(document.visibilityState==='hidden') saveOnExitIfNeeded();
 });
 window.addEventListener('pagehide', saveOnExitIfNeeded);
-window.addEventListener('blur', saveOnExitIfNeeded); // extra safety net on older mobile browsers
+window.addEventListener('blur', saveOnExitIfNeeded);
 
 /* =========================================================================
    SETTINGS  (Controls / Video / Sound — all persisted in save.settings)
@@ -2010,10 +2072,104 @@ function showLevelUpCards(){
 }
 
 /* =========================================================================
+   IN-GAME SHOP & STATS LOGIC
+   ========================================================================= */
+
+function renderShop(){
+  const wrap = document.getElementById('shopWrap');
+  wrap.innerHTML = "";
+  document.getElementById('shopGoldDisplay').textContent = Math.floor(player.gold);
+  
+  SHOP_ITEMS.forEach(item => {
+    const purchased = player.shopPurchases[item.id] || 0;
+    const maxed = purchased >= item.max;
+    const canAfford = player.gold >= item.cost;
+    
+    const el = document.createElement('div');
+    el.className = 'card shop-card';
+    el.innerHTML = `
+      <div class="icon">${item.icon}</div>
+      <div class="name">${item.name}</div>
+      <div class="desc">${item.desc}</div>
+      <div class="price">${maxed ? "MAXED" : item.cost + " GOLD"}</div>
+      <button class="buy-btn" ${(!canAfford || maxed) ? 'disabled' : ''}>
+        ${maxed ? "MAXED OUT" : "BUY"}
+      </button>
+    `;
+    
+    const btn = el.querySelector('.buy-btn');
+    btn.onclick = () => {
+      if(player.gold >= item.cost && purchased < item.max){
+        player.gold -= item.cost;
+        player.shopPurchases[item.id] = purchased + 1;
+        item.apply(player);
+        SFX.uiClick();
+        SFX.pickupGold(); // reuse sound for purchase
+        logEvent(`Bought ${item.name}`);
+        renderShop();
+        refreshHud();
+      }
+    };
+    wrap.appendChild(el);
+  });
+}
+
+function openShop(){
+  if(state !== 'playing' && state !== 'paused') return;
+  setState('shop');
+  SFX.stopHeartbeat();
+  MUSIC.stop();
+  renderShop();
+  show('screen-shop');
+}
+
+function renderIngameStats(){
+  const grid = document.getElementById('ingameStatsGrid');
+  const s = player.stats;
+  grid.innerHTML = `
+    <div class="stat-row"><span class="k">Level</span><span>${player.level}</span></div>
+    <div class="stat-row"><span class="k">Health</span><span>${Math.round(player.hp)} / ${player.maxHp}</span></div>
+    <div class="stat-row"><span class="k">Gold</span><span style="color:var(--gold)">${Math.floor(player.gold)}</span></div>
+    <div class="stat-row"><span class="k">Damage Multiplier</span><span>+${Math.round((s.dmgMult-1)*100)}%</span></div>
+    <div class="stat-row"><span class="k">Attack Speed</span><span>+${Math.round((s.atkSpeedMult-1)*100)}%</span></div>
+    <div class="stat-row"><span class="k">Movement Speed</span><span>${Math.round(s.moveSpeed)}</span></div>
+    <div class="stat-row"><span class="k">Pickup Radius</span><span>${Math.round(s.pickupRadius)}</span></div>
+    <div class="stat-row"><span class="k">Armor</span><span>${s.armor.toFixed(1)}</span></div>
+    <div class="stat-row"><span class="k">Regeneration</span><span>+${s.regen.toFixed(1)}/s</span></div>
+    <div class="stat-row"><span class="k">Gold Multiplier</span><span>+${Math.round((s.goldMult-1)*100)}%</span></div>
+    <div class="stat-row"><span class="k">Lifesteal</span><span>+${Math.round(s.lifesteal*100)}%</span></div>
+    <div class="stat-row"><span class="k">XP Multiplier</span><span>+${Math.round((s.xpMult-1)*100)}%</span></div>
+    <div class="stat-row"><span class="k">Crit Chance</span><span>${Math.round(s.critChance*100)}%</span></div>
+    <div class="stat-row"><span class="k">Crit Damage</span><span>+${Math.round((s.critMult-1)*100)}%</span></div>
+    <div class="stat-row"><span class="k">Revive</span><span style="color:${player.hasRevive?'var(--xp)':'var(--dim)'}">${player.hasRevive ? "READY ☥" : "None"}</span></div>
+  `;
+}
+
+function openIngameStats(){
+  if(state !== 'playing' && state !== 'paused') return;
+  setState('ingame-stats');
+  SFX.stopHeartbeat();
+  MUSIC.stop();
+  renderIngameStats();
+  show('screen-ingame-stats');
+}
+
+/* =========================================================================
    DEATH / RUN END
    ========================================================================= */
 
 function die(){
+  // Check for revive first
+  if(player.hasRevive){
+    player.hasRevive = false;
+    player.hp = Math.floor(player.maxHp * 0.5);
+    player.gold = 0; // Penalty for reviving
+    logEvent("☥ REBORN! Gold reset to 0.");
+    SFX.levelup();
+    vibrate([0, 50, 50, 50]);
+    return; // Cancel death
+  }
+
   setState('dead');
   SFX.stopHeartbeat();
   MUSIC.stop();
@@ -2285,7 +2441,7 @@ function loop(now){
     autosaveTimer -= dt;
     if(autosaveTimer<=0){ doAutosave(true); autosaveTimer = AUTOSAVE_INTERVAL; }
   }
-  if(state==="playing" || state==="levelup" || state==="paused" || state==="dead" || state==="victory"){
+  if(state==="playing" || state==="levelup" || state==="paused" || state==="dead" || state==="victory" || state==="shop" || state==="ingame-stats"){
     render();
   }
   requestAnimationFrame(loop);
@@ -2299,7 +2455,7 @@ function hideAll(){
   document.querySelectorAll('.screen').forEach(s=>s.classList.add('hidden'));
 }
 function show(id){ hideAll(); document.getElementById(id).classList.remove('hidden'); }
-function setState(s){ state = s; if(s!=='playing' && s!=='levelup' && s!=='paused'){ document.getElementById('hud').classList.add('hidden'); } }
+function setState(s){ state = s; if(s!=='playing' && s!=='levelup' && s!=='paused' && s!=='shop' && s!=='ingame-stats'){ document.getElementById('hud').classList.add('hidden'); } }
 
 function goMenu(){
   setState('menu');
@@ -2419,11 +2575,18 @@ document.getElementById('btnToMenu').onclick = goMenu;
 document.getElementById('btnKeepPlaying').onclick = ()=>{ hideAll(); setState('playing'); MUSIC.start(); };
 document.getElementById('btnVictoryMenu').onclick = ()=>{ applyRunStatsIncrement(true); save.activeRun=null; persistSave(); goMenu(); };
 
+// New HUD buttons
+document.getElementById('statsBtnHud').onclick = ()=>{ SFX.uiClick(); openIngameStats(); };
+document.getElementById('shopBtnHud').onclick = ()=>{ SFX.uiClick(); openShop(); };
+document.getElementById('shopBack').onclick = ()=>{ hideAll(); setState('playing'); MUSIC.start(); };
+document.getElementById('statsBack').onclick = ()=>{ hideAll(); setState('playing'); MUSIC.start(); };
+document.getElementById('btnPauseShop').onclick = ()=>{ openShop(); };
+
 /* =========================================================================
    BOOT
    ========================================================================= */
 
-(async function boot(){
+   (async function boot(){
   await loadSave();
   goMenu();
   requestAnimationFrame(loop);
