@@ -111,7 +111,7 @@
   .shop-card:hover:not(:disabled) { transform: none !important; }
   .shop-card .icon { font-size:18px; margin-bottom:4px; }
   .shop-card .name { font-family:'Rajdhani',sans-serif; font-weight:700; font-size:13px; margin-bottom:2px; line-height:1.1; }
-  .shop-card .desc { font-size:10px; line-height:1.3; color:var(--dim); display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  .shop-card .desc { font-size:10px; line-height:1.3; color:var(--dim); display:-webkit-box; line-clamp:2; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
   .shop-card .price { font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--gold); margin-top:6px; font-weight:700; }
   .shop-card .buy-btn { width:fit-content; border:1px solid var(--gold); color:var(--gold); background:transparent; padding:5px; border-radius:2px; cursor:pointer; font-family:'JetBrains Mono',monospace; font-size:10px; font-weight:700; transition:all .15s; text-transform:uppercase; letter-spacing:0.5px; margin-top:5px; }
   .shop-card .buy-btn:hover:not(:disabled) { background:rgba(255,179,71,0.15); }
@@ -806,6 +806,7 @@ function startRun(){
   warnedBossIds = new Set();
   appliedKills = 0; appliedGold = 0; autosaveTimer = AUTOSAVE_INTERVAL;
   eliteKillsRun = 0; bossKilledRun = false; appliedEliteKills = 0; appliedBossFolded = false;
+  lastWeaponSig = null;
   save.activeRun = null; persistSave();
   updateContinueButton();
   setState("playing");
@@ -841,6 +842,7 @@ function continueRun(){
   appliedEliteKills = snap.appliedEliteKills!=null ? snap.appliedEliteKills : eliteKillsRun;
   appliedBossFolded = snap.appliedBossFolded!=null ? snap.appliedBossFolded : false;
   autosaveTimer = AUTOSAVE_INTERVAL;
+  lastWeaponSig = null;
   setState("playing");
   document.getElementById('hud').classList.remove('hidden');
   logEvent("Run resumed.");
@@ -1477,19 +1479,23 @@ function spawnEnemy(id, forcedPos, overrides={}){
 
 const BOSS_WARNING_LEAD = 4; // seconds of warning before a boss actually spawns
 
+const MAX_ENEMIES = 240; // hard cap — regular/elite spawns pause above this; bosses always get through
 function updateSpawns(dt){
   const wave = currentWave();
   lastSpawn -= dt;
   if(lastSpawn<=0){
-    spawnEnemy(pick(wave.ids));
+    if(enemies.length < MAX_ENEMIES) spawnEnemy(pick(wave.ids));
     lastSpawn = wave.interval * rand(0.85,1.15);
   }
   if(wave.elite){
     eliteTimer -= dt;
     if(eliteTimer<=0){
-      const eliteId = wave.eliteIds ? pick(wave.eliteIds) : "ogre";
-      spawnEnemy(eliteId); eliteTimer = wave.eliteEvery;
-      showEliteToast(eliteId);
+      if(enemies.length < MAX_ENEMIES){
+        const eliteId = wave.eliteIds ? pick(wave.eliteIds) : "ogre";
+        spawnEnemy(eliteId);
+        showEliteToast(eliteId);
+      }
+      eliteTimer = wave.eliteEvery;
     }
   }
   if(wave.boss && wave.bossId && !spawnedBossIds.has(wave.bossId)){
@@ -1549,6 +1555,44 @@ function updatePlayer(dt){
     player.y = clamp(player.y + (dy/len)*player.stats.moveSpeed*dt, player.radius, WORLD.h-player.radius);
   }
   if(player.stats.regen>0) player.hp = Math.min(player.maxHp, player.hp + player.stats.regen*dt);
+}
+
+/* =========================================================================
+   SPATIAL GRID — every weapon and enemy-AI lookup used to be a raw
+   `for(const e of enemies)` scan. That's fine at 20 enemies; it's the
+   actual cause of the movement-frame stutter once a run runs long enough
+   to have 150-300+ enemies alive plus a screen full of bullets, because
+   every one of those scans (nearestEnemy, bullet/enemy collisions, melee/
+   nova/orbit radius checks, chain-lightning jumps) is O(enemies), several
+   of them run *per weapon per frame*, and bullet collision is
+   O(bullets × enemies). None of that is wasm-vs-JS — it's algorithmic,
+   and a uniform grid turns each of those into an O(local density) lookup
+   regardless of engine. Rebuilt once per frame, read many times.
+   ========================================================================= */
+const GRID_CELL = 160;
+const spatialGrid = new Map(); // "cx,cy" -> Enemy[]
+function gridKey(cx,cy){ return cx+','+cy; }
+function rebuildSpatialGrid(){
+  spatialGrid.clear();
+  for(const e of enemies){
+    const cx = Math.floor(e.x/GRID_CELL), cy = Math.floor(e.y/GRID_CELL);
+    const key = gridKey(cx,cy);
+    let bucket = spatialGrid.get(key);
+    if(!bucket){ bucket = []; spatialGrid.set(key,bucket); }
+    bucket.push(e);
+  }
+}
+// Calls fn(enemy) for every enemy within `radius` of (x,y) — cheap, no array allocation.
+function forEachEnemyNear(x,y,radius,fn){
+  const minCx = Math.floor((x-radius)/GRID_CELL), maxCx = Math.floor((x+radius)/GRID_CELL);
+  const minCy = Math.floor((y-radius)/GRID_CELL), maxCy = Math.floor((y+radius)/GRID_CELL);
+  for(let cx=minCx; cx<=maxCx; cx++){
+    for(let cy=minCy; cy<=maxCy; cy++){
+      const bucket = spatialGrid.get(gridKey(cx,cy));
+      if(!bucket) continue;
+      for(const e of bucket) fn(e);
+    }
+  }
 }
 
 /* =========================================================================
@@ -1718,7 +1762,11 @@ function damagePlayer(amount){
 
 function nearestEnemy(x,y,maxD){
   let best=null, bestD=maxD?maxD*maxD:Infinity;
-  for(const e of enemies){ const d=dist2(x,y,e.x,e.y); if(d<bestD){ bestD=d; best=e; } }
+  const radius = maxD || Math.max(WORLD.w,WORLD.h);
+  forEachEnemyNear(x,y,radius, e=>{
+    const d=dist2(x,y,e.x,e.y);
+    if(d<bestD){ bestD=d; best=e; }
+  });
   return best;
 }
 
@@ -1758,15 +1806,15 @@ function weaponFire(wid, lvl, dt){
         const dps = (def.base.dps + def.perLvl.dps*(lvl-1)) * player.stats.dmgMult;
         const dmgTick = dps*def.base.tick;
         const range = player.coneRange;
-        for(const e of enemies){
+        forEachEnemyNear(player.x, player.y, range, e=>{
           const edx = e.x-player.x, edy = e.y-player.y;
           const ed = Math.hypot(edx,edy);
-          if(ed > range) continue;
+          if(ed > range) return;
           const angTo = Math.atan2(edy,edx);
           let diff = Math.abs(angTo - player.coneAimAngle);
           if(diff > Math.PI) diff = Math.PI*2 - diff;
           if(diff <= def.base.coneAngle/2){ dealDamage(e, dmgTick); }
-        }
+        });
         player.weaponTimers[wid+"_tick"] = def.base.tick;
         spawnParticle(player.x+Math.cos(player.coneAimAngle)*range*0.5, player.y+Math.sin(player.coneAimAngle)*range*0.5, "#ff9d4d", 2);
       }
@@ -1784,12 +1832,12 @@ function weaponFire(wid, lvl, dt){
       const ang = player.orbitAngle + (i/count)*Math.PI*2;
       const bx = player.x + Math.cos(ang)*def.base.radius;
       const by = player.y + Math.sin(ang)*def.base.radius;
-      for(const e of enemies){
+      forEachEnemyNear(bx, by, 120, e=>{
         if(dist2(bx,by,e.x,e.y) < (e.radius+14)*(e.radius+14)){
           const last = player.orbitHits.get(e)||0;
           if(runTime-last >= def.base.hitCd){ dealDamage(e, dmg); player.orbitHits.set(e, runTime); }
         }
-      }
+      });
     }
     return;
   }
@@ -1800,8 +1848,10 @@ function weaponFire(wid, lvl, dt){
   if(def.kind==="melee"){
     const radius = def.base.radius + (def.perLvl.radius||0)*(lvl-1);
     const dmg = (def.base.dmg + def.perLvl.dmg*(lvl-1)) * player.stats.dmgMult;
-    let hit=false;
-    for(const e of enemies){ if(dist2(player.x,player.y,e.x,e.y) < radius*radius){ dealDamage(e, dmg); hit=true; } }
+    const r2 = radius*radius;
+    forEachEnemyNear(player.x, player.y, radius, e=>{
+      if(dist2(player.x,player.y,e.x,e.y) < r2){ dealDamage(e, dmg); }
+    });
     player.swordFx = { r:radius, t:0.22 };
     SFX.swordSwing();
     return;
@@ -1846,7 +1896,11 @@ function weaponFire(wid, lvl, dt){
       hit.add(cur);
       arcPoints.push({x:cur.x, y:cur.y});
       let next=null, bestD=def.base.jumpRange*def.base.jumpRange;
-      for(const e of enemies){ if(hit.has(e)) continue; const dd=dist2(cur.x,cur.y,e.x,e.y); if(dd<bestD){ bestD=dd; next=e; } }
+      forEachEnemyNear(cur.x, cur.y, def.base.jumpRange, e=>{
+        if(hit.has(e)) return;
+        const dd=dist2(cur.x,cur.y,e.x,e.y);
+        if(dd<bestD){ bestD=dd; next=e; }
+      });
       cur = next;
     }
     if(arcPoints.length>1){ chainArcs.push({points:arcPoints, life:0.18, maxLife:0.18}); SFX.chainZap(); }
@@ -1868,7 +1922,10 @@ function weaponFire(wid, lvl, dt){
   if(def.kind==="nova"){
     const dmg = (def.base.dmg + def.perLvl.dmg*(lvl-1)) * player.stats.dmgMult;
     const radius = def.base.radius + (def.perLvl.radius||0)*(lvl-1);
-    for(const e of enemies){ if(dist2(player.x,player.y,e.x,e.y) < radius*radius){ dealDamage(e, dmg); } }
+    const r2 = radius*radius;
+    forEachEnemyNear(player.x, player.y, radius, e=>{
+      if(dist2(player.x,player.y,e.x,e.y) < r2){ dealDamage(e, dmg); }
+    });
     novaPulses.push({x:player.x, y:player.y, radius, life:0.4, maxLife:0.4});
     SFX.novaBurst();
     return;
@@ -1909,14 +1966,16 @@ function updateBullets(dt){
     if(b.life<=0){ bullets.splice(i,1); continue; }
 
     if(b.owner==="player"){
-      for(const e of enemies){
-        if(b.hitset.has(e)) continue;
+      let removed = false;
+      forEachEnemyNear(b.x, b.y, b.radius+60, e=>{
+        if(removed || b.hitset.has(e)) return;
         if(dist2(b.x,b.y,e.x,e.y) < (b.radius+e.radius)*(b.radius+e.radius)){
           dealDamage(e, b.dmg); b.hitset.add(e);
-          if(b.pierce<=0){ bullets.splice(i,1); break; }
-          b.pierce--;
+          if(b.pierce<=0){ bullets.splice(i,1); removed = true; }
+          else b.pierce--;
         }
-      }
+      });
+      if(removed) continue;
     } else {
       if(dist2(b.x,b.y,player.x,player.y) < (b.radius+player.radius)*(b.radius+player.radius)){
         damagePlayer(b.dmg); bullets.splice(i,1);
@@ -1941,6 +2000,7 @@ function dealDamage(enemy, dmg){
 function killEnemy(enemy){
   const idx = enemies.indexOf(enemy);
   if(idx>=0) enemies.splice(idx,1);
+  if(player.orbitHits) player.orbitHits.delete(enemy);
   killCount++;
   if(enemy.elite) eliteKillsRun++;
   if(enemy.boss) bossKilledRun = true;
@@ -2273,16 +2333,21 @@ function refreshHud(){
   const dps = dpsWindow.reduce((s,x)=>s+x.dmg,0)/3;
   document.getElementById('dpsVal').textContent = Math.round(dps)+" dps";
 
-  const row = document.getElementById('weaponRow');
-  row.innerHTML = "";
-  for(const wid of Object.keys(player.weapons)){
-    const def = WEAPONS[wid];
-    const el = document.createElement('div');
-    el.className = 'wpn-icon';
-    el.innerHTML = `${def.icon}<span class="wlvl">${player.weapons[wid]}</span>`;
-    row.appendChild(el);
+  const weaponSig = Object.keys(player.weapons).map(wid=>wid+':'+player.weapons[wid]).join(',');
+  if(weaponSig !== lastWeaponSig){
+    lastWeaponSig = weaponSig;
+    const row = document.getElementById('weaponRow');
+    row.innerHTML = "";
+    for(const wid of Object.keys(player.weapons)){
+      const def = WEAPONS[wid];
+      const el = document.createElement('div');
+      el.className = 'wpn-icon';
+      el.innerHTML = `${def.icon}<span class="wlvl">${player.weapons[wid]}</span>`;
+      row.appendChild(el);
+    }
   }
 }
+let lastWeaponSig = null;
 
 /* =========================================================================
    RENDER
@@ -2428,6 +2493,7 @@ function loop(now){
     updateSpawns(dt);
     updatePlayer(dt);
     updateEnemies(dt);
+    rebuildSpatialGrid();
     updateWeapons(dt);
     updateBullets(dt);
     updateOrbs(dt);
