@@ -401,6 +401,29 @@ const WEAPONS = {
   thorn_aura:{name:"Thorn Aura",icon:"🌵",type:"aura",tags:["reflect","poison"],base:{reflectPct:0.25,radius:90},perLevel:{reflectPct:0.03},maxLevel:8,evolvesInto:"bramble_god"},
   chain_lightning:{name:"Chain Lightning",icon:"⚡",type:"chain",tags:["lightning","crowd"],base:{dmg:10,cd:1.1,jumps:3,jumpRange:260},perLevel:{dmg:4,jumps:0.5},maxLevel:8,evolvesInto:"maelstrom_of_ruin"},
 };
+// Global weapon rework/nerf pass: the player was reported as too strong overall.
+// Rather than hand-tuning 20 separate weapons' dmg/dps fields (error-prone and
+// easy to leave inconsistent), every weapon's damage-dealing fields are scaled
+// down by one tunable constant here, applied uniformly right after the weapon
+// data is defined above (evolutions, per-level scaling, talents, etc. all read
+// the already-nerfed numbers, so nothing downstream needs to change).
+const PLAYER_WEAPON_DMG_MULT = 0.85;
+for(const wid of Object.keys(WEAPONS)){
+  const w = WEAPONS[wid];
+  if(w.base.dmg!=null) w.base.dmg = +(w.base.dmg*PLAYER_WEAPON_DMG_MULT).toFixed(2);
+  if(w.base.dps!=null) w.base.dps = +(w.base.dps*PLAYER_WEAPON_DMG_MULT).toFixed(2);
+  if(w.perLevel.dmg!=null) w.perLevel.dmg = +(w.perLevel.dmg*PLAYER_WEAPON_DMG_MULT).toFixed(2);
+  if(w.perLevel.dps!=null) w.perLevel.dps = +(w.perLevel.dps*PLAYER_WEAPON_DMG_MULT).toFixed(2);
+}
+// Per-weapon color, used everywhere a weapon's projectile/effect is drawn so each
+// weapon reads as visually distinct instead of every bullet being the same beige.
+const WEAPON_COLORS = {
+  blood_blade:"#ff4d5e", chain_hook:"#c8c8d8", warhammer:"#ffb347", bow:"#ffd479", plasma_rifle:"#ff6f9c",
+  railgun:"#7ee0ff", shuriken_storm:"#dfe3ee", laser_array:"#ff6f9c", prism_beam:"#b98cff", fire_nova:"#ff9d4d",
+  frost_field:"#8fd8ff", poison_cloud:"#8aff6b", necro_staff:"#c86bff", spirit_wolves:"#e0b48a", turret_deployer:"#8a8f9e",
+  spike_trap:"#ff8a4d", tesla_coil:"#ffe15c", holy_aura:"#ffffff", thorn_aura:"#8aff6b", chain_lightning:"#ffe15c",
+};
+function weaponColor(wid){ return WEAPON_COLORS[wid] || "#ffd479"; }
 
 const EVOLUTIONS = {
   crimson_executioner:{from:"blood_blade",catalyst:"blood_chalice",name:"Crimson Executioner",icon:"🩸",desc:"Every hit heals for 8% of damage dealt; executes below 15% HP."},
@@ -984,7 +1007,7 @@ let rerollCharges=0;
 
 function freshStats(){
   return { dmgMult:1, atkSpeedMult:1, moveSpeed:230, pickupRadius:70, armor:0, regen:0, goldMult:1,
-    lifesteal:0, xpMult:1, critChance:0, critMult:1.8,
+    lifesteal:0, xpMult:1, critChance:0, critMult:1.65,
     fireMult:1, frostMult:1, lightningMult:1, poisonMult:1, holyMult:1, cdrMult:1, eliteDmgMult:1, soulMult:1,
     summonDmgMult:1, summonCountMult:1, summonDurationMult:1, bonusPierce:0, bonusProjectiles:0,
     thorns:0, shieldCd:0, burnOnHitChance:0, chainOnHitChance:0, slowOnHit:0, hpPerKill:0,
@@ -1082,8 +1105,8 @@ function softMult(v, softStart, k){
   const over = v - softStart;
   return softStart + (over/(1+over/k));
 }
-function effDmgMult(){ return softMult(player.stats.dmgMult, 3, 7); }        // linear to +200%, asymptote ~x10
-function effAtkSpeedMult(){ return softMult(player.stats.atkSpeedMult, 2, 1.6); }
+function effDmgMult(){ return softMult(player.stats.dmgMult, 2.4, 5.5); }        // was (3,7) — lower ceiling, softer scaling: player nerf
+function effAtkSpeedMult(){ return softMult(player.stats.atkSpeedMult, 1.7, 1.3); } // was (2,1.6)
 function effGoldMult(){ return softMult(player.stats.goldMult||1, 2.5, 2.5); }
 function effXpMult(){ return softMult(player.stats.xpMult||1, 2.5, 2.5); }
 // area / beam / aura / chain / trap weapons are the "arcane" family the mage
@@ -1237,7 +1260,7 @@ function weaponFire(wid, lvl, dt){
       const again = nearestEnemy(player.x,player.y,def.base.jumpRange*1.4);
       if(again && !hit.has(again)){ dealDamage(again, dmg*0.6, wid); arcPoints.push({x:player.x,y:player.y},{x:again.x,y:again.y}); }
     }
-    if(arcPoints.length>1){ chainArcs.push({points:arcPoints,life:0.18,maxLife:0.18}); SFX.chainZap(); }
+    if(arcPoints.length>1){ chainArcs.push({points:arcPoints,life:0.18,maxLife:0.18,color:weaponColor(wid)}); SFX.chainZap(); }
     return;
   }
   if(player.weaponTimers[wid]>0) return;
@@ -1255,7 +1278,7 @@ function weaponFire(wid, lvl, dt){
         if(!e.dead && e.hp>0 && e.hp/e.maxHp<0.15) dealDamage(e, e.hp+9999, wid);
       }
     });
-    player.swordFx={r:radius,t:0.22}; SFX.swordSwing();
+    player.swordFx={r:radius,t:0.22,color:weaponColor(wid)}; SFX.swordSwing();
     return;
   }
   if(def.type==="projectile"){
@@ -1274,7 +1297,7 @@ function weaponFire(wid, lvl, dt){
     for(let i=0;i<count;i++){
       const spread=(i-(count-1)/2)*0.16, ang=baseAng+spread;
       spawnBullet({owner:"player",x:player.x,y:player.y,vx:Math.cos(ang)*def.base.speed,vy:Math.sin(ang)*def.base.speed,
-        dmg,radius:5,life:2.2,color:"#ffd479",pierce,weaponId:wid,forceCrit,detonate});
+        dmg,radius:5,life:2.2,color:weaponColor(wid),pierce,weaponId:wid,forceCrit,detonate});
     }
     SFX.bowShot();
     return;
@@ -1911,13 +1934,13 @@ function updateZones(dt){
    rather than at each mutation site, so it's a single source of truth and
    self-heals if a bad number ever slips through (e.g. from a future card). */
 const STAT_CAPS = {
-  dmgMult:[0,50], atkSpeedMult:[0.1,10], cdrMult:[0.08,3], critChance:[0,0.9], critMult:[1,6],
-  damageReduction:[0,0.6], arcaneDmgMult:[0.2,5], reviveChance:[0,0.5], chillCap:[0.1,0.6], burnStacks:[1,4],
-  moveSpeed:[40,900], pickupRadius:[20,2000], armor:[0,80], regen:[0,50], goldMult:[0,10], xpMult:[0,10],
-  lifesteal:[0,0.6], chainOnHitChance:[0,0.9], burnOnHitChance:[0,0.9], extraChainChance:[0,0.9],
-  eliteDmgMult:[0,10], soulMult:[0,10], thorns:[0,1], bonusPierce:[0,50], bonusProjectiles:[0,20],
-  aoeRadiusMult:[0.2,5], rangeMult:[0.2,5], summonDmgMult:[0,10], summonCountMult:[0,5], fireMult:[0,10],
-  frostMult:[0,10], lightningMult:[0,10], poisonMult:[0,10], holyMult:[0,10],
+  dmgMult:[0,32], atkSpeedMult:[0.1,6], cdrMult:[0.18,3], critChance:[0,0.8], critMult:[1,4.5],
+  damageReduction:[0,0.55], arcaneDmgMult:[0.2,4], reviveChance:[0,0.4], chillCap:[0.1,0.6], burnStacks:[1,4],
+  moveSpeed:[40,820], pickupRadius:[20,2000], armor:[0,65], regen:[0,40], goldMult:[0,8], xpMult:[0,8],
+  lifesteal:[0,0.45], chainOnHitChance:[0,0.8], burnOnHitChance:[0,0.8], extraChainChance:[0,0.8],
+  eliteDmgMult:[0,7], soulMult:[0,8], thorns:[0,0.85], bonusPierce:[0,40], bonusProjectiles:[0,15],
+  aoeRadiusMult:[0.2,4], rangeMult:[0.2,4], summonDmgMult:[0,8], summonCountMult:[0,4], fireMult:[0,8],
+  frostMult:[0,8], lightningMult:[0,8], poisonMult:[0,8], holyMult:[0,8],
 };
 function clampPlayerStats(){
   if(!player) return;
@@ -2385,6 +2408,17 @@ function updateJuice(dt){
   for(let i=0;i<floaters.length;i++){ const f=floaters[i]; f.y+=f.vy*dt; f.life-=dt;
     if(f.life<=0){ floaterPool.push(f); continue; } floaters[fw++]=f; }
   floaters.length=fw;
+  // FIX: chainArcs (chain-lightning visuals) and novaPulses (area-burst rings) were
+  // pushed on every attack but never had their `life` ticked down, never pruned, and
+  // were never actually drawn — a silent unbounded memory leak for the whole run,
+  // on top of the visual effect simply not existing. Both are now aged out here and
+  // rendered in render() below.
+  let cw=0;
+  for(let i=0;i<chainArcs.length;i++){ const c=chainArcs[i]; c.life-=dt; if(c.life<=0) continue; chainArcs[cw++]=c; }
+  chainArcs.length=cw;
+  let nw=0;
+  for(let i=0;i<novaPulses.length;i++){ const n=novaPulses[i]; n.life-=dt; if(n.life<=0) continue; novaPulses[nw++]=n; }
+  novaPulses.length=nw;
   if(camera.shake) camera.shake=Math.max(0,camera.shake-dt*20);
 }
 function refreshHud(){
@@ -2452,15 +2486,43 @@ function render(){
   for(const z of zones){ ctx2d.beginPath(); ctx2d.fillStyle= z.tag==="lightning"?"rgba(255,224,92,0.18)": z.tag==="boss"?"rgba(255,77,94,0.15)": z.tag==="burnzone"?"rgba(255,120,60,0.18)": z.slowOnly?"rgba(140,80,40,0.15)":"rgba(140,255,120,0.14)"; ctx2d.arc(z.x,z.y,z.radius,0,7); ctx2d.fill(); }
   for(const o of orbs){ ctx2d.beginPath(); ctx2d.fillStyle = o.type==="xp"?"#7cff6b": o.type==="gold"?"#ffb347": o.type==="crystal"?"#7ee0ff":"#ff9ecb"; ctx2d.shadowColor=ctx2d.fillStyle; ctx2d.shadowBlur=glow(8); ctx2d.arc(o.x,o.y,o.radius,0,7); ctx2d.fill(); }
   ctx2d.shadowBlur=0;
-  if(player.swordFx){ const alpha=player.swordFx.t/0.22; ctx2d.beginPath(); ctx2d.strokeStyle=`rgba(185,140,255,${alpha*0.7})`; ctx2d.lineWidth=6; ctx2d.arc(player.x,player.y,player.swordFx.r,0,Math.PI*2); ctx2d.stroke(); }
+  // Chain-lightning arcs and area-burst pulses (see updateJuice fix above) — actually drawn now.
+  for(const c of chainArcs){
+    const alpha=clamp(c.life/c.maxLife,0,1); ctx2d.beginPath();
+    ctx2d.strokeStyle = c.color||"#ffe15c"; ctx2d.globalAlpha=alpha*0.85; ctx2d.lineWidth=3; ctx2d.shadowColor=c.color||"#ffe15c"; ctx2d.shadowBlur=glow(10);
+    ctx2d.moveTo(c.points[0].x,c.points[0].y);
+    for(let i=1;i<c.points.length;i++) ctx2d.lineTo(c.points[i].x,c.points[i].y);
+    ctx2d.stroke(); ctx2d.globalAlpha=1; ctx2d.shadowBlur=0;
+  }
+  for(const n of novaPulses){
+    const alpha=clamp(n.life/n.maxLife,0,1); const grow=1+(1-alpha)*0.25;
+    ctx2d.beginPath(); ctx2d.strokeStyle=n.color; ctx2d.globalAlpha=alpha*0.8; ctx2d.lineWidth=4;
+    ctx2d.arc(n.x,n.y,n.radius*grow,0,7); ctx2d.stroke(); ctx2d.globalAlpha=1;
+  }
+  if(player.swordFx){ const alpha=player.swordFx.t/0.22; ctx2d.beginPath(); ctx2d.strokeStyle=player.swordFx.color||"#b98cff"; ctx2d.globalAlpha=alpha*0.7; ctx2d.lineWidth=6; ctx2d.arc(player.x,player.y,player.swordFx.r,0,Math.PI*2); ctx2d.stroke(); ctx2d.globalAlpha=1; }
   if(player.beamTarget && enemies.includes(player.beamTarget)){ const t=player.beamTarget; ctx2d.beginPath(); ctx2d.strokeStyle="#ff6f9c"; ctx2d.lineWidth=3; ctx2d.shadowColor="#ff6f9c"; ctx2d.shadowBlur=glow(12); ctx2d.moveTo(player.x,player.y); ctx2d.lineTo(t.x,t.y); ctx2d.stroke(); ctx2d.shadowBlur=0; }
-  if(player.auraRadius){ for(const k of Object.keys(player.auraRadius)){ ctx2d.beginPath(); ctx2d.strokeStyle= k==="holy_aura"?"rgba(255,255,255,0.25)":"rgba(140,255,80,0.2)"; ctx2d.lineWidth=2; ctx2d.arc(player.x,player.y,player.auraRadius[k],0,7); ctx2d.stroke(); } }
+  if(player.auraRadius){ for(const k of Object.keys(player.auraRadius)){ ctx2d.beginPath(); ctx2d.strokeStyle= k==="holy_aura"?"rgba(255,255,255,0.28)":"rgba(140,255,80,0.24)"; ctx2d.lineWidth=2; ctx2d.arc(player.x,player.y,player.auraRadius[k],0,7); ctx2d.stroke(); } }
   for(const m of minions){ ctx2d.beginPath(); ctx2d.fillStyle="#8fffcf"; ctx2d.shadowColor="#8fffcf"; ctx2d.shadowBlur=glow(8); ctx2d.arc(m.x,m.y,m.radius,0,7); ctx2d.fill(); }
   ctx2d.shadowBlur=0;
   for(const e of enemies){
     ctx2d.beginPath(); ctx2d.fillStyle=e.hitFlash>0?"#ffffff":e.color; ctx2d.shadowColor=e.glow; ctx2d.shadowBlur=glow(e.boss?26:(e.elite?18:10));
     ctx2d.arc(e.x,e.y,e.radius,0,7); ctx2d.fill(); ctx2d.shadowBlur=0;
     if(e.elite||e.boss){ const bw=e.radius*2.4; ctx2d.fillStyle="#1a1c24"; ctx2d.fillRect(e.x-bw/2,e.y-e.radius-14,bw,5); ctx2d.fillStyle=e.boss?"#ff4d5e":"#ffb347"; ctx2d.fillRect(e.x-bw/2,e.y-e.radius-14,bw*clamp(e.hp/e.maxHp,0,1),5); }
+    // Status-effect icons: previously the only visible feedback for burn/poison/slow/
+    // shield/stagger/mark was a one-frame white hit-flash. Each active effect now
+    // gets a small billboard icon above the enemy so the player can actually read
+    // what's affecting a target at a glance.
+    if(quality!=='low'){
+      let iconX=e.x-((e.burning?1:0)+(e.poisoned?1:0)+(e.slowed?1:0)+(e.shield>0?1:0)+(e._marked?1:0))*7 + e.radius*0.4;
+      const iconY=e.y-e.radius-22;
+      ctx2d.font="11px sans-serif"; ctx2d.textAlign="center";
+      if(e.burning){ ctx2d.fillText("🔥",iconX,iconY); iconX+=14; }
+      if(e.poisoned){ ctx2d.fillText("☠",iconX,iconY); iconX+=14; }
+      if(e.slowed){ ctx2d.fillText(e.frozenSolid?"🧊":"❄",iconX,iconY); iconX+=14; }
+      if(e.shield>0){ ctx2d.fillText("🛡",iconX,iconY); iconX+=14; }
+      if(e._marked){ ctx2d.fillText("🎯",iconX,iconY); iconX+=14; }
+      if(e.staggerT>0){ ctx2d.fillText("💫",iconX,iconY); iconX+=14; }
+    }
   }
   for(const b of bullets){ ctx2d.beginPath(); ctx2d.fillStyle=b.color; ctx2d.shadowColor=b.color; ctx2d.shadowBlur=glow(8); ctx2d.arc(b.x,b.y,b.radius,0,7); ctx2d.fill(); }
   ctx2d.shadowBlur=0;
