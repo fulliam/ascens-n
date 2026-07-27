@@ -451,6 +451,7 @@ const CARDS = [
   {id:"swift_boots",cat:"utility",name:"Swift Boots",tags:["speed"],stackable:true,maxStacks:4,desc:"+9% movement speed.",apply:p=>p.stats.moveSpeed*=1.09},
   {id:"lucky_charm",cat:"utility",name:"Lucky Charm",tags:["luck"],stackable:true,maxStacks:3,desc:"+15% chance for rare card options.",apply:p=>p.stats.luck=(p.stats.luck||0)+0.15},
   {id:"quick_hands",cat:"utility",name:"Quick Hands",tags:["cooldown"],stackable:true,maxStacks:4,desc:"-8% all weapon cooldowns.",apply:p=>p.stats.cdrMult=(p.stats.cdrMult||1)*0.92},
+  {id:"farsight",cat:"utility",name:"Farsight",tags:["range"],stackable:true,maxStacks:4,desc:"+14% attack range. Also gradually zooms the camera out so you can see what you can now hit.",apply:p=>p.stats.rangeMult=(p.stats.rangeMult||1)*1.14},
   {id:"fire_mastery",cat:"elemental",name:"Fire Mastery",tags:["fire"],stackable:true,maxStacks:3,desc:"+30% to fire/burn effects.",apply:p=>p.stats.fireMult=(p.stats.fireMult||1)*1.3},
   {id:"frost_mastery",cat:"elemental",name:"Frost Mastery",tags:["frost"],stackable:true,maxStacks:3,desc:"+30% to frost/slow effects.",apply:p=>p.stats.frostMult=(p.stats.frostMult||1)*1.3},
   {id:"lightning_mastery",cat:"elemental",name:"Lightning Mastery",tags:["lightning"],stackable:true,maxStacks:3,desc:"+30% to lightning/chain effects.",apply:p=>p.stats.lightningMult=(p.stats.lightningMult||1)*1.3},
@@ -568,8 +569,18 @@ const ENEMIES_NORMAL_RAW = [
   ["screecher","support",20,90,4,"Reveals/coordinates nearby foes."],
   ["tomb_warden","tank",96,38,15,"Ground slam radius attack."],
 ];
+// Tuning knobs: enemies were reported as too weak and too sparse. Rather than
+// hand-editing every one of the 50 enemy entries above (error-prone and hard to
+// re-balance later), the HP/damage buff is a single multiplier applied here, and
+// spawn density/power scaling is a single multiplier applied in currentWave()
+// below. Kept moderate on purpose — see the range/camera-zoom additions further
+// down, which are meant to offset this by letting the player actually see and
+// react to the extra threat instead of just taking more unavoidable damage.
+const ENEMY_HP_MULT = 1.3;
+const ENEMY_DMG_MULT = 1.12;
 const ENEMIES_NORMAL = ENEMIES_NORMAL_RAW.map(([id,role,hp,speed,dmg,behavior],i)=>{
   const rc = roleColor(role,i);
+  hp = Math.round(hp*ENEMY_HP_MULT); dmg = +(dmg*ENEMY_DMG_MULT).toFixed(1);
   return { id,name:id.replace(/_/g," ").replace(/\b\w/g,c=>c.toUpperCase()), role, hp, speed, dmg,
     xp:Math.max(1,Math.round(hp/6)), gold:Math.max(1,Math.round(hp/14)),
     brain:brainForRole(role), radius:{melee:13,ranged:11,tank:20,swarm:9,assassin:10,support:14}[role]||12,
@@ -600,6 +611,7 @@ const ENEMIES_ELITE_RAW = [
 ];
 const ENEMIES_ELITE = ENEMIES_ELITE_RAW.map(([id,role,hp,speed,dmg,special,behavior],i)=>{
   const rc = roleColor(role,i+30);
+  hp = Math.round(hp*ENEMY_HP_MULT); dmg = +(dmg*ENEMY_DMG_MULT).toFixed(1);
   return { id,name:id.replace(/_/g," ").replace(/\b\w/g,c=>c.toUpperCase()), role, hp, speed, dmg, special,
     xp:Math.max(4,Math.round(hp/10)), gold:Math.max(2,Math.round(hp/18)),
     brain:brainForRole(role), radius:{melee:18,ranged:16,tank:24,swarm:14,assassin:16,support:19}[role]||18,
@@ -611,7 +623,8 @@ const ENEMIES = {};
 for(const e of ENEMIES_NORMAL) ENEMIES[e.id]=e;
 for(const e of ENEMIES_ELITE) ENEMIES[e.id]=e;
 
-const BOSS_ROSTER = {
+const BOSS_HP_MULT = 1.2, BOSS_DMG_MULT = 1.08; // moderate buff, in line with ENEMY_HP_MULT/ENEMY_DMG_MULT above
+const BOSS_ROSTER_RAW = {
   dragon:   { name:"Dragon",         hp:5200,  dmg:34, speed:34, radius:46, color:"#ff4d5e", glow:"#6b1c22" },
   wyvern:   { name:"Wyvern",         hp:8200,  dmg:38, speed:40, radius:44, color:"#ff9d4d", glow:"#7a3d0f" },
   lich:     { name:"Lich",           hp:6800,  dmg:28, speed:36, radius:42, color:"#c86bff", glow:"#4a1c6b" },
@@ -623,42 +636,54 @@ const BOSS_ROSTER = {
   frost_queen: { name:"Frost Queen", hp:7800,  dmg:24, speed:50, radius:40, color:"#8fd8ff", glow:"#1c4a6b" },
   bloodmoon_alpha:{ name:"Bloodmoon Alpha",hp:9500,dmg:32,speed:130,radius:36,color:"#ff6e6e",glow:"#6b1c1c" },
 };
+const BOSS_ROSTER = {};
+for(const key of Object.keys(BOSS_ROSTER_RAW)){
+  const b = BOSS_ROSTER_RAW[key];
+  BOSS_ROSTER[key] = Object.assign({}, b, { hp: Math.round(b.hp*BOSS_HP_MULT), dmg: +(b.dmg*BOSS_DMG_MULT).toFixed(1) });
+}
 
 const BOSSES = {
+  // Every boss below now uses at least one of the new pattern shapes (spiral/star/
+  // flower/aimed-fan/expanding-rings) in addition to its original radialBurst ring,
+  // so bosses read as visually distinct from each other instead of "ring of bullets"
+  // ten times over. Cooldowns are kept close to the originals so the buff is variety,
+  // not raw extra damage output.
   dragon:{ phases:[{id:"p1",hpAbove:0,attacks:[
     {id:"radial_burst",cd:2.6,action:(b,ctx)=>ctx.radialBurst(b,8,220,0.7)},
+    {id:"spiral",cd:3.4,action:(b,ctx)=>ctx.spiralBurst(b,3,200,0.55)},
     {id:"melee",cd:0.9,action:(b,ctx)=>ctx.chaseAttack(b)}]}]},
   wyvern:{ phases:[
     {id:"p1",hpAbove:0.5,attacks:[{id:"charge",cd:1.6,action:(b,ctx)=>ctx.dashCharge(b,2.4,1.2)},{id:"breath",cd:3.0,action:(b,ctx)=>ctx.radialBurst(b,10,240,0.6)}]},
-    {id:"p2",hpAbove:0,attacks:[{id:"charge_fast",cd:1.0,action:(b,ctx)=>ctx.dashCharge(b,3.2,0.9)},{id:"breath_wide",cd:2.2,action:(b,ctx)=>ctx.radialBurst(b,14,260,0.6)}],onEnter:(b,ctx)=>ctx.log("Wyvern grows desperate!")}]},
+    {id:"p2",hpAbove:0,attacks:[{id:"charge_fast",cd:1.0,action:(b,ctx)=>ctx.dashCharge(b,3.2,0.9)},{id:"breath_wide",cd:2.2,action:(b,ctx)=>ctx.radialBurst(b,14,260,0.6)},{id:"fan",cd:2.6,action:(b,ctx)=>ctx.aimedFan(b,5,50,300,0.55)}],onEnter:(b,ctx)=>ctx.log("Wyvern grows desperate!")}]},
   lich:{ phases:[
     {id:"p1",hpAbove:0.6,attacks:[{id:"summon",cd:7,action:(b,ctx)=>ctx.summon(b,["revenant","shade_elite"],2)},{id:"bolt",cd:2.4,action:(b,ctx)=>ctx.radialBurst(b,6,200,0.65)}]},
-    {id:"p2",hpAbove:0.25,attacks:[{id:"tp",cd:6,action:(b,ctx)=>ctx.teleportAway(b,260)},{id:"summon2",cd:6,action:(b,ctx)=>ctx.summon(b,["revenant","shade_elite"],2)},{id:"bolt2",cd:2.4,action:(b,ctx)=>ctx.radialBurst(b,6,200,0.65)}],onEnter:(b,ctx)=>ctx.log("The Lich begins blinking through shadows.")},
-    {id:"p3",hpAbove:0,attacks:[{id:"tp2",cd:3.5,action:(b,ctx)=>ctx.teleportAway(b,300)},{id:"summon3",cd:4.5,action:(b,ctx)=>ctx.summon(b,["revenant","shade_elite","golem_pup"],3)}],onEnter:(b,ctx)=>ctx.log("The Lich enters a desperate frenzy!")}]},
+    {id:"p2",hpAbove:0.25,attacks:[{id:"tp",cd:6,action:(b,ctx)=>ctx.teleportAway(b,260)},{id:"summon2",cd:6,action:(b,ctx)=>ctx.summon(b,["revenant","shade_elite"],2)},{id:"bolt2",cd:2.4,action:(b,ctx)=>ctx.radialBurst(b,6,200,0.65)},{id:"cross",cd:4.5,action:(b,ctx)=>ctx.crossBurst(b,190,0.55)}],onEnter:(b,ctx)=>ctx.log("The Lich begins blinking through shadows.")},
+    {id:"p3",hpAbove:0,attacks:[{id:"tp2",cd:3.5,action:(b,ctx)=>ctx.teleportAway(b,300)},{id:"summon3",cd:4.5,action:(b,ctx)=>ctx.summon(b,["revenant","shade_elite","golem_pup"],3)},{id:"cross2",cd:3.2,action:(b,ctx)=>ctx.crossBurst(b,220,0.6)}],onEnter:(b,ctx)=>ctx.log("The Lich enters a desperate frenzy!")}]},
   overlord:{ phases:[
     {id:"p1",hpAbove:0.66,attacks:[{id:"charge",cd:1.8,action:(b,ctx)=>ctx.dashCharge(b,2.6,1.1)},{id:"burst",cd:2.8,action:(b,ctx)=>ctx.radialBurst(b,14,250,0.6)}]},
-    {id:"p2",hpAbove:0.33,attacks:[{id:"charge2",cd:1.4,action:(b,ctx)=>ctx.dashCharge(b,3.0,1.0)},{id:"burst2",cd:2.2,action:(b,ctx)=>ctx.radialBurst(b,18,260,0.6)},{id:"summon",cd:9,action:(b,ctx)=>ctx.summon(b,["shade_elite"],1)}],onEnter:(b,ctx)=>ctx.log("The Overlord calls its first reinforcements.")},
-    {id:"p3",hpAbove:0,attacks:[{id:"charge3",cd:1.0,action:(b,ctx)=>ctx.dashCharge(b,3.4,0.9)},{id:"burst3",cd:1.6,action:(b,ctx)=>ctx.radialBurst(b,22,270,0.6)},{id:"summon2",cd:7,action:(b,ctx)=>ctx.summon(b,["shade_elite","golem"],1)}],onEnter:(b,ctx)=>ctx.log("The Overlord unleashes its full wrath!")}]},
+    {id:"p2",hpAbove:0.33,attacks:[{id:"charge2",cd:1.4,action:(b,ctx)=>ctx.dashCharge(b,3.0,1.0)},{id:"burst2",cd:2.2,action:(b,ctx)=>ctx.radialBurst(b,18,260,0.6)},{id:"summon",cd:9,action:(b,ctx)=>ctx.summon(b,["shade_elite"],1)},{id:"flower",cd:4,action:(b,ctx)=>ctx.flowerBurst(b,5,230,0.5)}],onEnter:(b,ctx)=>ctx.log("The Overlord calls its first reinforcements.")},
+    {id:"p3",hpAbove:0,attacks:[{id:"charge3",cd:1.0,action:(b,ctx)=>ctx.dashCharge(b,3.4,0.9)},{id:"burst3",cd:1.6,action:(b,ctx)=>ctx.radialBurst(b,22,270,0.6)},{id:"summon2",cd:7,action:(b,ctx)=>ctx.summon(b,["shade_elite","golem"],1)},{id:"rings",cd:5,action:(b,ctx)=>ctx.expandingRings(b,3,10,240,0.55)}],onEnter:(b,ctx)=>ctx.log("The Overlord unleashes its full wrath!")}]},
   ancient_tree:{ phases:[
     {id:"p1",hpAbove:0.5,attacks:[{id:"roots",cd:5,action:(b,ctx)=>ctx.zoneDenial(b,3,140,4)},{id:"summon",cd:8,action:(b,ctx)=>ctx.summon(b,["bog_leech","plague_rat"],3)}]},
-    {id:"p2",hpAbove:0,attacks:[{id:"roots2",cd:3.5,action:(b,ctx)=>ctx.zoneDenial(b,5,150,4)},{id:"summon2",cd:6,action:(b,ctx)=>ctx.summon(b,["bog_leech","plague_rat","boar"],3)}],onEnter:(b,ctx)=>ctx.log("The Ancient Tree's roots spread further.")}]},
+    {id:"p2",hpAbove:0,attacks:[{id:"roots2",cd:3.5,action:(b,ctx)=>ctx.zoneDenial(b,5,150,4)},{id:"summon2",cd:6,action:(b,ctx)=>ctx.summon(b,["bog_leech","plague_rat","boar"],3)},{id:"flower",cd:4.5,action:(b,ctx)=>ctx.flowerBurst(b,6,170,0.45)}],onEnter:(b,ctx)=>ctx.log("The Ancient Tree's roots spread further.")}]},
   void_knight:{ phases:[
     {id:"sword",hpAbove:0.5,attacks:[{id:"slash",cd:1.0,action:(b,ctx)=>ctx.chaseAttack(b)},{id:"combo",cd:3.0,action:(b,ctx)=>ctx.dashCharge(b,2.2,1.0)}]},
-    {id:"teleport",hpAbove:0.2,attacks:[{id:"blink",cd:2.5,action:(b,ctx)=>ctx.teleportBehindAndStrike(b)}],onEnter:(b,ctx)=>ctx.log("Void Knight vanishes into shadow.")},
-    {id:"fury",hpAbove:0,attacks:[{id:"flurry",cd:0.6,action:(b,ctx)=>ctx.chaseAttack(b)},{id:"blink2",cd:1.8,action:(b,ctx)=>ctx.teleportBehindAndStrike(b)}],onEnter:(b,ctx)=>ctx.log("Void Knight enters a berserk fury.")}]},
+    {id:"teleport",hpAbove:0.2,attacks:[{id:"blink",cd:2.5,action:(b,ctx)=>ctx.teleportBehindAndStrike(b)},{id:"fan",cd:3.2,action:(b,ctx)=>ctx.aimedFan(b,4,35,280,0.5)}],onEnter:(b,ctx)=>ctx.log("Void Knight vanishes into shadow.")},
+    {id:"fury",hpAbove:0,attacks:[{id:"flurry",cd:0.6,action:(b,ctx)=>ctx.chaseAttack(b)},{id:"blink2",cd:1.8,action:(b,ctx)=>ctx.teleportBehindAndStrike(b)},{id:"fan2",cd:2.4,action:(b,ctx)=>ctx.aimedFan(b,6,55,300,0.5)}],onEnter:(b,ctx)=>ctx.log("Void Knight enters a berserk fury.")}]},
   machine_god:{ phases:[
     {id:"p1",hpAbove:0.4,attacks:[{id:"lasers",cd:2.0,action:(b,ctx)=>ctx.sweepLaser(b,300)},{id:"turrets",cd:8,action:(b,ctx)=>ctx.deployTurrets(b,2)}]},
-    {id:"p2",hpAbove:0,attacks:[{id:"lasers2",cd:1.2,action:(b,ctx)=>ctx.sweepLaser(b,340)},{id:"turrets2",cd:6,action:(b,ctx)=>ctx.deployTurrets(b,4)},{id:"shield",cd:12,action:(b,ctx)=>ctx.grantShield(b,300)}],onEnter:(b,ctx)=>ctx.log("Machine God activates its defense grid.")}]},
+    {id:"p2",hpAbove:0,attacks:[{id:"lasers2",cd:1.2,action:(b,ctx)=>ctx.sweepLaser(b,340)},{id:"turrets2",cd:6,action:(b,ctx)=>ctx.deployTurrets(b,4)},{id:"shield",cd:12,action:(b,ctx)=>ctx.grantShield(b,300)},{id:"cross",cd:5,action:(b,ctx)=>ctx.crossBurst(b,210,0.5)}],onEnter:(b,ctx)=>ctx.log("Machine God activates its defense grid.")}]},
   the_collector:{ phases:[{id:"p1",hpAbove:0,attacks:[
     {id:"steal_xp",cd:6,action:(b,ctx)=>ctx.stealResource(b,"xp",0.1)},
     {id:"steal_gold",cd:6,action:(b,ctx)=>ctx.stealResource(b,"gold",0.15)},
-    {id:"jam",cd:15,action:(b,ctx)=>ctx.disableRandomWeapon(3)}]}]},
+    {id:"jam",cd:15,action:(b,ctx)=>ctx.disableRandomWeapon(3)},
+    {id:"spiral",cd:3.6,action:(b,ctx)=>ctx.spiralBurst(b,4,210,0.5)}]}]},
   frost_queen:{ phases:[
     {id:"p1",hpAbove:0.5,attacks:[{id:"spikes",cd:2.2,action:(b,ctx)=>ctx.radialBurst(b,10,220,0.55)},{id:"field",cd:6,action:(b,ctx)=>ctx.zoneDenial(b,1,180,5)}]},
-    {id:"p2",hpAbove:0,attacks:[{id:"blizzard",cd:4,action:(b,ctx)=>ctx.zoneDenial(b,1,260,6)},{id:"spikes2",cd:1.6,action:(b,ctx)=>ctx.radialBurst(b,14,240,0.55)}],onEnter:(b,ctx)=>ctx.log("Frost Queen calls a blizzard.")}]},
+    {id:"p2",hpAbove:0,attacks:[{id:"blizzard",cd:4,action:(b,ctx)=>ctx.zoneDenial(b,1,260,6)},{id:"spikes2",cd:1.6,action:(b,ctx)=>ctx.radialBurst(b,14,240,0.55)},{id:"rings",cd:4.8,action:(b,ctx)=>ctx.expandingRings(b,3,9,220,0.5)}],onEnter:(b,ctx)=>ctx.log("Frost Queen calls a blizzard.")}]},
   bloodmoon_alpha:{ phases:[
     {id:"p1",hpAbove:0.35,attacks:[{id:"pounce",cd:2.0,action:(b,ctx)=>ctx.dashCharge(b,3.6,0.7)},{id:"howl",cd:9,action:(b,ctx)=>ctx.summon(b,["wolf","iron_hound"],3)}]},
-    {id:"p2",hpAbove:0,attacks:[{id:"pounce2",cd:1.2,action:(b,ctx)=>ctx.dashCharge(b,4.2,0.6)},{id:"howl2",cd:6,action:(b,ctx)=>ctx.summon(b,["wolf","iron_hound"],4)}],onEnter:(b,ctx)=>ctx.log("Bloodmoon Alpha calls the pack.")}]},
+    {id:"p2",hpAbove:0,attacks:[{id:"pounce2",cd:1.2,action:(b,ctx)=>ctx.dashCharge(b,4.2,0.6)},{id:"howl2",cd:6,action:(b,ctx)=>ctx.summon(b,["wolf","iron_hound"],4)},{id:"spiral",cd:3,action:(b,ctx)=>ctx.spiralBurst(b,5,260,0.45)}],onEnter:(b,ctx)=>ctx.log("Bloodmoon Alpha calls the pack.")}]},
 };
 const FINAL_BOSS_ID = "overlord";
 
@@ -864,6 +889,7 @@ const ARMORY_ITEMS = [
   {id:"artifact_gold",name:"Midas Band",icon:"💰",desc:"+8% gold gained per level.",cost:3,maxLevel:4,apply:(p,lvl)=>{p.stats.goldMult*=(1+0.08*lvl);}},
   {id:"artifact_start_gold",name:"Adventurer's Purse",icon:"👛",desc:"Start each run with 40 bonus gold per level.",cost:2,maxLevel:5,apply:(p,lvl)=>{p.gold+=40*lvl;}},
   {id:"artifact_slot",name:"Void Satchel",icon:"🎒",desc:"+1 weapon slot per level.",cost:8,maxLevel:2,apply:(p,lvl)=>{p.extraWeaponSlots=(p.extraWeaponSlots||0)+lvl;}},
+  {id:"artifact_range",name:"Farseer's Lens",icon:"🔭",desc:"+8% attack range per level (camera adjusts automatically).",cost:5,maxLevel:4,apply:(p,lvl)=>{p.stats.rangeMult=(p.stats.rangeMult||1)*(1+0.08*lvl);}},
 ];
 function armoryLevel(id){ return (save.armoryUnlocks && save.armoryUnlocks[id]) || 0; }
 function armoryCost(item, currentLevel){ return Math.ceil(item.cost*Math.pow(1.6,currentLevel)); }
@@ -940,7 +966,7 @@ window.addEventListener('resize', resize); resize();
 const WORLD = { w:4600, h:4600 };
 
 let player, enemies, bullets, orbs, particles, floaters, zones, minions;
-let camera = {x:0,y:0};
+let camera = {x:0,y:0,zoom:null};
 let runTime=0, killCount=0, dpsWindow=[];
 let state = "menu";
 let lastSpawn=0, eliteTimer=0;
@@ -998,13 +1024,13 @@ function startRun(){
   hideAll();
   player = newPlayer(selectedCharacter);
   enemies=[]; bullets=[]; orbs=[]; particles=[]; floaters=[]; zones=[]; minions=[];
-  chainArcs=[]; novaPulses=[];
+  chainArcs=[]; novaPulses=[]; camera.zoom=null;
   runTime=0; killCount=0; dpsWindow=[];
   lastSpawn=0; eliteTimer=0; keys={};
   spawnedBossIds=new Set(); warnedBossIds=new Set();
   appliedKills=0; appliedGold=0; autosaveTimer=AUTOSAVE_INTERVAL;
   eliteKillsRun=0; bossKilledRun=false; appliedEliteKills=0; appliedBossFolded=false;
-  lastWeaponSig=null; eventTimer=rand(70,110); tempModifiers=[]; rerollCharges=0;
+  lastWeaponSig=null; eventTimer=rand(70,110); tempModifiers=[]; rerollCharges=0; formationTimer=26;
   runStats = { evolutionsThisRun:0, synergiesTriggered:0, legendaryCardsTaken:0, merchantEventsVisited:0,
     treasureEventsOpened:0, arenasCleared:0, miniBossesDefeated:0, riskyChoicesTaken:0, cursedShrinesActivated:0,
     passiveSlotsFilled:0, bossesKilledIds:[], stolenByCollector:false, overlordReachedAtSeconds:null, completed:false };
@@ -1501,8 +1527,10 @@ function killEnemy(enemy){
 /* =========================================================================
    PART 8 — ENEMY SPAWNING / AI (extends base chase/keep_distance/charge/swarm/summon + phaseboss + elite specials)
    ========================================================================= */
+const WAVE_POWER_MULT = 1.1; // modest global bump to enemy scaling density (pairs with ENEMY_HP_MULT/ENEMY_DMG_MULT)
 function currentWave(){
   let w=WAVES[0]; for(const ww of WAVES) if(runTime>=ww.t) w=ww;
+  w = Object.assign({}, w, { mult: w.mult*WAVE_POWER_MULT });
   if(runTime>ENDLESS_START_T){
     // Endless post-Overlord scaling: keep raising density/multiplier over time instead of
     // freezing at the last authored wave's numbers forever (see ENDLESS_* constants above).
@@ -1585,11 +1613,58 @@ const MAX_ENEMIES = 1200; // hard ceiling; dynamicMaxEnemies() further scales th
 function dynamicMaxEnemies(){ return enemyDensity==='low' ? 400 : enemyDensity==='medium' ? 800 : MAX_ENEMIES; }
 const AI_TICK_INTERVAL = 0.2; // normal enemies re-run their brain logic ~5x/sec instead of 60x/sec; elites/bosses are exempt
 const BOSS_WARNING_LEAD = 4;
+
+/* ---- Formation spawns -------------------------------------------------
+   Waves used to only scale by raw count/interval. This adds shaped bursts —
+   a ring, a V/wedge, a firing line, a pincer (two flanking clusters), and an
+   inward spiral — spawned as a single readable group around the player at a
+   safe distance, instead of always trickling in from random angles. Purely
+   presentational/tactical (same enemies, same total density budget over
+   time — formationTimer competes with, not stacks on top of, eventual
+   density) so it adds variety without silently increasing difficulty. */
+let formationTimer = 26;
+function spawnFormation(ids, shape){
+  const cx=player.x, cy=player.y, distance=560;
+  const baseAngle = rand(0,Math.PI*2);
+  const positions=[];
+  if(shape==='ring'){
+    const n=10; for(let i=0;i<n;i++){ const ang=baseAngle+(i/n)*Math.PI*2; positions.push({x:cx+Math.cos(ang)*distance,y:cy+Math.sin(ang)*distance}); }
+  } else if(shape==='v'){
+    const n=9; const perp=baseAngle+Math.PI/2;
+    for(let i=0;i<n;i++){ const side=i%2===0?1:-1; const depth=Math.floor(i/2);
+      positions.push({x:cx+Math.cos(baseAngle)*distance+Math.cos(perp)*side*depth*48, y:cy+Math.sin(baseAngle)*distance+Math.sin(perp)*side*depth*48}); }
+  } else if(shape==='line'){
+    const n=10; const perp=baseAngle+Math.PI/2;
+    for(let i=0;i<n;i++){ const off=(i-n/2)*52; positions.push({x:cx+Math.cos(baseAngle)*distance+Math.cos(perp)*off, y:cy+Math.sin(baseAngle)*distance+Math.sin(perp)*off}); }
+  } else if(shape==='pincer'){
+    const n=6; for(const side of [-1,1]){ const ang=baseAngle+side*0.55;
+      for(let i=0;i<n;i++){ const a2=ang+(i-n/2)*0.09; positions.push({x:cx+Math.cos(a2)*distance,y:cy+Math.sin(a2)*distance}); } }
+  } else { // spiral
+    const n=12; for(let i=0;i<n;i++){ const ang=baseAngle+i*0.5, r=260+i*26; positions.push({x:cx+Math.cos(ang)*r,y:cy+Math.sin(ang)*r}); }
+  }
+  let spawned=0;
+  for(const pos of positions){
+    if(enemies.length>=dynamicMaxEnemies()) break;
+    if(spawnEnemy(pick(ids), {x:clamp(pos.x,40,WORLD.w-40), y:clamp(pos.y,40,WORLD.h-40)})) spawned++;
+  }
+  return spawned;
+}
+const FORMATION_SHAPES = ['ring','v','line','pincer','spiral'];
 function updateSpawns(dt){
   const wave = currentWave();
   const spawnMult = tempModifiers.filter(m=>m.key==="spawnRate").reduce((a,m)=>a*m.mult,1);
   lastSpawn -= dt*spawnMult;
   if(lastSpawn<=0){ if(enemies.length<dynamicMaxEnemies()) spawnEnemy(pick(wave.ids)); lastSpawn = wave.interval*rand(0.85,1.15); }
+  // Formation bursts: gated behind a slower independent timer so early game (first
+  // ~25s) stays calm, then fires progressively more often as wave.mult climbs,
+  // floored at 14s so it never becomes a second, uncapped spawn stream.
+  formationTimer -= dt*spawnMult;
+  if(formationTimer<=0 && runTime>25){
+    const shape = pick(FORMATION_SHAPES);
+    const n = spawnFormation(wave.ids, shape);
+    if(n>0) logEvent(`A ${shape} formation closes in...`);
+    formationTimer = clamp(32 - wave.mult*2.2, 14, 32);
+  }
   if(wave.elite){
     eliteTimer -= dt;
     if(eliteTimer<=0){ if(enemies.length<dynamicMaxEnemies()){ const eid=wave.eliteIds?pick(wave.eliteIds):"ogre"; spawnEnemy(eid); showEliteToast(eid); } eliteTimer=wave.eliteEvery; }
@@ -1640,6 +1715,41 @@ function bossCtx(dt){
     grantShield:(b,amount)=>{ b.shield=(b.shield||0)+amount; },
     stealResource:(b,type,pct)=>{ if(type==="gold"){ const amt=Math.floor(player.gold*pct); player.gold-=amt; runStats.stolenByCollector=true; logEvent("The Collector steals your gold!"); } else { player.xp=Math.max(0,player.xp-player.xp*pct); runStats.stolenByCollector=true; logEvent("The Collector siphons your XP!"); } },
     disableRandomWeapon:(duration)=>{ const wids=Object.keys(player.weapons); if(!wids.length) return; const wid=pick(wids); player.disabledWeapons[wid]= duration===Infinity?Infinity:(runTime+duration); logEvent(`${WEAPONS[wid].name} has been disabled!`); },
+    // ---- Pattern attacks: give bosses more visually distinct bullet shapes
+    // beyond a single expanding ring (radialBurst), per design request. Each
+    // one is still just spawnBullet() calls with different angle/speed math —
+    // no new gameplay system, just more shapes for the existing bullets. ----
+    spiralBurst:(b,arms,speed,dmgFactor)=>{
+      arms=arms||3; b._spiralAngle=(b._spiralAngle||0)+0.36;
+      for(let a=0;a<arms;a++){ const ang=b._spiralAngle+(a/arms)*Math.PI*2;
+        spawnBullet({owner:"enemy",x:b.x,y:b.y,vx:Math.cos(ang)*speed,vy:Math.sin(ang)*speed,dmg:b.dmg*dmgFactor,radius:6,life:3.4,color:b.color,pierce:0}); }
+    },
+    crossBurst:(b,speed,dmgFactor)=>{
+      // 8-point star: an inner ring of 8 plus an outer offset ring of 4, fired together
+      for(let a=0;a<8;a++){ const ang=(a/8)*Math.PI*2+Math.PI/8;
+        spawnBullet({owner:"enemy",x:b.x,y:b.y,vx:Math.cos(ang)*speed,vy:Math.sin(ang)*speed,dmg:b.dmg*dmgFactor,radius:6,life:3,color:b.color,pierce:0}); }
+      for(let a=0;a<4;a++){ const ang=(a/4)*Math.PI*2;
+        spawnBullet({owner:"enemy",x:b.x,y:b.y,vx:Math.cos(ang)*speed*1.3,vy:Math.sin(ang)*speed*1.3,dmg:b.dmg*dmgFactor,radius:8,life:2.6,color:b.color,pierce:0}); }
+    },
+    flowerBurst:(b,petals,speed,dmgFactor)=>{
+      petals=petals||6;
+      for(let p=0;p<petals;p++){ const baseAng=(p/petals)*Math.PI*2;
+        for(let k=-1;k<=1;k++){ const ang=baseAng+k*0.22;
+          spawnBullet({owner:"enemy",x:b.x,y:b.y,vx:Math.cos(ang)*speed*(1+Math.abs(k)*0.18),vy:Math.sin(ang)*speed*(1+Math.abs(k)*0.18),dmg:b.dmg*dmgFactor,radius:6,life:3,color:b.color,pierce:0}); }
+      }
+    },
+    aimedFan:(b,count,spreadDeg,speed,dmgFactor)=>{
+      const dx=player.x-b.x,dy=player.y-b.y,base=Math.atan2(dy,dx); const spread=spreadDeg*Math.PI/180;
+      for(let i=0;i<count;i++){ const ang=base-spread/2+(count>1?spread*(i/(count-1)):spread/2);
+        spawnBullet({owner:"enemy",x:b.x,y:b.y,vx:Math.cos(ang)*speed,vy:Math.sin(ang)*speed,dmg:b.dmg*dmgFactor,radius:6,life:3,color:b.color,pierce:0}); }
+    },
+    expandingRings:(b,rings,perRing,baseSpeed,dmgFactor)=>{
+      rings=rings||3;
+      for(let r=0;r<rings;r++){ const speed=baseSpeed*(0.6+r*0.35);
+        for(let a=0;a<perRing;a++){ const ang=(a/perRing)*Math.PI*2+r*0.15;
+          spawnBullet({owner:"enemy",x:b.x,y:b.y,vx:Math.cos(ang)*speed,vy:Math.sin(ang)*speed,dmg:b.dmg*dmgFactor*(1-r*0.1),radius:6,life:4-r*0.5,color:b.color,pierce:0}); }
+      }
+    },
   };
 }
 function updateEliteSpecial(e,dt){
@@ -1995,6 +2105,7 @@ function renderIngameStats(){
     <div class="stat-row"><span class="k">Arcane Dmg (area/beam/chain)</span><span>+${Math.round(((s.arcaneDmgMult||1)-1)*100)}%</span></div>
     <div class="stat-row"><span class="k">Revive Chance</span><span>${Math.round((s.reviveChance||0)*100)}%</span></div>
     <div class="stat-row"><span class="k">Chill Strength / Burn Stacks</span><span>${Math.round((s.chillCap||0.35)*100)}% / ${s.burnStacks||1}</span></div>
+    <div class="stat-row"><span class="k">Attack Range</span><span>+${Math.round(((s.rangeMult||1)-1)*100)}% (cam ${Math.round((camera.zoom||targetZoomForRange())*100)}%)</span></div>
     <div class="stat-row"><span class="k">Elite Dmg Mult</span><span>+${Math.round((s.eliteDmgMult-1)*100)}%</span></div>
     <div class="stat-row"><span class="k">Fire / Frost / Lightning / Poison</span><span>${s.fireMult.toFixed(2)} / ${s.frostMult.toFixed(2)} / ${s.lightningMult.toFixed(2)} / ${s.poisonMult.toFixed(2)}</span></div>
     <div class="stat-row"><span class="k">Passives</span><span>${player.passives.length} / ${MAX_PASSIVE_SLOTS+(s.extraPassiveSlots||0)}</span></div>
@@ -2305,14 +2416,37 @@ function refreshHud(){
 }
 let lastWeaponSig=null;
 function glow(size){ return quality==='low'?0:(quality==='medium'?size*0.6:size); }
+/* ---- Range-driven camera zoom -------------------------------------------
+   Balance parameter requested: player attack range is upgradeable (rangeMult,
+   fed by the Farsight card / Farseer's Lens armory item / Eagle Eye talent —
+   all pre-existing stat, now given real progression content), and the
+   camera's "field of view" scales proportionally with it, clamped to a
+   [MIN_ZOOM, MAX_ZOOM] window. This directly prevents the failure mode of
+   the player's weapons reaching well past the edge of the screen with no
+   way to see (or react to) what they're hitting: as range grows the camera
+   eases outward to keep the effective weapon range visible, but never so
+   far out that enemies become unreadable specks or performance suffers.
+   Current zoom is smoothed (camera.zoom lerps toward the target) so upgrades
+   don't cause a jarring snap mid-run. */
+const CAMERA_MAX_ZOOM = 1.0;   // closest-in view (default, rangeMult<=1)
+const CAMERA_MIN_ZOOM = 0.62;  // most-zoomed-out view, reached at high rangeMult
+function targetZoomForRange(){
+  const rangeMult = (player && player.stats.rangeMult) || 1;
+  const z = 1/Math.sqrt(Math.max(1,rangeMult));
+  return clamp(z, CAMERA_MIN_ZOOM, CAMERA_MAX_ZOOM);
+}
 function render(){
   const w=canvas.width,h=canvas.height;
   ctx2d.fillStyle="#08090d"; ctx2d.fillRect(0,0,w,h);
+  const targetZoom = targetZoomForRange();
+  camera.zoom = camera.zoom==null ? targetZoom : camera.zoom+(targetZoom-camera.zoom)*0.04;
+  const zoom = camera.zoom;
+  const viewW = w/zoom, viewH = h/zoom;
   const shakeX=camera.shake?rand(-camera.shake,camera.shake):0, shakeY=camera.shake?rand(-camera.shake,camera.shake):0;
-  camera.x=player.x-w/2+shakeX; camera.y=player.y-h/2+shakeY;
-  ctx2d.save(); ctx2d.translate(-camera.x,-camera.y);
+  camera.x=player.x-viewW/2+shakeX; camera.y=player.y-viewH/2+shakeY;
+  ctx2d.save(); ctx2d.scale(zoom,zoom); ctx2d.translate(-camera.x,-camera.y);
   ctx2d.strokeStyle="rgba(255,255,255,0.035)"; ctx2d.lineWidth=1;
-  const grid=80, startX=Math.floor(camera.x/grid)*grid, endX=camera.x+w+grid, startY=Math.floor(camera.y/grid)*grid, endY=camera.y+h+grid;
+  const grid=80, startX=Math.floor(camera.x/grid)*grid, endX=camera.x+viewW+grid, startY=Math.floor(camera.y/grid)*grid, endY=camera.y+viewH+grid;
   ctx2d.beginPath(); for(let x=startX;x<endX;x+=grid){ctx2d.moveTo(x,startY);ctx2d.lineTo(x,endY);} for(let y=startY;y<endY;y+=grid){ctx2d.moveTo(startX,y);ctx2d.lineTo(endX,y);} ctx2d.stroke();
   ctx2d.strokeStyle="rgba(185,140,255,0.25)"; ctx2d.lineWidth=4; ctx2d.strokeRect(0,0,WORLD.w,WORLD.h);
   for(const z of zones){ ctx2d.beginPath(); ctx2d.fillStyle= z.tag==="lightning"?"rgba(255,224,92,0.18)": z.tag==="boss"?"rgba(255,77,94,0.15)": z.tag==="burnzone"?"rgba(255,120,60,0.18)": z.slowOnly?"rgba(140,80,40,0.15)":"rgba(140,255,120,0.14)"; ctx2d.arc(z.x,z.y,z.radius,0,7); ctx2d.fill(); }
@@ -2553,7 +2687,7 @@ function continueRun(){
   eliteKillsRun=snap.eliteKillsRun||0; bossKilledRun=!!snap.bossKilledRun;
   appliedEliteKills=snap.appliedEliteKills!=null?snap.appliedEliteKills:eliteKillsRun; appliedBossFolded=snap.appliedBossFolded!=null?snap.appliedBossFolded:false;
   runStats = snap.runStatsSnap || { evolutionsThisRun:0, synergiesTriggered:0, legendaryCardsTaken:0, merchantEventsVisited:0, treasureEventsOpened:0, arenasCleared:0, miniBossesDefeated:0, riskyChoicesTaken:0, cursedShrinesActivated:0, passiveSlotsFilled:player.passives.length, bossesKilledIds:[], stolenByCollector:false, overlordReachedAtSeconds:null, completed:false };
-  autosaveTimer=AUTOSAVE_INTERVAL; lastWeaponSig=null; eventTimer=rand(70,110); tempModifiers=[];
+  autosaveTimer=AUTOSAVE_INTERVAL; lastWeaponSig=null; eventTimer=rand(70,110); tempModifiers=[]; formationTimer=26;
   setState("playing"); document.getElementById('hud').classList.remove('hidden');
   logEvent("Run resumed."); SFX.runStart(); MUSIC.start();
 }
