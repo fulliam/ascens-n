@@ -1086,7 +1086,7 @@ function startRun(){
   spawnedBossIds=new Set(); warnedBossIds=new Set();
   appliedKills=0; appliedGold=0; autosaveTimer=AUTOSAVE_INTERVAL;
   eliteKillsRun=0; bossKilledRun=false; appliedEliteKills=0; appliedBossFolded=false;
-  lastWeaponSig=null; eventTimer=rand(70,110); tempModifiers=[]; rerollCharges=0; formationTimer=26;
+  lastWeaponSig=null; eventTimer=rand(70,110); tempModifiers=[]; rerollCharges=0; formationTimer=18;
   runStats = { evolutionsThisRun:0, synergiesTriggered:0, legendaryCardsTaken:0, merchantEventsVisited:0,
     treasureEventsOpened:0, arenasCleared:0, miniBossesDefeated:0, riskyChoicesTaken:0, cursedShrinesActivated:0,
     passiveSlotsFilled:0, bossesKilledIds:[], stolenByCollector:false, overlordReachedAtSeconds:null, completed:false };
@@ -1591,9 +1591,10 @@ function killEnemy(enemy){
    PART 8 — ENEMY SPAWNING / AI (extends base chase/keep_distance/charge/swarm/summon + phaseboss + elite specials)
    ========================================================================= */
 const WAVE_POWER_MULT = 1.1; // modest global bump to enemy scaling density (pairs with ENEMY_HP_MULT/ENEMY_DMG_MULT)
+const WAVE_SPAWN_RATE_MULT = 1.35; // waves read as sparse/easy — trickle-spawn cadence faster across every wave entry
 function currentWave(){
   let w=WAVES[0]; for(const ww of WAVES) if(runTime>=ww.t) w=ww;
-  w = Object.assign({}, w, { mult: w.mult*WAVE_POWER_MULT });
+  w = Object.assign({}, w, { mult: w.mult*WAVE_POWER_MULT, interval: w.interval/WAVE_SPAWN_RATE_MULT });
   if(runTime>ENDLESS_START_T){
     // Endless post-Overlord scaling: keep raising density/multiplier over time instead of
     // freezing at the last authored wave's numbers forever (see ENDLESS_* constants above).
@@ -1637,13 +1638,25 @@ function pruneDeadEnemies(){
   enemies.length = write;
 }
 
+// Every un-forced-position spawn (trickle spawns, formations, bosses) needs a radius that's
+// guaranteed outside the current camera view, not a flat world-space constant — the view's
+// half-diagonal changes with canvas size *and* with camera.zoom (see the range/zoom rework:
+// zoom now regularly sits near CAMERA_MAX_ZOOM, i.e. the *smallest* view, so a flat distance
+// tuned against a more-zoomed-out view previously fell inside the visible rect on most window
+// sizes — that's what caused enemies to visibly pop in on screen instead of approaching from
+// outside it). margin is extra clearance so spawns don't appear right at the edge either.
+function offscreenSpawnRadius(margin){
+  const zoom = camera.zoom || targetZoomForRange();
+  const halfDiag = Math.hypot(canvas.width/zoom, canvas.height/zoom)/2;
+  return halfDiag + (margin==null ? rand(80,160) : margin);
+}
 function spawnEnemy(id, forcedPos, overrides={}){
   const def = ENEMIES[id]; if(!def) return null;
   const wave = currentWave();
   if(enemies.length>=dynamicMaxEnemies()) return null; // hard cap enforced at the single creation point
   let x,y;
   if(forcedPos){ x=forcedPos.x; y=forcedPos.y; }
-  else{ const ang=rand(0,Math.PI*2), r=rand(520,660); x=clamp(player.x+Math.cos(ang)*r,40,WORLD.w-40); y=clamp(player.y+Math.sin(ang)*r,40,WORLD.h-40); }
+  else{ const ang=rand(0,Math.PI*2), r=offscreenSpawnRadius(); x=clamp(player.x+Math.cos(ang)*r,40,WORLD.w-40); y=clamp(player.y+Math.sin(ang)*r,40,WORLD.h-40); }
   const scale = overrides.scale!=null?overrides.scale:wave.mult;
   const hpMult = overrides.hpMult!=null?overrides.hpMult:1;
   const radiusMult = overrides.radiusMult!=null?overrides.radiusMult:1;
@@ -1660,7 +1673,7 @@ function spawnBoss(bossDefId, forcedPos){
   const def = BOSS_ROSTER[bossDefId]; if(!def) return null;
   const wave = currentWave(); const scale = wave.mult*0.85;
   let x,y;
-  if(forcedPos){x=forcedPos.x;y=forcedPos.y;} else { const ang=rand(0,Math.PI*2); x=clamp(player.x+Math.cos(ang)*680,40,WORLD.w-40); y=clamp(player.y+Math.sin(ang)*680,40,WORLD.h-40); }
+  if(forcedPos){x=forcedPos.x;y=forcedPos.y;} else { const ang=rand(0,Math.PI*2); const r=offscreenSpawnRadius(140); x=clamp(player.x+Math.cos(ang)*r,40,WORLD.w-40); y=clamp(player.y+Math.sin(ang)*r,40,WORLD.h-40); }
   const e = resetEnemyFields(acquireEnemyObject());
   Object.assign(e, { id:bossDefId, bossDefId, name:def.name, x,y, hp:def.hp*scale, maxHp:def.hp*scale, speed:def.speed, radius:def.radius,
     dmg:def.dmg*Math.min(scale,3), xp:def.hp/13, gold:def.hp/25, brain:"phaseboss", color:def.color, glow:def.glow,
@@ -1679,15 +1692,15 @@ const BOSS_WARNING_LEAD = 4;
 
 /* ---- Formation spawns -------------------------------------------------
    Waves used to only scale by raw count/interval. This adds shaped bursts —
-   a ring, a V/wedge, a firing line, a pincer (two flanking clusters), and an
-   inward spiral — spawned as a single readable group around the player at a
-   safe distance, instead of always trickling in from random angles. Purely
-   presentational/tactical (same enemies, same total density budget over
-   time — formationTimer competes with, not stacks on top of, eventual
-   density) so it adds variety without silently increasing difficulty. */
-let formationTimer = 26;
+   a ring, a V/wedge, a firing line, a pincer (two flanking clusters), an
+   inward spiral, a four-point cross, and a layered double ring — spawned as
+   a single readable group around the player at a camera-safe distance
+   instead of always trickling in from random angles. `distance` is computed
+   from the current view (offscreenSpawnRadius) rather than a flat constant,
+   same fix and same reasoning as spawnEnemy/spawnBoss above. */
+let formationTimer = 18;
 function spawnFormation(ids, shape){
-  const cx=player.x, cy=player.y, distance=560;
+  const cx=player.x, cy=player.y, distance=offscreenSpawnRadius(40);
   const baseAngle = rand(0,Math.PI*2);
   const positions=[];
   if(shape==='ring'){
@@ -1702,8 +1715,17 @@ function spawnFormation(ids, shape){
   } else if(shape==='pincer'){
     const n=6; for(const side of [-1,1]){ const ang=baseAngle+side*0.55;
       for(let i=0;i<n;i++){ const a2=ang+(i-n/2)*0.09; positions.push({x:cx+Math.cos(a2)*distance,y:cy+Math.sin(a2)*distance}); } }
-  } else { // spiral
-    const n=12; for(let i=0;i<n;i++){ const ang=baseAngle+i*0.5, r=260+i*26; positions.push({x:cx+Math.cos(ang)*r,y:cy+Math.sin(ang)*r}); }
+  } else if(shape==='spiral'){
+    const n=12; for(let i=0;i<n;i++){ const ang=baseAngle+i*0.5, r=distance+i*26; positions.push({x:cx+Math.cos(ang)*r,y:cy+Math.sin(ang)*r}); }
+  } else if(shape==='cross'){
+    const clusters=4, perCluster=3;
+    for(let k=0;k<clusters;k++){ const ang=baseAngle+k*(Math.PI/2), perp=ang+Math.PI/2;
+      for(let j=0;j<perCluster;j++){ const off=(j-(perCluster-1)/2)*46;
+        positions.push({x:cx+Math.cos(ang)*distance+Math.cos(perp)*off, y:cy+Math.sin(ang)*distance+Math.sin(perp)*off}); } }
+  } else { // double_ring — a layered inner+outer ring, the biggest/densest formation
+    const inner=8, outer=14;
+    for(let i=0;i<inner;i++){ const ang=baseAngle+(i/inner)*Math.PI*2; positions.push({x:cx+Math.cos(ang)*distance,y:cy+Math.sin(ang)*distance}); }
+    for(let i=0;i<outer;i++){ const ang=baseAngle+(i/outer)*Math.PI*2+0.15; positions.push({x:cx+Math.cos(ang)*(distance+90),y:cy+Math.sin(ang)*(distance+90)}); }
   }
   let spawned=0;
   for(const pos of positions){
@@ -1712,21 +1734,21 @@ function spawnFormation(ids, shape){
   }
   return spawned;
 }
-const FORMATION_SHAPES = ['ring','v','line','pincer','spiral'];
+const FORMATION_SHAPES = ['ring','v','line','pincer','spiral','cross','double_ring'];
 function updateSpawns(dt){
   const wave = currentWave();
   const spawnMult = tempModifiers.filter(m=>m.key==="spawnRate").reduce((a,m)=>a*m.mult,1);
   lastSpawn -= dt*spawnMult;
   if(lastSpawn<=0){ if(enemies.length<dynamicMaxEnemies()) spawnEnemy(pick(wave.ids)); lastSpawn = wave.interval*rand(0.85,1.15); }
   // Formation bursts: gated behind a slower independent timer so early game (first
-  // ~25s) stays calm, then fires progressively more often as wave.mult climbs,
-  // floored at 14s so it never becomes a second, uncapped spawn stream.
+  // ~15s) stays calm, then fires progressively more often as wave.mult climbs,
+  // floored at 10s so it never becomes a second, uncapped spawn stream.
   formationTimer -= dt*spawnMult;
-  if(formationTimer<=0 && runTime>25){
+  if(formationTimer<=0 && runTime>15){
     const shape = pick(FORMATION_SHAPES);
     const n = spawnFormation(wave.ids, shape);
     if(n>0) logEvent(`A ${shape} formation closes in...`);
-    formationTimer = clamp(32 - wave.mult*2.2, 14, 32);
+    formationTimer = clamp(24 - wave.mult*2.6, 10, 24);
   }
   if(wave.elite){
     eliteTimer -= dt;
@@ -2964,7 +2986,7 @@ function continueRun(){
   eliteKillsRun=snap.eliteKillsRun||0; bossKilledRun=!!snap.bossKilledRun;
   appliedEliteKills=snap.appliedEliteKills!=null?snap.appliedEliteKills:eliteKillsRun; appliedBossFolded=snap.appliedBossFolded!=null?snap.appliedBossFolded:false;
   runStats = snap.runStatsSnap || { evolutionsThisRun:0, synergiesTriggered:0, legendaryCardsTaken:0, merchantEventsVisited:0, treasureEventsOpened:0, arenasCleared:0, miniBossesDefeated:0, riskyChoicesTaken:0, cursedShrinesActivated:0, passiveSlotsFilled:player.passives.length, bossesKilledIds:[], stolenByCollector:false, overlordReachedAtSeconds:null, completed:false };
-  autosaveTimer=AUTOSAVE_INTERVAL; lastWeaponSig=null; eventTimer=rand(70,110); tempModifiers=[]; formationTimer=26;
+  autosaveTimer=AUTOSAVE_INTERVAL; lastWeaponSig=null; eventTimer=rand(70,110); tempModifiers=[]; formationTimer=18;
   setState("playing"); document.getElementById('hud').classList.remove('hidden');
   logEvent("Run resumed."); SFX.runStart(); MUSIC.start();
 }
