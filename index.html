@@ -383,12 +383,17 @@ const WEAPONS = {
   blood_blade:{name:"Blood Blade",icon:"🗡",type:"melee",tags:["bleed","lifesteal"],base:{dmg:16,cd:0.8,radius:70,pierce:99},perLevel:{dmg:6,radius:4},maxLevel:8,evolvesInto:"crimson_executioner"},
   chain_hook:{name:"Chain Hook",icon:"⛓",type:"melee",tags:["control","pull"],base:{dmg:12,cd:1.4,radius:150},perLevel:{dmg:5,radius:10},maxLevel:8,evolvesInto:"gravity_chain"},
   warhammer:{name:"Warhammer",icon:"🔨",type:"melee",tags:["stagger","knockback"],base:{dmg:34,cd:1.7,radius:90},perLevel:{dmg:12,radius:6},maxLevel:8,evolvesInto:"seismic_maul"},
-  bow:{name:"Bow",icon:"🏹",type:"projectile",tags:["physical"],base:{dmg:9,cd:0.55,speed:520,pierce:1,count:1},perLevel:{dmg:4,count:0.34},maxLevel:8,evolvesInto:"void_sniper"},
-  plasma_rifle:{name:"Plasma Rifle",icon:"🔫",type:"projectile",tags:["fire","burst"],base:{dmg:6,cd:0.14,speed:640,pierce:0,count:1},perLevel:{dmg:2.4},maxLevel:8,evolvesInto:"annihilator"},
-  railgun:{name:"Railgun",icon:"🎯",type:"projectile",tags:["physical","crit"],base:{dmg:36,cd:1.6,speed:900,pierce:6,count:1},perLevel:{dmg:15,pierce:1},maxLevel:8,evolvesInto:"world_ender"},
-  shuriken_storm:{name:"Shuriken Storm",icon:"✳",type:"projectile",tags:["bleed","crowd"],base:{dmg:5,cd:0.45,speed:460,pierce:2,count:3},perLevel:{dmg:2,count:0.5},maxLevel:8,evolvesInto:"blade_maelstrom"},
-  laser_array:{name:"Laser Array",icon:"🔺",type:"beam",tags:["single_target","sustained"],base:{dps:26,range:340,tick:0.2},perLevel:{dps:11},maxLevel:8,evolvesInto:"quantum_beam"},
-  prism_beam:{name:"Prism Beam",icon:"🌈",type:"beam",tags:["elemental","split"],base:{dps:18,range:300,tick:0.2},perLevel:{dps:8},maxLevel:8,evolvesInto:"kaleidoscope"},
+  // searchRadius/life (added alongside the pre-existing speed) replace what used to be one flat
+  // 900-unit target search + fixed 2.2s bullet life shared by every projectile weapon regardless of
+  // identity — see weaponFire()'s projectile branch. Values below are sized so each weapon's real
+  // reach (speed*life) clears its own searchRadius with modest margin, and archetypes read distinctly:
+  // plasma_rifle is a close spray, bow/shuriken are mid-range, railgun is the deliberate long-reach outlier.
+  bow:{name:"Bow",icon:"🏹",type:"projectile",tags:["physical"],base:{dmg:9,cd:0.55,speed:520,pierce:1,count:1,searchRadius:420,life:1.3},perLevel:{dmg:4,count:0.34},maxLevel:8,evolvesInto:"void_sniper"},
+  plasma_rifle:{name:"Plasma Rifle",icon:"🔫",type:"projectile",tags:["fire","burst"],base:{dmg:6,cd:0.14,speed:640,pierce:0,count:1,searchRadius:320,life:0.8},perLevel:{dmg:2.4},maxLevel:8,evolvesInto:"annihilator"},
+  railgun:{name:"Railgun",icon:"🎯",type:"projectile",tags:["physical","crit"],base:{dmg:36,cd:1.6,speed:900,pierce:6,count:1,searchRadius:620,life:1.0},perLevel:{dmg:15,pierce:1},maxLevel:8,evolvesInto:"world_ender"},
+  shuriken_storm:{name:"Shuriken Storm",icon:"✳",type:"projectile",tags:["bleed","crowd"],base:{dmg:5,cd:0.45,speed:460,pierce:2,count:3,searchRadius:360,life:1.1},perLevel:{dmg:2,count:0.5},maxLevel:8,evolvesInto:"blade_maelstrom"},
+  laser_array:{name:"Laser Array",icon:"🔺",type:"beam",tags:["single_target","sustained"],base:{dps:26,range:260,tick:0.2},perLevel:{dps:11},maxLevel:8,evolvesInto:"quantum_beam"},
+  prism_beam:{name:"Prism Beam",icon:"🌈",type:"beam",tags:["elemental","split"],base:{dps:18,range:240,tick:0.2},perLevel:{dps:8},maxLevel:8,evolvesInto:"kaleidoscope"},
   fire_nova:{name:"Fire Nova",icon:"🔥",type:"area",tags:["fire","burn"],base:{dmg:22,cd:2.6,radius:130},perLevel:{dmg:9,radius:9},maxLevel:8,evolvesInto:"inferno"},
   frost_field:{name:"Frost Field",icon:"❄",type:"area",tags:["frost","slow"],base:{dmg:8,cd:1.6,radius:150},perLevel:{dmg:3,radius:8},maxLevel:8,evolvesInto:"absolute_zero"},
   poison_cloud:{name:"Poison Cloud",icon:"☠",type:"area",tags:["poison","dot"],base:{dmg:8,cd:1.2,radius:140,lingerLife:3},perLevel:{dmg:3,radius:6},maxLevel:8,evolvesInto:"plague_zone"},
@@ -1275,17 +1280,20 @@ function weaponFire(wid, lvl, dt){
     // Maelstrom of Ruin: chains never decay — every jump hits for full damage and gets bonus extra jumps.
     const neverDecay = evo==="maelstrom_of_ruin";
     if(neverDecay) jumps += 2;
+    // jumpRange now goes through weaponRange() like beam/projectile search radii — rangeMult
+    // used to have zero effect on chain weapons, which was itself part of the mechanism bug.
+    const jumpRange = weaponRange(def.base.jumpRange);
     const hit=new Set(); const arcPoints=[{x:player.x,y:player.y}];
-    let cur = nearestEnemy(player.x,player.y,def.base.jumpRange*1.4);
+    let cur = nearestEnemy(player.x,player.y,jumpRange*1.4);
     for(let i=0;i<=jumps&&cur;i++){
       dealDamage(cur, dmg*(neverDecay?1:(1-i*0.1)), wid); hit.add(cur); arcPoints.push({x:cur.x,y:cur.y});
-      let next=null,bestD=def.base.jumpRange*def.base.jumpRange;
-      forEachEnemyNear(cur.x,cur.y,def.base.jumpRange,e=>{ if(hit.has(e))return; const dd=dist2(cur.x,cur.y,e.x,e.y); if(dd<bestD){bestD=dd;next=e;} });
+      let next=null,bestD=jumpRange*jumpRange;
+      forEachEnemyNear(cur.x,cur.y,jumpRange,e=>{ if(hit.has(e))return; const dd=dist2(cur.x,cur.y,e.x,e.y); if(dd<bestD){bestD=dd;next=e;} });
       cur=next;
     }
     // Storm Avatar (legendary card): chain can strike again starting back from the player.
     if(player.stats.stormAvatar && hit.size>0 && Math.random()<0.35){
-      const again = nearestEnemy(player.x,player.y,def.base.jumpRange*1.4);
+      const again = nearestEnemy(player.x,player.y,jumpRange*1.4);
       if(again && !hit.has(again)){ dealDamage(again, dmg*0.6, wid); arcPoints.push({x:player.x,y:player.y},{x:again.x,y:again.y}); }
     }
     if(arcPoints.length>1){ chainArcs.push({points:arcPoints,life:0.18,maxLife:0.18,color:weaponColor(wid)}); SFX.chainZap(); }
@@ -1310,7 +1318,11 @@ function weaponFire(wid, lvl, dt){
     return;
   }
   if(def.type==="projectile"){
-    const target = nearestEnemy(player.x,player.y,weaponRange(900));
+    // Each weapon searches for a target within its own tuned searchRadius (scaled by rangeMult,
+    // same as beam/chain) instead of every projectile weapon sharing one flat 900-unit lock-on —
+    // that flat number was well past screen edge even before any range upgrade, which is why
+    // enemies could get shot down long before they ever closed in on the player.
+    const target = nearestEnemy(player.x,player.y,weaponRange(def.base.searchRadius||420));
     if(!target) return;
     const count = Math.max(1,Math.round(def.base.count+(def.perLevel.count||0)*(lvl-1))+(player.stats.bonusProjectiles||0));
     const dmg = (def.base.dmg+(def.perLevel.dmg||0)*(lvl-1))*dmgMult;
@@ -1325,7 +1337,7 @@ function weaponFire(wid, lvl, dt){
     for(let i=0;i<count;i++){
       const spread=(i-(count-1)/2)*0.16, ang=baseAng+spread;
       spawnBullet({owner:"player",x:player.x,y:player.y,vx:Math.cos(ang)*def.base.speed,vy:Math.sin(ang)*def.base.speed,
-        dmg,radius:5,life:2.2,color:weaponColor(wid),pierce,weaponId:wid,forceCrit,detonate});
+        dmg,radius:5,life:def.base.life||1.1,color:weaponColor(wid),pierce,weaponId:wid,forceCrit,detonate});
     }
     SFX.bowShot();
     return;
@@ -2539,22 +2551,46 @@ function refreshHud(){
 let lastWeaponSig=null;
 function glow(size){ return quality==='low'?0:(quality==='medium'?size*0.6:size); }
 /* ---- Range-driven camera zoom -------------------------------------------
-   Balance parameter requested: player attack range is upgradeable (rangeMult,
-   fed by the Farsight card / Farseer's Lens armory item / Eagle Eye talent —
-   all pre-existing stat, now given real progression content), and the
-   camera's "field of view" scales proportionally with it, clamped to a
-   [MIN_ZOOM, MAX_ZOOM] window. This directly prevents the failure mode of
-   the player's weapons reaching well past the edge of the screen with no
-   way to see (or react to) what they're hitting: as range grows the camera
-   eases outward to keep the effective weapon range visible, but never so
-   far out that enemies become unreadable specks or performance suffers.
-   Current zoom is smoothed (camera.zoom lerps toward the target) so upgrades
-   don't cause a jarring snap mid-run. */
-const CAMERA_MAX_ZOOM = 1.0;   // closest-in view (default, rangeMult<=1)
-const CAMERA_MIN_ZOOM = 0.62;  // most-zoomed-out view, reached at high rangeMult
+   Camera zoom follows the player's actual current effective attack reach,
+   not the raw rangeMult stat. rangeMult (Farsight card / Farseer's Lens /
+   Eagle Eye talent) only ever moved beam range and the projectile target
+   search radius — melee/area/aura/trap reach is governed by a *different*
+   stat (aoeRadiusMult) that never touched the camera, and chain weapons
+   weren't scaled by anything. So a rangeMult-only formula was frequently
+   wrong: it zoomed out for builds it didn't actually help (pure melee/AoE)
+   and stayed put for builds where aoeRadiusMult had genuinely extended
+   real reach. playerMaxEffectiveReach() computes the true number — the
+   farthest an equipped weapon can currently touch something, using each
+   weapon's own governing stat — and the zoom curve is built from that.
+   Baseline weapon reach is deliberately modest (see the WEAPONS table:
+   projectile searchRadius/life, beam range) so a fresh, unupgraded build
+   sits at max zoom-in and enemies have to actually close the distance,
+   instead of getting cleared from off-screen. Smoothed via lerp so range
+   upgrades mid-run don't cause a jarring snap. */
+const CAMERA_MAX_ZOOM = 1.0;    // closest-in view — sits here at/under REACH_BASELINE
+const CAMERA_MIN_ZOOM = 0.62;   // most-zoomed-out view, reached at very high effective reach
+const REACH_BASELINE = 380;     // effective reach at/below which zoom stays fully zoomed-in
+function playerMaxEffectiveReach(){
+  if(!player) return REACH_BASELINE;
+  let maxReach = 0;
+  for(const wid of Object.keys(player.weapons)){
+    const def = weaponDef(wid);
+    if(def.type==="melee" || def.type==="area" || def.type==="aura" || def.type==="trap"){
+      maxReach = Math.max(maxReach, weaponRadius(def.base.radius));
+    } else if(def.type==="projectile"){
+      maxReach = Math.max(maxReach, Math.min(weaponRange(def.base.searchRadius||420), def.base.speed*(def.base.life||1.1)));
+    } else if(def.type==="beam"){
+      maxReach = Math.max(maxReach, weaponRange(def.base.range));
+    } else if(def.type==="chain"){
+      maxReach = Math.max(maxReach, weaponRange(def.base.jumpRange)*1.4);
+    }
+    // summon: minions roam and fight on their own — not a camera-relevant "reach" stat.
+  }
+  return Math.max(maxReach, 120); // never collapse to ~0 (e.g. a summon-only loadout)
+}
 function targetZoomForRange(){
-  const rangeMult = (player && player.stats.rangeMult) || 1;
-  const z = 1/Math.sqrt(Math.max(1,rangeMult));
+  const reach = playerMaxEffectiveReach();
+  const z = Math.sqrt(REACH_BASELINE/Math.max(REACH_BASELINE,reach));
   return clamp(z, CAMERA_MIN_ZOOM, CAMERA_MAX_ZOOM);
 }
 function render(){
