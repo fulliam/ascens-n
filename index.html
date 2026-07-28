@@ -666,47 +666,75 @@ for(const key of Object.keys(BOSS_ROSTER_RAW)){
 }
 
 const BOSSES = {
-  // Every boss below now uses at least one of the new pattern shapes (spiral/star/
-  // flower/aimed-fan/expanding-rings) in addition to its original radialBurst ring,
-  // so bosses read as visually distinct from each other instead of "ring of bullets"
-  // ten times over. Cooldowns are kept close to the originals so the buff is variety,
-  // not raw extra damage output.
-  dragon:{ phases:[{id:"p1",hpAbove:0,attacks:[
-    {id:"radial_burst",cd:2.6,action:(b,ctx)=>ctx.radialBurst(b,8,220,0.7)},
-    {id:"spiral",cd:3.4,action:(b,ctx)=>ctx.spiralBurst(b,3,200,0.55)},
-    {id:"melee",cd:0.9,action:(b,ctx)=>ctx.chaseAttack(b)}]}]},
+  // Each boss gets one signature pattern nobody else uses (its "this is what
+  // fighting X feels like" move) plus its established charge/summon/teleport
+  // kit, and gains an extra pattern or two as it drops into later phases —
+  // classic danmaku-boss escalation (more/denser/layered shapes the lower its
+  // HP gets), not just a harder-hitting version of phase 1. Signatures:
+  //   dragon          — fire_spiral (curling breath stream)
+  //   wyvern          — wind_wave (rippling gust curtain)
+  //   lich            — curse_bolts (homing seekers)
+  //   overlord        — blade_guard (orbiting demon blades, final-boss only)
+  //   ancient_tree    — vine_wave (rippling thorn curtain)
+  //   void_knight     — void_spiral (ranged burst between melee combos)
+  //   machine_god     — targeting_grid (rotating laser windmill)
+  //   the_collector   — greed_mandala (layered coin-bloom rings)
+  //   frost_queen     — snowflake (layered ice mandala)
+  //   bloodmoon_alpha — blood_spiral + scent_claws (spiral + homing claws)
+  dragon:{ phases:[
+    {id:"p1",hpAbove:0.4,attacks:[
+      {id:"radial_burst",cd:2.6,action:(b,ctx)=>ctx.radialBurst(b,8,220,0.7)},
+      {id:"fire_spiral",cd:3.4,action:(b,ctx)=>ctx.spiralStream(b,{arms:1,speed:210,dmgFactor:0.14,spin:0.5,ticks:14,tickInterval:0.08})},
+      {id:"melee",cd:0.9,action:(b,ctx)=>ctx.chaseAttack(b)}]},
+    {id:"p2",hpAbove:0,attacks:[
+      {id:"radial_burst2",cd:2.0,action:(b,ctx)=>ctx.radialBurst(b,10,240,0.65)},
+      {id:"fire_spiral2",cd:2.6,action:(b,ctx)=>ctx.spiralStream(b,{arms:2,speed:230,dmgFactor:0.13,spin:0.6,ticks:16,tickInterval:0.07})},
+      {id:"ember_windmill",cd:4.2,action:(b,ctx)=>ctx.crossWindmill(b,{blades:4,speed:200,dmgFactor:0.16,spin:0.55,ticks:12,tickInterval:0.08})},
+      {id:"melee2",cd:0.7,action:(b,ctx)=>ctx.chaseAttack(b)}],onEnter:(b,ctx)=>ctx.log("The Dragon's fury ignites!")}]},
   wyvern:{ phases:[
     {id:"p1",hpAbove:0.5,attacks:[{id:"charge",cd:1.6,action:(b,ctx)=>ctx.dashCharge(b,2.4,1.2)},{id:"breath",cd:3.0,action:(b,ctx)=>ctx.radialBurst(b,10,240,0.6)}]},
-    {id:"p2",hpAbove:0,attacks:[{id:"charge_fast",cd:1.0,action:(b,ctx)=>ctx.dashCharge(b,3.2,0.9)},{id:"breath_wide",cd:2.2,action:(b,ctx)=>ctx.radialBurst(b,14,260,0.6)},{id:"fan",cd:2.6,action:(b,ctx)=>ctx.aimedFan(b,5,50,300,0.55)}],onEnter:(b,ctx)=>ctx.log("Wyvern grows desperate!")}]},
+    {id:"p2",hpAbove:0,attacks:[{id:"charge_fast",cd:1.0,action:(b,ctx)=>ctx.dashCharge(b,3.2,0.9)},{id:"breath_wide",cd:2.2,action:(b,ctx)=>ctx.radialBurst(b,14,260,0.6)},{id:"fan",cd:2.6,action:(b,ctx)=>ctx.aimedFan(b,5,50,300,0.55)},
+      {id:"wind_wave",cd:3.6,action:(b,ctx)=>ctx.waveCurtain(b,{count:9,speed:210,dmgFactor:0.18,spreadDeg:80,amp:80,freq:5.5})}],onEnter:(b,ctx)=>ctx.log("Wyvern grows desperate!")}]},
   lich:{ phases:[
     {id:"p1",hpAbove:0.6,attacks:[{id:"summon",cd:7,action:(b,ctx)=>ctx.summon(b,["revenant","shade_elite"],2)},{id:"bolt",cd:2.4,action:(b,ctx)=>ctx.radialBurst(b,6,200,0.65)}]},
-    {id:"p2",hpAbove:0.25,attacks:[{id:"tp",cd:6,action:(b,ctx)=>ctx.teleportAway(b,260)},{id:"summon2",cd:6,action:(b,ctx)=>ctx.summon(b,["revenant","shade_elite"],2)},{id:"bolt2",cd:2.4,action:(b,ctx)=>ctx.radialBurst(b,6,200,0.65)},{id:"cross",cd:4.5,action:(b,ctx)=>ctx.crossBurst(b,190,0.55)}],onEnter:(b,ctx)=>ctx.log("The Lich begins blinking through shadows.")},
-    {id:"p3",hpAbove:0,attacks:[{id:"tp2",cd:3.5,action:(b,ctx)=>ctx.teleportAway(b,300)},{id:"summon3",cd:4.5,action:(b,ctx)=>ctx.summon(b,["revenant","shade_elite","golem_pup"],3)},{id:"cross2",cd:3.2,action:(b,ctx)=>ctx.crossBurst(b,220,0.6)}],onEnter:(b,ctx)=>ctx.log("The Lich enters a desperate frenzy!")}]},
+    {id:"p2",hpAbove:0.25,attacks:[{id:"tp",cd:6,action:(b,ctx)=>ctx.teleportAway(b,260)},{id:"summon2",cd:6,action:(b,ctx)=>ctx.summon(b,["revenant","shade_elite"],2)},{id:"cross",cd:4.5,action:(b,ctx)=>ctx.crossBurst(b,190,0.55)},
+      {id:"curse_bolts",cd:3.8,action:(b,ctx)=>ctx.homingVolley(b,{count:3,speed:150,dmgFactor:0.3,homingTime:1.4,turnRate:2.4,spreadDeg:40})}],onEnter:(b,ctx)=>ctx.log("The Lich begins blinking through shadows.")},
+    {id:"p3",hpAbove:0,attacks:[{id:"tp2",cd:3.5,action:(b,ctx)=>ctx.teleportAway(b,300)},{id:"summon3",cd:4.5,action:(b,ctx)=>ctx.summon(b,["revenant","shade_elite","golem_pup"],3)},{id:"cross2",cd:3.2,action:(b,ctx)=>ctx.crossBurst(b,220,0.6)},
+      {id:"curse_bolts2",cd:2.8,action:(b,ctx)=>ctx.homingVolley(b,{count:4,speed:170,dmgFactor:0.28,homingTime:1.6,turnRate:2.8,spreadDeg:60})}],onEnter:(b,ctx)=>ctx.log("The Lich enters a desperate frenzy!")}]},
   overlord:{ phases:[
     {id:"p1",hpAbove:0.66,attacks:[{id:"charge",cd:1.8,action:(b,ctx)=>ctx.dashCharge(b,2.6,1.1)},{id:"burst",cd:2.8,action:(b,ctx)=>ctx.radialBurst(b,14,250,0.6)}]},
     {id:"p2",hpAbove:0.33,attacks:[{id:"charge2",cd:1.4,action:(b,ctx)=>ctx.dashCharge(b,3.0,1.0)},{id:"burst2",cd:2.2,action:(b,ctx)=>ctx.radialBurst(b,18,260,0.6)},{id:"summon",cd:9,action:(b,ctx)=>ctx.summon(b,["shade_elite"],1)},{id:"flower",cd:4,action:(b,ctx)=>ctx.flowerBurst(b,5,230,0.5)}],onEnter:(b,ctx)=>ctx.log("The Overlord calls its first reinforcements.")},
-    {id:"p3",hpAbove:0,attacks:[{id:"charge3",cd:1.0,action:(b,ctx)=>ctx.dashCharge(b,3.4,0.9)},{id:"burst3",cd:1.6,action:(b,ctx)=>ctx.radialBurst(b,22,270,0.6)},{id:"summon2",cd:7,action:(b,ctx)=>ctx.summon(b,["shade_elite","golem"],1)},{id:"rings",cd:5,action:(b,ctx)=>ctx.expandingRings(b,3,10,240,0.55)}],onEnter:(b,ctx)=>ctx.log("The Overlord unleashes its full wrath!")}]},
+    {id:"p3",hpAbove:0,attacks:[{id:"charge3",cd:1.0,action:(b,ctx)=>ctx.dashCharge(b,3.4,0.9)},{id:"burst3",cd:1.6,action:(b,ctx)=>ctx.radialBurst(b,22,270,0.6)},{id:"summon2",cd:7,action:(b,ctx)=>ctx.summon(b,["shade_elite","golem"],1)},
+      {id:"mandala",cd:5,action:(b,ctx)=>ctx.mandalaBloom(b,{layers:3,perLayer:9,speed:180,dmgFactor:0.2,layerDelay:0.1})},
+      {id:"blade_guard",cd:8,action:(b,ctx)=>ctx.orbitingBlades(b,{count:6,radius:100,angularSpeed:3.4,duration:2,dmgFactor:0.22,releaseSpeed:260})}],onEnter:(b,ctx)=>ctx.log("The Overlord unleashes its full wrath!")}]},
   ancient_tree:{ phases:[
     {id:"p1",hpAbove:0.5,attacks:[{id:"roots",cd:5,action:(b,ctx)=>ctx.zoneDenial(b,3,140,4)},{id:"summon",cd:8,action:(b,ctx)=>ctx.summon(b,["bog_leech","plague_rat"],3)}]},
-    {id:"p2",hpAbove:0,attacks:[{id:"roots2",cd:3.5,action:(b,ctx)=>ctx.zoneDenial(b,5,150,4)},{id:"summon2",cd:6,action:(b,ctx)=>ctx.summon(b,["bog_leech","plague_rat","boar"],3)},{id:"flower",cd:4.5,action:(b,ctx)=>ctx.flowerBurst(b,6,170,0.45)}],onEnter:(b,ctx)=>ctx.log("The Ancient Tree's roots spread further.")}]},
+    {id:"p2",hpAbove:0,attacks:[{id:"roots2",cd:3.5,action:(b,ctx)=>ctx.zoneDenial(b,5,150,4)},{id:"summon2",cd:6,action:(b,ctx)=>ctx.summon(b,["bog_leech","plague_rat","boar"],3)},{id:"flower",cd:4.5,action:(b,ctx)=>ctx.flowerBurst(b,6,170,0.45)},
+      {id:"vine_wave",cd:3.8,action:(b,ctx)=>ctx.waveCurtain(b,{count:8,speed:160,dmgFactor:0.2,spreadDeg:100,amp:60,freq:4.5})}],onEnter:(b,ctx)=>ctx.log("The Ancient Tree's roots spread further.")}]},
   void_knight:{ phases:[
     {id:"sword",hpAbove:0.5,attacks:[{id:"slash",cd:1.0,action:(b,ctx)=>ctx.chaseAttack(b)},{id:"combo",cd:3.0,action:(b,ctx)=>ctx.dashCharge(b,2.2,1.0)}]},
     {id:"teleport",hpAbove:0.2,attacks:[{id:"blink",cd:2.5,action:(b,ctx)=>ctx.teleportBehindAndStrike(b)},{id:"fan",cd:3.2,action:(b,ctx)=>ctx.aimedFan(b,4,35,280,0.5)}],onEnter:(b,ctx)=>ctx.log("Void Knight vanishes into shadow.")},
-    {id:"fury",hpAbove:0,attacks:[{id:"flurry",cd:0.6,action:(b,ctx)=>ctx.chaseAttack(b)},{id:"blink2",cd:1.8,action:(b,ctx)=>ctx.teleportBehindAndStrike(b)},{id:"fan2",cd:2.4,action:(b,ctx)=>ctx.aimedFan(b,6,55,300,0.5)}],onEnter:(b,ctx)=>ctx.log("Void Knight enters a berserk fury.")}]},
+    {id:"fury",hpAbove:0,attacks:[{id:"flurry",cd:0.6,action:(b,ctx)=>ctx.chaseAttack(b)},{id:"blink2",cd:1.8,action:(b,ctx)=>ctx.teleportBehindAndStrike(b)},{id:"fan2",cd:2.4,action:(b,ctx)=>ctx.aimedFan(b,6,55,300,0.5)},
+      {id:"void_spiral",cd:3.4,action:(b,ctx)=>ctx.spiralStream(b,{arms:2,speed:220,dmgFactor:0.14,spin:0.65,ticks:12,tickInterval:0.07})}],onEnter:(b,ctx)=>ctx.log("Void Knight enters a berserk fury.")}]},
   machine_god:{ phases:[
     {id:"p1",hpAbove:0.4,attacks:[{id:"lasers",cd:2.0,action:(b,ctx)=>ctx.sweepLaser(b,300)},{id:"turrets",cd:8,action:(b,ctx)=>ctx.deployTurrets(b,2)}]},
-    {id:"p2",hpAbove:0,attacks:[{id:"lasers2",cd:1.2,action:(b,ctx)=>ctx.sweepLaser(b,340)},{id:"turrets2",cd:6,action:(b,ctx)=>ctx.deployTurrets(b,4)},{id:"shield",cd:12,action:(b,ctx)=>ctx.grantShield(b,300)},{id:"cross",cd:5,action:(b,ctx)=>ctx.crossBurst(b,210,0.5)}],onEnter:(b,ctx)=>ctx.log("Machine God activates its defense grid.")}]},
+    {id:"p2",hpAbove:0,attacks:[{id:"lasers2",cd:1.2,action:(b,ctx)=>ctx.sweepLaser(b,340)},{id:"turrets2",cd:6,action:(b,ctx)=>ctx.deployTurrets(b,4)},{id:"shield",cd:12,action:(b,ctx)=>ctx.grantShield(b,300)},
+      {id:"targeting_grid",cd:5,action:(b,ctx)=>ctx.crossWindmill(b,{blades:4,speed:210,dmgFactor:0.15,spin:0.45,ticks:14,tickInterval:0.08})}],onEnter:(b,ctx)=>ctx.log("Machine God activates its defense grid.")}]},
   the_collector:{ phases:[{id:"p1",hpAbove:0,attacks:[
     {id:"steal_xp",cd:6,action:(b,ctx)=>ctx.stealResource(b,"xp",0.1)},
     {id:"steal_gold",cd:6,action:(b,ctx)=>ctx.stealResource(b,"gold",0.15)},
     {id:"jam",cd:15,action:(b,ctx)=>ctx.disableRandomWeapon(3)},
-    {id:"spiral",cd:3.6,action:(b,ctx)=>ctx.spiralBurst(b,4,210,0.5)}]}]},
+    {id:"greed_mandala",cd:4.2,action:(b,ctx)=>ctx.mandalaBloom(b,{layers:2,perLayer:6,speed:190,dmgFactor:0.22,layerDelay:0.12})}]}]},
   frost_queen:{ phases:[
     {id:"p1",hpAbove:0.5,attacks:[{id:"spikes",cd:2.2,action:(b,ctx)=>ctx.radialBurst(b,10,220,0.55)},{id:"field",cd:6,action:(b,ctx)=>ctx.zoneDenial(b,1,180,5)}]},
-    {id:"p2",hpAbove:0,attacks:[{id:"blizzard",cd:4,action:(b,ctx)=>ctx.zoneDenial(b,1,260,6)},{id:"spikes2",cd:1.6,action:(b,ctx)=>ctx.radialBurst(b,14,240,0.55)},{id:"rings",cd:4.8,action:(b,ctx)=>ctx.expandingRings(b,3,9,220,0.5)}],onEnter:(b,ctx)=>ctx.log("Frost Queen calls a blizzard.")}]},
+    {id:"p2",hpAbove:0,attacks:[{id:"blizzard",cd:4,action:(b,ctx)=>ctx.zoneDenial(b,1,260,6)},{id:"spikes2",cd:1.6,action:(b,ctx)=>ctx.radialBurst(b,14,240,0.55)},
+      {id:"snowflake",cd:4.6,action:(b,ctx)=>ctx.mandalaBloom(b,{layers:3,perLayer:6,speed:170,dmgFactor:0.2,layerDelay:0.1})},
+      {id:"frost_wave",cd:3.6,action:(b,ctx)=>ctx.waveCurtain(b,{count:9,speed:180,dmgFactor:0.18,spreadDeg:90,amp:65,freq:5})}],onEnter:(b,ctx)=>ctx.log("Frost Queen calls a blizzard.")}]},
   bloodmoon_alpha:{ phases:[
     {id:"p1",hpAbove:0.35,attacks:[{id:"pounce",cd:2.0,action:(b,ctx)=>ctx.dashCharge(b,3.6,0.7)},{id:"howl",cd:9,action:(b,ctx)=>ctx.summon(b,["wolf","iron_hound"],3)}]},
-    {id:"p2",hpAbove:0,attacks:[{id:"pounce2",cd:1.2,action:(b,ctx)=>ctx.dashCharge(b,4.2,0.6)},{id:"howl2",cd:6,action:(b,ctx)=>ctx.summon(b,["wolf","iron_hound"],4)},{id:"spiral",cd:3,action:(b,ctx)=>ctx.spiralBurst(b,5,260,0.45)}],onEnter:(b,ctx)=>ctx.log("Bloodmoon Alpha calls the pack.")}]},
+    {id:"p2",hpAbove:0,attacks:[{id:"pounce2",cd:1.2,action:(b,ctx)=>ctx.dashCharge(b,4.2,0.6)},{id:"howl2",cd:6,action:(b,ctx)=>ctx.summon(b,["wolf","iron_hound"],4)},
+      {id:"blood_spiral",cd:3,action:(b,ctx)=>ctx.spiralStream(b,{arms:1,speed:250,dmgFactor:0.13,spin:0.6,ticks:12,tickInterval:0.07})},
+      {id:"scent_claws",cd:4.4,action:(b,ctx)=>ctx.homingVolley(b,{count:3,speed:180,dmgFactor:0.26,homingTime:1.2,turnRate:3,spreadDeg:50})}],onEnter:(b,ctx)=>ctx.log("Bloodmoon Alpha calls the pack.")}]},
 };
 const FINAL_BOSS_ID = "overlord";
 
@@ -995,7 +1023,7 @@ let state = "menu";
 let lastSpawn=0, eliteTimer=0;
 let keys={};
 let touchVec={x:0,y:0};
-let chainArcs=[], novaPulses=[];
+let chainArcs=[], novaPulses=[], pendingShots=[];
 let spawnedBossIds=new Set(), warnedBossIds=new Set();
 const AUTOSAVE_INTERVAL=6; let autosaveTimer=AUTOSAVE_INTERVAL;
 let appliedKills=0, appliedGold=0;
@@ -1046,7 +1074,7 @@ function maxWeaponSlots(p){ return MAX_WEAPON_SLOTS_BASE + (p.extraWeaponSlots||
 function startRun(){
   hideAll();
   player = newPlayer(selectedCharacter);
-  enemies=[]; bullets=[]; orbs=[]; particles=[]; floaters=[]; zones=[]; minions=[];
+  enemies=[]; bullets=[]; orbs=[]; particles=[]; floaters=[]; zones=[]; minions=[]; pendingShots=[];
   chainArcs=[]; novaPulses=[]; camera.zoom=null;
   runTime=0; killCount=0; dpsWindow=[];
   lastSpawn=0; eliteTimer=0; keys={};
@@ -1738,27 +1766,87 @@ function bossCtx(dt){
     grantShield:(b,amount)=>{ b.shield=(b.shield||0)+amount; },
     stealResource:(b,type,pct)=>{ if(type==="gold"){ const amt=Math.floor(player.gold*pct); player.gold-=amt; runStats.stolenByCollector=true; logEvent("The Collector steals your gold!"); } else { player.xp=Math.max(0,player.xp-player.xp*pct); runStats.stolenByCollector=true; logEvent("The Collector siphons your XP!"); } },
     disableRandomWeapon:(duration)=>{ const wids=Object.keys(player.weapons); if(!wids.length) return; const wid=pick(wids); player.disabledWeapons[wid]= duration===Infinity?Infinity:(runTime+duration); logEvent(`${WEAPONS[wid].name} has been disabled!`); },
-    // ---- Pattern attacks: give bosses more visually distinct bullet shapes
-    // beyond a single expanding ring (radialBurst), per design request. Each
-    // one is still just spawnBullet() calls with different angle/speed math —
-    // no new gameplay system, just more shapes for the existing bullets. ----
-    spiralBurst:(b,arms,speed,dmgFactor)=>{
-      arms=arms||3; b._spiralAngle=(b._spiralAngle||0)+0.36;
-      for(let a=0;a<arms;a++){ const ang=b._spiralAngle+(a/arms)*Math.PI*2;
-        spawnBullet({owner:"enemy",x:b.x,y:b.y,vx:Math.cos(ang)*speed,vy:Math.sin(ang)*speed,dmg:b.dmg*dmgFactor,radius:6,life:3.4,color:b.color,pierce:0}); }
+    // ---- Pattern attacks: give bosses visually distinct, genre-recognizable
+    // bullet-hell shapes instead of every attack reading as "another ring".
+    // Two flavors:
+    //  - instant bursts (crossBurst/flowerBurst/aimedFan/expandingRings) fire
+    //    everything the moment they're called — fine for shapes that are
+    //    already readable as a single frame (a cross, a ring, a fan).
+    //  - channeled patterns (spiralStream/crossWindmill/mandalaBloom) release
+    //    their bullets over a short window via queueShot(), because a curl or
+    //    a windmill can't exist as a single instant — it only reads as that
+    //    shape once you see it sweep/rotate over a handful of frames.
+    // waveCurtain/homingVolley/orbitingBlades tag bullets with wobble/homing/
+    // orbit fields that updateBullets() interprets every frame (see PART 14).
+    // Total dmg-per-activation is kept in the same rough ballpark as a boss's
+    // old single-shape moves — this is a variety/readability pass, not a
+    // numeric balance pass (that's ascension-balance's job). ----
+    spiralStream:(b,opts)=>{
+      const o=Object.assign({arms:1,speed:210,dmgFactor:0.14,spin:0.55,ticks:14,tickInterval:0.08,radius:5,life:3},opts);
+      for(let i=0;i<o.ticks;i++){ queueShot(i*o.tickInterval, ()=>{ if(b.dead) return;
+        b._spiralAngle=(b._spiralAngle||0)+o.spin;
+        for(let a=0;a<o.arms;a++){ const ang=b._spiralAngle+(a/o.arms)*Math.PI*2;
+          spawnBullet({owner:"enemy",x:b.x,y:b.y,vx:Math.cos(ang)*o.speed,vy:Math.sin(ang)*o.speed,dmg:b.dmg*o.dmgFactor,radius:o.radius,life:o.life,color:b.color,pierce:0,shape:"spiral"}); } }); }
+    },
+    crossWindmill:(b,opts)=>{
+      const o=Object.assign({blades:4,speed:190,dmgFactor:0.16,spin:0.5,ticks:12,tickInterval:0.09,radius:8},opts);
+      for(let i=0;i<o.ticks;i++){ queueShot(i*o.tickInterval, ()=>{ if(b.dead) return;
+        b._windmillAngle=(b._windmillAngle||0)+o.spin;
+        for(let a=0;a<o.blades;a++){ const ang=b._windmillAngle+(a/o.blades)*Math.PI*2;
+          spawnBullet({owner:"enemy",x:b.x,y:b.y,vx:Math.cos(ang)*o.speed,vy:Math.sin(ang)*o.speed,dmg:b.dmg*o.dmgFactor,radius:o.radius,life:2.6,color:b.color,pierce:0,shape:"diamond"}); } }); }
+    },
+    mandalaBloom:(b,opts)=>{
+      // Concentric rings fired with a short stagger, alternating spin direction
+      // per ring — a layered "kaleidoscope/snowflake" bloom rather than a flat
+      // expandingRings burst (classic ice-fairy/flower danmaku boss look).
+      const o=Object.assign({layers:3,perLayer:8,speed:170,dmgFactor:0.22,layerDelay:0.12},opts);
+      for(let L=0;L<o.layers;L++){ queueShot(L*o.layerDelay, ()=>{ if(b.dead) return;
+        const dir=L%2===0?1:-1, rot=dir*L*0.18, spd=o.speed*(0.65+L*0.28);
+        for(let a=0;a<o.perLayer;a++){ const ang=(a/o.perLayer)*Math.PI*2+rot;
+          spawnBullet({owner:"enemy",x:b.x,y:b.y,vx:Math.cos(ang)*spd,vy:Math.sin(ang)*spd,dmg:b.dmg*o.dmgFactor*(1-L*0.08),radius:6,life:3.6-L*0.4,color:b.color,pierce:0,shape:"ring"}); } }); }
+    },
+    waveCurtain:(b,opts)=>{
+      // A fan of bullets aimed at the player that then snake sideways as they
+      // travel (wobble field, handled in updateBullets) — a rippling "wave"
+      // wall rather than straight darts.
+      const o=Object.assign({count:9,speed:190,dmgFactor:0.2,spreadDeg:80,amp:70,freq:5},opts);
+      const dx=player.x-b.x,dy=player.y-b.y,base=Math.atan2(dy,dx); const spread=o.spreadDeg*Math.PI/180;
+      for(let i=0;i<o.count;i++){ const ang=base-spread/2+(o.count>1?spread*(i/(o.count-1)):spread/2);
+        spawnBullet({owner:"enemy",x:b.x,y:b.y,vx:Math.cos(ang)*o.speed,vy:Math.sin(ang)*o.speed,dmg:b.dmg*o.dmgFactor,radius:6,life:3,color:b.color,pierce:0,shape:"wave",
+          wobble:{amp:o.amp,freq:o.freq,phase:i*0.9}}); }
+    },
+    homingVolley:(b,opts)=>{
+      // A handful of slow bolts that steer toward the player for homingTime
+      // seconds (handled in updateBullets), then fly straight — a seeking
+      // volley rather than another straight-line burst.
+      const o=Object.assign({count:3,speed:150,dmgFactor:0.3,homingTime:1.4,turnRate:2.6,spreadDeg:40},opts);
+      const dx=player.x-b.x,dy=player.y-b.y,base=Math.atan2(dy,dx); const spread=o.spreadDeg*Math.PI/180;
+      for(let i=0;i<o.count;i++){ const ang=base-spread/2+(o.count>1?spread*(i/(o.count-1)):spread/2);
+        spawnBullet({owner:"enemy",x:b.x,y:b.y,vx:Math.cos(ang)*o.speed,vy:Math.sin(ang)*o.speed,dmg:b.dmg*o.dmgFactor,radius:6,life:4,color:b.color,pierce:0,shape:"homing",
+          homing:{t:o.homingTime,turnRate:o.turnRate}}); }
+    },
+    orbitingBlades:(b,opts)=>{
+      // Blades that circle the boss for `duration` seconds (orbit field,
+      // handled in updateBullets) before flinging outward on release — a
+      // "spinning guard" hazard rather than a projectile burst.
+      const o=Object.assign({count:5,radius:90,angularSpeed:3.2,duration:1.8,dmgFactor:0.18,releaseSpeed:260},opts);
+      const startAngle=rand(0,Math.PI*2);
+      for(let i=0;i<o.count;i++){ const angle=startAngle+(i/o.count)*Math.PI*2;
+        spawnBullet({owner:"enemy",x:b.x+Math.cos(angle)*o.radius,y:b.y+Math.sin(angle)*o.radius,vx:0,vy:0,dmg:b.dmg*o.dmgFactor,radius:7,life:o.duration+2.5,color:b.color,pierce:0,shape:"blade",
+          orbit:{boss:b,angle,radius:o.radius,angularSpeed:o.angularSpeed,t:o.duration,releaseSpeed:o.releaseSpeed}}); }
     },
     crossBurst:(b,speed,dmgFactor)=>{
       // 8-point star: an inner ring of 8 plus an outer offset ring of 4, fired together
       for(let a=0;a<8;a++){ const ang=(a/8)*Math.PI*2+Math.PI/8;
-        spawnBullet({owner:"enemy",x:b.x,y:b.y,vx:Math.cos(ang)*speed,vy:Math.sin(ang)*speed,dmg:b.dmg*dmgFactor,radius:6,life:3,color:b.color,pierce:0}); }
+        spawnBullet({owner:"enemy",x:b.x,y:b.y,vx:Math.cos(ang)*speed,vy:Math.sin(ang)*speed,dmg:b.dmg*dmgFactor,radius:6,life:3,color:b.color,pierce:0,shape:"diamond"}); }
       for(let a=0;a<4;a++){ const ang=(a/4)*Math.PI*2;
-        spawnBullet({owner:"enemy",x:b.x,y:b.y,vx:Math.cos(ang)*speed*1.3,vy:Math.sin(ang)*speed*1.3,dmg:b.dmg*dmgFactor,radius:8,life:2.6,color:b.color,pierce:0}); }
+        spawnBullet({owner:"enemy",x:b.x,y:b.y,vx:Math.cos(ang)*speed*1.3,vy:Math.sin(ang)*speed*1.3,dmg:b.dmg*dmgFactor,radius:8,life:2.6,color:b.color,pierce:0,shape:"diamond"}); }
     },
     flowerBurst:(b,petals,speed,dmgFactor)=>{
       petals=petals||6;
       for(let p=0;p<petals;p++){ const baseAng=(p/petals)*Math.PI*2;
         for(let k=-1;k<=1;k++){ const ang=baseAng+k*0.22;
-          spawnBullet({owner:"enemy",x:b.x,y:b.y,vx:Math.cos(ang)*speed*(1+Math.abs(k)*0.18),vy:Math.sin(ang)*speed*(1+Math.abs(k)*0.18),dmg:b.dmg*dmgFactor,radius:6,life:3,color:b.color,pierce:0}); }
+          spawnBullet({owner:"enemy",x:b.x,y:b.y,vx:Math.cos(ang)*speed*(1+Math.abs(k)*0.18),vy:Math.sin(ang)*speed*(1+Math.abs(k)*0.18),dmg:b.dmg*dmgFactor,radius:6,life:3,color:b.color,pierce:0,shape:"petal"}); }
       }
     },
     aimedFan:(b,count,spreadDeg,speed,dmgFactor)=>{
@@ -1770,7 +1858,7 @@ function bossCtx(dt){
       rings=rings||3;
       for(let r=0;r<rings;r++){ const speed=baseSpeed*(0.6+r*0.35);
         for(let a=0;a<perRing;a++){ const ang=(a/perRing)*Math.PI*2+r*0.15;
-          spawnBullet({owner:"enemy",x:b.x,y:b.y,vx:Math.cos(ang)*speed,vy:Math.sin(ang)*speed,dmg:b.dmg*dmgFactor*(1-r*0.1),radius:6,life:4-r*0.5,color:b.color,pierce:0}); }
+          spawnBullet({owner:"enemy",x:b.x,y:b.y,vx:Math.cos(ang)*speed,vy:Math.sin(ang)*speed,dmg:b.dmg*dmgFactor*(1-r*0.1),radius:6,life:4-r*0.5,color:b.color,pierce:0,shape:"ring"}); }
       }
     },
   };
@@ -2224,8 +2312,8 @@ function renderMerchantCardOffers(){
   leave.onclick=()=>{ SFX.uiClick(); closeEvent(); };
   wrap.appendChild(leave);
 }
-function triggerRandomEvent(){
-  const def = pick(EVENTS); activeEventDef=def;
+function triggerRandomEvent(forceId){
+  const def = forceId ? (EVENTS.find(e=>e.id===forceId)||pick(EVENTS)) : pick(EVENTS); activeEventDef=def;
   if(def.cat==="merchant") runStats.merchantEventsVisited=(runStats.merchantEventsVisited||0)+1;
   if(def.cat==="treasure") runStats.treasureEventsOpened=(runStats.treasureEventsOpened||0)+1;
   if(def.cat==="cursed_shrine") runStats.cursedShrinesActivated=(runStats.cursedShrinesActivated||0)+1;
@@ -2524,7 +2612,48 @@ function render(){
       if(e.staggerT>0){ ctx2d.fillText("💫",iconX,iconY); iconX+=14; }
     }
   }
-  for(const b of bullets){ ctx2d.beginPath(); ctx2d.fillStyle=b.color; ctx2d.shadowColor=b.color; ctx2d.shadowBlur=glow(8); ctx2d.arc(b.x,b.y,b.radius,0,7); ctx2d.fill(); }
+  for(const b of bullets){
+    ctx2d.fillStyle=b.color; ctx2d.strokeStyle=b.color; ctx2d.shadowColor=b.color; ctx2d.shadowBlur=glow(8);
+    if(b.shape==="spiral"){
+      // Elongated comet with a fading tail pointing back along its travel direction —
+      // makes a sweeping burst read as a curling streak instead of a plain dot.
+      const ang=Math.atan2(b.vy,b.vx);
+      ctx2d.save(); ctx2d.translate(b.x,b.y); ctx2d.rotate(ang);
+      ctx2d.beginPath(); ctx2d.ellipse(0,0,b.radius*1.6,b.radius*0.7,0,0,7); ctx2d.fill();
+      ctx2d.globalAlpha=0.35; ctx2d.beginPath(); ctx2d.ellipse(-b.radius*2.4,0,b.radius*1.1,b.radius*0.4,0,0,7); ctx2d.fill(); ctx2d.globalAlpha=1;
+      ctx2d.restore();
+    } else if(b.shape==="diamond"){
+      ctx2d.save(); ctx2d.translate(b.x,b.y); ctx2d.rotate(Math.PI/4);
+      ctx2d.fillRect(-b.radius,-b.radius,b.radius*2,b.radius*2);
+      ctx2d.restore();
+    } else if(b.shape==="petal"){
+      const ang=Math.atan2(b.vy,b.vx);
+      ctx2d.save(); ctx2d.translate(b.x,b.y); ctx2d.rotate(ang);
+      ctx2d.beginPath(); ctx2d.ellipse(0,0,b.radius*1.4,b.radius*0.8,0,0,7); ctx2d.fill();
+      ctx2d.restore();
+    } else if(b.shape==="ring"){
+      ctx2d.beginPath(); ctx2d.lineWidth=Math.max(2,b.radius*0.5); ctx2d.arc(b.x,b.y,b.radius,0,7); ctx2d.stroke();
+    } else if(b.shape==="wave"){
+      const ang=Math.atan2(b.vy,b.vx);
+      ctx2d.save(); ctx2d.translate(b.x,b.y); ctx2d.rotate(ang);
+      ctx2d.lineWidth=Math.max(2,b.radius*0.55); ctx2d.lineJoin='round'; ctx2d.beginPath();
+      ctx2d.moveTo(-b.radius*1.4,-b.radius*1.1); ctx2d.lineTo(b.radius*0.7,0); ctx2d.lineTo(-b.radius*1.4,b.radius*1.1);
+      ctx2d.stroke();
+      ctx2d.restore();
+    } else if(b.shape==="homing"){
+      const ang=Math.atan2(b.vy,b.vx);
+      ctx2d.save(); ctx2d.translate(b.x,b.y); ctx2d.rotate(ang);
+      ctx2d.beginPath(); ctx2d.moveTo(b.radius*1.5,0); ctx2d.lineTo(-b.radius*0.9,-b.radius*0.9); ctx2d.lineTo(-b.radius*0.9,b.radius*0.9); ctx2d.closePath(); ctx2d.fill();
+      ctx2d.restore();
+    } else if(b.shape==="blade"){
+      const ang = b.orbit ? (b.orbit.angle+Math.PI/2*Math.sign(b.orbit.angularSpeed||1)) : Math.atan2(b.vy,b.vx);
+      ctx2d.save(); ctx2d.translate(b.x,b.y); ctx2d.rotate(ang);
+      ctx2d.beginPath(); ctx2d.moveTo(b.radius*2.1,0); ctx2d.lineTo(-b.radius*0.8,-b.radius*0.6); ctx2d.lineTo(-b.radius*0.8,b.radius*0.6); ctx2d.closePath(); ctx2d.fill();
+      ctx2d.restore();
+    } else {
+      ctx2d.beginPath(); ctx2d.arc(b.x,b.y,b.radius,0,7); ctx2d.fill();
+    }
+  }
   ctx2d.shadowBlur=0;
   for(const p of particles){ ctx2d.globalAlpha=clamp(p.life/p.maxLife,0,1); ctx2d.fillStyle=p.color; ctx2d.fillRect(p.x-2,p.y-2,4,4); }
   ctx2d.globalAlpha=1;
@@ -2545,7 +2674,7 @@ function loop(now){
   if(state==="playing"){
     runTime+=dt;
     updateSpawns(dt); updatePlayer(dt); updateEnemies(dt); rebuildSpatialGrid();
-    updateWeapons(dt); updateBullets(dt); updateMinions(dt); updateZones(dt); updateOrbs(dt);
+    updateWeapons(dt); updatePendingShots(dt); updateBullets(dt); updateMinions(dt); updateZones(dt); updateOrbs(dt);
     updateTempModifiers(dt);
     pruneDeadEnemies(); // single end-of-frame removal pass (also returns objects to the enemy pool)
     eventTimer-=dt; if(eventTimer<=0){ triggerRandomEvent(); eventTimer=rand(90,140); }
@@ -2565,9 +2694,48 @@ function gridKey(cx,cy){ return cx+','+cy; }
 function rebuildSpatialGrid(){ spatialGrid.clear(); for(const e of enemies){ const cx=Math.floor(e.x/GRID_CELL),cy=Math.floor(e.y/GRID_CELL); const key=gridKey(cx,cy); let b=spatialGrid.get(key); if(!b){b=[];spatialGrid.set(key,b);} b.push(e); } }
 function forEachEnemyNear(x,y,radius,fn){ const minCx=Math.floor((x-radius)/GRID_CELL),maxCx=Math.floor((x+radius)/GRID_CELL),minCy=Math.floor((y-radius)/GRID_CELL),maxCy=Math.floor((y+radius)/GRID_CELL);
   for(let cx=minCx;cx<=maxCx;cx++) for(let cy=minCy;cy<=maxCy;cy++){ const b=spatialGrid.get(gridKey(cx,cy)); if(!b) continue; for(const e of b){ if(!e.dead) fn(e); } } }
+// Lets a boss attack schedule a bullet a few frames in the future instead of firing it
+// this instant — used so a single burst can release its shots one-by-one (sweeping around
+// the boss) instead of all at once, which is what actually reads as a "shape" on screen.
+function queueShot(delay,fn){ pendingShots.push({t:delay,fn}); }
+function updatePendingShots(dt){
+  for(let i=pendingShots.length-1;i>=0;i--){ const s=pendingShots[i]; s.t-=dt; if(s.t<=0){ s.fn(); pendingShots.splice(i,1); } }
+}
 function updateBullets(dt){
   for(let i=bullets.length-1;i>=0;i--){
-    const b=bullets[i]; b.x+=b.vx*dt; b.y+=b.vy*dt; b.life-=dt;
+    const b=bullets[i];
+    // Homing: steer velocity toward the player (bounded turn rate) instead of
+    // moving in a straight line, for as long as b.homing.t stays positive.
+    if(b.homing && b.homing.t>0){
+      b.homing.t-=dt;
+      const desiredAng=Math.atan2(player.y-b.y,player.x-b.x), curAng=Math.atan2(b.vy,b.vx);
+      let diff=desiredAng-curAng; diff=Math.atan2(Math.sin(diff),Math.cos(diff));
+      const turn=clamp(diff,-b.homing.turnRate*dt,b.homing.turnRate*dt), spd=Math.hypot(b.vx,b.vy)||1;
+      const newAng=curAng+turn; b.vx=Math.cos(newAng)*spd; b.vy=Math.sin(newAng)*spd;
+    }
+    // Orbit: circle the spawning boss at a fixed radius instead of moving by
+    // velocity, until its timer runs out (or the boss dies), then release on
+    // a tangential straight line.
+    if(b.orbit){
+      const o=b.orbit; o.t-=dt;
+      if(o.t<=0 || o.boss.dead){
+        const tangAng=o.angle+Math.PI/2*Math.sign(o.angularSpeed||1);
+        b.vx=Math.cos(tangAng)*o.releaseSpeed; b.vy=Math.sin(tangAng)*o.releaseSpeed;
+        b.orbit=null;
+      } else {
+        o.angle+=o.angularSpeed*dt; b.x=o.boss.x+Math.cos(o.angle)*o.radius; b.y=o.boss.y+Math.sin(o.angle)*o.radius;
+      }
+    }
+    if(!b.orbit){ b.x+=b.vx*dt; b.y+=b.vy*dt; }
+    // Wobble: sideways sine drift perpendicular to travel direction, so a
+    // straight-fired bullet snakes like a wave instead of flying true.
+    if(b.wobble){
+      b.wobble.t=(b.wobble.t||0)+dt;
+      const ang=Math.atan2(b.vy,b.vx), perpX=-Math.sin(ang), perpY=Math.cos(ang);
+      const off=Math.sin(b.wobble.t*b.wobble.freq+b.wobble.phase)*b.wobble.amp;
+      b.x+=perpX*off*dt; b.y+=perpY*off*dt;
+    }
+    b.life-=dt;
     if(b.life<=0){ bullets.splice(i,1); continue; }
     if(b.owner==="player"){
       let removed=false;
@@ -2590,7 +2758,18 @@ function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
 function fmtTime(s){ const m=Math.floor(s/60),sec=Math.floor(s%60); return String(m).padStart(2,'0')+":"+String(sec).padStart(2,'0'); }
 function logEvent(text){ const log=document.getElementById('eventLog'); const div=document.createElement('div'); div.textContent="▸ "+text; log.appendChild(div); setTimeout(()=>div.remove(),3200); while(log.children.length>5) log.removeChild(log.firstChild); }
 function updateBossPhase(boss,defs,ctx){
-  const hpPct=boss.hp/boss.maxHp; let phase=defs.phases[0]; for(const p of defs.phases) if(hpPct<=p.hpAbove) phase=p;
+  // Phases are authored high-to-low by hpAbove, each meant to own the range
+  // (hpAbove, previous phase's hpAbove] — e.g. [0.6,0.25,0] means p1 owns
+  // (0.6,1], p2 owns (0.25,0.6], p3 owns (0,0.25]. The old `hpPct<=p.hpAbove`
+  // scan picked whichever phase matched LAST while iterating in that same
+  // high-to-low order, which is backwards: it kept re-selecting the highest
+  // threshold still satisfied instead of the lowest, so a boss's final phase
+  // (hpAbove:0) was only ever reachable at exactly hp=0 — i.e. never, since
+  // death happens first. That silently meant every boss's last, most-escalated
+  // phase (and its unique attacks) never actually played out.
+  const hpPct=boss.hp/boss.maxHp;
+  let phase=defs.phases[defs.phases.length-1];
+  for(const p of defs.phases){ if(hpPct>p.hpAbove){ phase=p; break; } }
   if(boss.currentPhaseId!==phase.id){ boss.currentPhaseId=phase.id; boss.phaseAttackCds={}; if(phase.onEnter) phase.onEnter(boss,ctx); }
   boss.phaseAttackCds=boss.phaseAttackCds||{};
   for(const atk of phase.attacks){ boss.phaseAttackCds[atk.id]=(boss.phaseAttackCds[atk.id]??0)-ctx.dt; if(boss.phaseAttackCds[atk.id]<=0){ atk.action(boss,ctx); boss.phaseAttackCds[atk.id]=atk.cd; } }
@@ -2742,7 +2921,7 @@ function continueRun(){
     shopPurchases:Object.assign({},snap.player.shopPurchases||{}), hasRevive:!!snap.player.hasRevive, extraWeaponSlots:snap.player.extraWeaponSlots||0,
     disabledWeapons:{}, shield:0, character:snap.player.character||"warrior", momentumStacks:0, evolvedWeapons:{} };
   for(const wid of Object.keys(player.weapons)) performEvolution(wid);
-  enemies=[]; bullets=[]; orbs=[]; particles=[]; floaters=[]; zones=[]; minions=[]; chainArcs=[]; novaPulses=[];
+  enemies=[]; bullets=[]; orbs=[]; particles=[]; floaters=[]; zones=[]; minions=[]; pendingShots=[]; chainArcs=[]; novaPulses=[];
   runTime=snap.runTime||0; killCount=snap.killCount||0; dpsWindow=[]; lastSpawn=0; eliteTimer=0; keys={};
   spawnedBossIds=new Set(snap.bossesSpawned||[]); warnedBossIds=new Set(snap.bossesSpawned||[]);
   appliedKills=snap.appliedKills!=null?snap.appliedKills:killCount; appliedGold=snap.appliedGold!=null?snap.appliedGold:Math.floor(player.gold);
@@ -2855,6 +3034,48 @@ window.addEventListener('keydown',e=>{ keys[e.key.toLowerCase()]=true;
   if(e.key==='Escape' && ["playing","paused","shop","ingame-stats"].includes(state)){ if(state==='shop'||state==='ingame-stats'){ hideAll(); setState('playing'); MUSIC.start(); } else togglePause(); } });
 window.addEventListener('keyup',e=>{ keys[e.key.toLowerCase()]=false; });
 
+/* =========================================================================
+   DEBUG HOOK — not a player-facing feature. Everything above lives in this
+   IIFE's closure with zero window exports, so an external QA/devtools page
+   (see devtools.html) has no way to reach in and set up a scenario without
+   *some* door left open. This is that door: no UI, no menu entry, nothing
+   reachable from normal play — just object references for an external
+   script to drive. Safe to strip for a "clean" build; nothing else reads it.
+   ========================================================================= */
+window.__ASCENSION_DEBUG__ = {
+  get player(){ return player; },
+  get enemies(){ return enemies; },
+  get bullets(){ return bullets; },
+  get zones(){ return zones; },
+  get minions(){ return minions; },
+  get orbs(){ return orbs; },
+  get pendingShots(){ return pendingShots; },
+  get state(){ return state; },
+  get runTime(){ return runTime; },
+  set runTime(v){ runTime=v; },
+  get save(){ return save; },
+  get camera(){ return camera; },
+  data: { WEAPONS, EVOLUTIONS, CARDS, PASSIVES, SYNERGIES, CHARACTERS, ENEMIES, BOSSES, BOSS_ROSTER,
+    EVENTS, ACHIEVEMENTS, WAVES, TALENT_BRANCHES, TALENT_STAT_LINES, ARMORY_ITEMS },
+  startRun, goMenu, quitRun, setState, hideAll, show,
+  spawnBoss, spawnEnemy, spawnFormation, currentWave, dynamicMaxEnemies,
+  performEvolution, checkAllEvolutions, checkSynergies, equipPassive,
+  triggerRandomEvent, closeEvent,
+  gainXp, damagePlayer, dealDamage, killEnemy,
+  doAutosave, persistSave, logEvent,
+  render,
+  giveWeapon(wid,lvl){ if(!WEAPONS[wid]) return false; player.weapons[wid]=lvl||1; checkAllEvolutions(); checkSynergies(); return true; },
+  removeWeapon(wid){ delete player.weapons[wid]; },
+  setLevel(lvl){ player.level=Math.max(1,lvl); },
+  setGold(g){ player.gold=g; },
+  setHp(hp){ player.hp=Math.min(hp,player.maxHp); },
+  setMaxHp(hp){ player.maxHp=hp; player.hp=Math.min(player.hp,hp); },
+  teleportPlayer(x,y){ player.x=clamp(x,0,WORLD.w); player.y=clamp(y,0,WORLD.h); },
+  killAllEnemies(){ for(const e of enemies) if(!e.boss) e.hp=0; },
+  clearEnemies(){ enemies.length=0; },
+  forceBossHpPct(boss,pct){ boss.hp=Math.max(1,boss.maxHp*clamp(pct,0.001,1)); },
+  startRunAs(charId){ selectedCharacter=charId; startRun(); },
+};
 /* =========================================================================
    BOOT
    ========================================================================= */
