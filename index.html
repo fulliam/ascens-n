@@ -701,6 +701,29 @@ const ENEMIES = {};
 for(const e of ENEMIES_NORMAL) ENEMIES[e.id]=e;
 for(const e of ENEMIES_ELITE) ENEMIES[e.id]=e;
 
+// ---- Enemy Mutations: normal (non-elite, non-boss) enemies can roll a mutation as
+// the run goes on, giving them their own qualitative progression instead of just
+// bigger wave.mult numbers — mirrors the player picking up cards/passives over time.
+// Elites/bosses keep their own hand-authored specials and never roll these.
+const ENEMY_MUTATIONS = [
+  {id:"frenzied",     name:"Frenzied",     icon:"🔥", color:"#ff4d4d", unlockT:0,   apply:e=>{ e.speed*=1.35; e.dmg*=1.2; }},
+  {id:"swift",        name:"Swift",        icon:"💨", color:"#ffe15c", unlockT:0,   apply:e=>{ e.speed*=1.7; }},
+  {id:"armored",      name:"Armored",      icon:"🪨", color:"#8a8f9e", unlockT:300, apply:e=>{ e.mutArmor=0.35; }},
+  {id:"volatile",     name:"Volatile",     icon:"💥", color:"#ff9d4d", unlockT:300, apply:e=>{ e.mutExplode=true; }},
+  {id:"warded",       name:"Warded",       icon:null, color:"#8fd8ff", unlockT:600, apply:e=>{ e.shield=e.maxHp*0.5; }},
+  {id:"regenerating", name:"Regenerating", icon:"💚", color:"#5cbf5c", unlockT:600, apply:e=>{ e.mutRegen=e.maxHp*0.025; }},
+  {id:"vampiric",     name:"Vampiric",     icon:"🩸", color:"#c86bff", unlockT:900, apply:e=>{ e.mutVampiric=true; }},
+];
+// Chance a given non-elite spawn rolls a mutation, and how many mutation types are
+// unlocked, both ramp up with runTime — 0% before t=180 (opening stays legible),
+// climbing to a 35% cap by ~t=2880 (48 min).
+function mutationChanceAt(t){ return t<180 ? 0 : clamp((t-180)/2700, 0, 0.35); }
+function rollMutation(t){
+  const pool = ENEMY_MUTATIONS.filter(m=>t>=m.unlockT);
+  if(!pool.length || Math.random()>=mutationChanceAt(t)) return null;
+  return pick(pool);
+}
+
 // Boss HP needs to hold up against real player DPS (which can reach 150k+) long
 // enough for their attack patterns to actually play out, not die in one hit.
 // Reward economy is intentionally decoupled from this (see rawHp below) so buffing
@@ -1713,6 +1736,7 @@ function dealDamage(enemy, dmg, weaponId){
     if(enemy.special==="reflect" && weaponId){ const wdef=weaponDef(weaponId); if(wdef && (wdef.type==="melee")){ damagePlayer(enemy.dmg*0.2); } } // Thornback/Iron Colossus: reflects melee damage back
     if(enemy.special==="mark" && !enemy._marked){ enemy._marked=true; } // Abyssal Watcher marks on first hit
     if(enemy._marked) forcedCrit=true;
+    if(enemy.mutArmor) dmg *= (1-enemy.mutArmor);
     if(enemy.shield>0){ const absorbed=Math.min(enemy.shield,dmg); enemy.shield-=absorbed; dmg-=absorbed; if(dmg<=0){ spawnFloater(enemy.x,enemy.y-10,"BLOCK","#7ee0ff"); return; } }
     dmg = Math.max(0, Math.min(dmg, 999999)); // sanity clamp against NaN/Infinity from broken combos
     enemy.hp -= dmg; enemy.hitFlash=1;
@@ -1771,6 +1795,7 @@ function killEnemy(enemy){
   spawnParticle(enemy.x,enemy.y,enemy.color,10);
   if(enemy.id==="imp" && !enemy.isSplit){ for(let i=0;i<2;i++){ const ang=rand(0,Math.PI*2); spawnEnemy("imp",{x:enemy.x+Math.cos(ang)*14,y:enemy.y+Math.sin(ang)*14},{isSplit:true,hpMult:0.4,radiusMult:0.65}); } }
   if(enemy.special==="explodeOnDeath"){ for(let i=0;i<4;i++){ const ang=(i/4)*Math.PI*2; spawnEnemy("rat_swarm",{x:enemy.x+Math.cos(ang)*30,y:enemy.y+Math.sin(ang)*30}); } logEvent("It explodes into a swarm!"); }
+  if(enemy.mutExplode){ spawnParticle(enemy.x,enemy.y,"#ff9d4d",14); zones.push({x:enemy.x,y:enemy.y,radius:75,dmg:enemy.dmg*1.2,life:0.35,maxLife:0.35,tickCd:0,tag:"boss",targetsPlayer:true}); }
   if(player.stats.raiseDeadChance>0 && Math.random()<player.stats.raiseDeadChance){ minions.push({x:enemy.x,y:enemy.y,weaponId:"raised",dmg:enemy.dmg*0.5,hp:20,speed:180,atkCd:0,life:12,radius:9,icon:"💀"}); }
   if(enemy.burning && player.stats.burnExplode){ forEachEnemyNear(enemy.x,enemy.y,80,e2=>{ if(!e2.dead){ e2.burning=true; e2.burnT=2; e2.burnDps=enemy.burnDps||4; } }); }
   if(enemy.slowed && player.stats.frostShatter){ forEachEnemyNear(enemy.x,enemy.y,90,e2=>{ if(e2!==enemy) queueSecondaryDamage(e2,20,null); }); }
@@ -1823,6 +1848,8 @@ function resetEnemyFields(o){
   o._justHit=false; o._lastDmgToPlayer=0; o._reassembled=false; o._chargeSpeedMult=undefined; o._chargeRecover=undefined;
   o._chargeTimer=0; o.currentPhaseId=null; o.phaseAttackCds={}; o.bossDefId=undefined; o._treasureGold=undefined; o._miniBossReward=undefined;
   o._buffAuraApplied=false; o._sacrificeCd=undefined; o._burstArmed=false;
+  o.mutation=null; o.mutationColor=undefined; o.mutationIcon=undefined;
+  o.mutArmor=0; o.mutExplode=false; o.mutRegen=0; o.mutVampiric=false;
   o.dead=false; o.vx=0; o.vy=0;
   return o;
 }
@@ -1865,6 +1892,10 @@ function spawnEnemy(id, forcedPos, overrides={}){
     isSplit:!!overrides.isSplit, atkCd:0, shootCd:rand(0,1), hitFlash:0,
     chargeCd:rand(1,2.4), chargeState:"idle", chargeDx:0, chargeDy:0, summonCd:rand(2.5,4), swarmPhase:rand(0,Math.PI*2), shield:0,
     aiTimer:rand(0,AI_TICK_INTERVAL) });
+  if(!def.elite && !overrides.isSplit){
+    const mut = rollMutation(runTime);
+    if(mut){ e.mutation=mut.id; e.mutationColor=mut.color; e.mutationIcon=mut.icon; mut.apply(e); }
+  }
   enemies.push(e); return e;
 }
 function spawnBoss(bossDefId, forcedPos){
@@ -1887,11 +1918,11 @@ function spawnBoss(bossDefId, forcedPos){
     shield:0, aiTimer:0 });
   enemies.push(e); return e;
 }
-const MAX_ENEMIES = 1200; // hard ceiling; dynamicMaxEnemies() further scales this down per the (now separate) enemy-density setting
+const MAX_ENEMIES = 1600; // hard ceiling; dynamicMaxEnemies() further scales this down per the (now separate) enemy-density setting
 // enemyDensity is a separate setting from graphics `quality` (Settings > Video >
 // Enemy Density) — lowering particle/glow detail for performance shouldn't also
 // thin out difficulty, so dynamicMaxEnemies() reads only the density setting.
-function dynamicMaxEnemies(){ return enemyDensity==='low' ? 400 : enemyDensity==='medium' ? 800 : MAX_ENEMIES; }
+function dynamicMaxEnemies(){ return enemyDensity==='low' ? 400 : enemyDensity==='medium' ? 1000 : MAX_ENEMIES; }
 const AI_TICK_INTERVAL = 0.2; // normal enemies re-run their brain logic ~5x/sec instead of 60x/sec; elites/bosses are exempt
 const BOSS_WARNING_LEAD = 4;
 
@@ -1944,7 +1975,13 @@ function updateSpawns(dt){
   const wave = currentWave();
   const spawnMult = tempModifiers.filter(m=>m.key==="spawnRate").reduce((a,m)=>a*m.mult,1);
   lastSpawn -= dt*spawnMult;
-  if(lastSpawn<=0){ if(enemies.length<dynamicMaxEnemies()) spawnEnemy(pick(wave.ids)); lastSpawn = wave.interval*rand(0.85,1.15); }
+  if(lastSpawn<=0){
+    // More than one enemy lands per trickle tick as wave.mult climbs, so the visible
+    // on-screen population grows over time too, not just each enemy's individual stats.
+    const burst = Math.min(6, Math.max(1, Math.floor(wave.mult/1.3)));
+    for(let i=0;i<burst && enemies.length<dynamicMaxEnemies();i++) spawnEnemy(pick(wave.ids));
+    lastSpawn = wave.interval*rand(0.85,1.15);
+  }
   // Formation bursts: gated behind a slower independent timer so early game (first
   // ~15s) stays calm, then fires progressively more often as wave.mult climbs,
   // floored at 10s so it never becomes a second, uncapped spawn stream.
@@ -2149,6 +2186,7 @@ function updateEnemies(dt){
     if(e.burning){ e.burnT-=dt; dealDamage(e, e.burnDps*dt, null); if(e.burnT<=0){ e.burning=false; e.burnStackCount=0; } if(e.dead) continue; }
     if(e.poisoned){ e.poisonT-=dt; dealDamage(e, e.poisonDps*dt, null); if(e.poisonT<=0) e.poisoned=false; if(e.dead) continue; }
     if(e.staggerT>0){ e.staggerT-=dt; continue; }
+    if(e.mutRegen && e.hp<e.maxHp) e.hp=Math.min(e.maxHp, e.hp+e.mutRegen*dt);
     if(e.special) updateEliteSpecial(e,dt);
     const speedMult = (e.slowed? (e.frozenSolid?0.05:0.5) : 1) * (1-Math.min(0.9,(player.stats.globalSlow||0)));
     const dx=player.x-e.x, dy=player.y-e.y, d=Math.hypot(dx,dy)||1;
@@ -2181,7 +2219,7 @@ function updateEnemies(dt){
       if(doTick){ e.vx=(dx/d)*e.speed; e.vy=(dy/d)*e.speed; }
       e.x += e.vx*dt*speedMult; e.y += e.vy*dt*speedMult;
       e.atkCd -= dt;
-      if(d < e.radius+player.radius+6 && e.atkCd<=0){ damagePlayer(e.dmg); e.atkCd=0.6; }
+      if(d < e.radius+player.radius+6 && e.atkCd<=0){ damagePlayer(e.dmg); if(e.mutVampiric) e.hp=Math.min(e.maxHp,e.hp+e.dmg*0.5); e.atkCd=0.6; }
     } else if(e.brain==="keep_distance_shoot"){
       if(doTick){
         const desired=260; let mx=0,my=0;
@@ -2195,7 +2233,7 @@ function updateEnemies(dt){
       e.chargeCd -= dt;
       if(e.chargeState==="idle"){ e.x+=(dx/d)*e.speed*0.5*dt*speedMult; e.y+=(dy/d)*e.speed*0.5*dt*speedMult; if(e.chargeCd<=0){ e.chargeState="charging"; e.chargeDx=dx/d; e.chargeDy=dy/d; e.chargeCd=0.5; } }
       else if(e.chargeState==="charging"){ e.x+=e.chargeDx*e.speed*3.2*dt*speedMult; e.y+=e.chargeDy*e.speed*3.2*dt*speedMult;
-        if(d<e.radius+player.radius+8){ damagePlayer(e.dmg*1.4); e.chargeState="cooldown"; e.chargeCd=1.4; } else if(e.chargeCd<=0){ e.chargeState="cooldown"; e.chargeCd=1.0; } }
+        if(d<e.radius+player.radius+8){ damagePlayer(e.dmg*1.4); if(e.mutVampiric) e.hp=Math.min(e.maxHp,e.hp+e.dmg*0.7); e.chargeState="cooldown"; e.chargeCd=1.4; } else if(e.chargeCd<=0){ e.chargeState="cooldown"; e.chargeCd=1.0; } }
       else { if(e.chargeCd<=0){ e.chargeState="idle"; e.chargeCd=rand(1.4,2.4); } }
     } else if(e.brain==="swarm"){
       e.swarmPhase += dt*3;
@@ -2206,7 +2244,7 @@ function updateEnemies(dt){
         e.vx=(ddx/dd)*e.speed; e.vy=(ddy/dd)*e.speed;
       }
       e.x+=e.vx*dt*speedMult; e.y+=e.vy*dt*speedMult;
-      e.atkCd-=dt; if(d<e.radius+player.radius+6 && e.atkCd<=0){ damagePlayer(e.dmg); e.atkCd=0.5; }
+      e.atkCd-=dt; if(d<e.radius+player.radius+6 && e.atkCd<=0){ damagePlayer(e.dmg); if(e.mutVampiric) e.hp=Math.min(e.maxHp,e.hp+e.dmg*0.5); e.atkCd=0.5; }
     } else if(e.brain==="summon"){
       const desired=300;
       if(d<desired-20){ e.x-=(dx/d)*e.speed*dt*speedMult; e.y-=(dy/d)*e.speed*dt*speedMult; } else if(d>desired+20){ e.x+=(dx/d)*e.speed*dt*speedMult; e.y+=(dy/d)*e.speed*dt*speedMult; }
@@ -2889,13 +2927,14 @@ function render(){
   for(const e of enemies){
     ctx2d.beginPath(); ctx2d.fillStyle=e.hitFlash>0?"#ffffff":e.color; ctx2d.shadowColor=e.glow; ctx2d.shadowBlur=glow(e.boss?26:(e.elite?18:10));
     ctx2d.arc(e.x,e.y,e.radius,0,7); ctx2d.fill(); ctx2d.shadowBlur=0;
+    if(e.mutation){ ctx2d.beginPath(); ctx2d.strokeStyle=e.mutationColor; ctx2d.lineWidth=2.5; ctx2d.arc(e.x,e.y,e.radius+2,0,7); ctx2d.stroke(); }
     if(e.elite||e.boss){ const bw=e.radius*2.4; ctx2d.fillStyle="#1a1c24"; ctx2d.fillRect(e.x-bw/2,e.y-e.radius-14,bw,5); ctx2d.fillStyle=e.boss?"#ff4d5e":"#ffb347"; ctx2d.fillRect(e.x-bw/2,e.y-e.radius-14,bw*clamp(e.hp/e.maxHp,0,1),5); }
     // Status-effect icons: previously the only visible feedback for burn/poison/slow/
     // shield/stagger/mark was a one-frame white hit-flash. Each active effect now
     // gets a small billboard icon above the enemy so the player can actually read
     // what's affecting a target at a glance.
     if(quality!=='low'){
-      let iconX=e.x-((e.burning?1:0)+(e.poisoned?1:0)+(e.slowed?1:0)+(e.shield>0?1:0)+(e._marked?1:0))*7 + e.radius*0.4;
+      let iconX=e.x-((e.burning?1:0)+(e.poisoned?1:0)+(e.slowed?1:0)+(e.shield>0?1:0)+(e._marked?1:0)+(e.mutationIcon?1:0))*7 + e.radius*0.4;
       const iconY=e.y-e.radius-22;
       ctx2d.font="11px sans-serif"; ctx2d.textAlign="center";
       if(e.burning){ ctx2d.fillText("🔥",iconX,iconY); iconX+=14; }
@@ -2904,6 +2943,7 @@ function render(){
       if(e.shield>0){ ctx2d.fillText("🛡",iconX,iconY); iconX+=14; }
       if(e._marked){ ctx2d.fillText("🎯",iconX,iconY); iconX+=14; }
       if(e.staggerT>0){ ctx2d.fillText("💫",iconX,iconY); iconX+=14; }
+      if(e.mutationIcon){ ctx2d.fillText(e.mutationIcon,iconX,iconY); iconX+=14; }
     }
   }
   for(const b of bullets){
