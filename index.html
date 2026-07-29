@@ -447,6 +447,15 @@ const WEAPON_COLORS = {
   whip:"#ff8a4d", twin_daggers:"#dfe3ee", javelin:"#c8c8d8", hand_cannon:"#ffb347", gauss_needle:"#7ee0ff",
   arc_lance:"#ffe15c", void_rift:"#b98cff", swarm_hive:"#e0b48a", glacier_totem:"#8fd8ff", storm_chain:"#ffe15c",
 };
+// Per-weapon bullet silhouette, reusing the shape-render branches render() already has for boss
+// attack patterns (spiral/diamond/petal/wave/homing/blade — see PART 12) instead of every player
+// projectile being an identical plain circle. Weapons not listed here keep the default circle,
+// which fits their identity (plasma_rifle is a rapid spray of small energy bolts).
+const PROJECTILE_SHAPES = { bow:"wave", railgun:"spiral", shuriken_storm:"blade", javelin:"homing", hand_cannon:"diamond", gauss_needle:"petal" };
+// Visual tier from weapon level (1-4) — drives bullet size/glow, melee afterimage count, chain arc
+// thickness, area/aura pulse intensity, etc. so leveling up reads as a growing presence on screen,
+// not just a bigger number in the level-up card.
+function weaponVisualTier(level){ return level>=7?4 : level>=5?3 : level>=3?2 : 1; }
 function weaponColor(wid){ return WEAPON_COLORS[wid] || "#ffd479"; }
 
 const EVOLUTIONS = {
@@ -596,15 +605,18 @@ const SYNERGIES = [
 ];
 
 const CHARACTERS = [
-  {id:"warrior",name:"Warrior",icon:"🛡",playstyle:"Melee bruiser, high HP, sustained brawling.",startWeapon:"warhammer",uniqueBonus:p=>{p.maxHp+=30;p.hp=p.maxHp;p.stats.armor+=1;},uniqueDesc:"+30 max HP, +1 armor at run start."},
-  {id:"mage",name:"Mage",icon:"🔮",playstyle:"Elemental caster, weaves multiple elements together.",startWeapon:"fire_nova",uniqueBonus:p=>{["fireMult","frostMult","lightningMult","poisonMult"].forEach(k=>p.stats[k]=(p.stats[k]||1)*1.15);},uniqueDesc:"+15% to all elemental multipliers at run start."},
+  {id:"warrior",name:"Warrior",icon:"🛡",color:"#ff5c5c",playstyle:"Melee bruiser, high HP, sustained brawling.",startWeapon:"warhammer",uniqueBonus:p=>{p.maxHp+=30;p.hp=p.maxHp;p.stats.armor+=1;},uniqueDesc:"+30 max HP, +1 armor at run start."},
+  {id:"mage",name:"Mage",icon:"🔮",color:"#b98cff",playstyle:"Elemental caster, weaves multiple elements together.",startWeapon:"fire_nova",uniqueBonus:p=>{["fireMult","frostMult","lightningMult","poisonMult"].forEach(k=>p.stats[k]=(p.stats[k]||1)*1.15);},uniqueDesc:"+15% to all elemental multipliers at run start."},
   // Small regen nudge: crit/move-speed don't help against unmitigated wave-pressure
   // chip damage, so a direct survivability boost closes the gap without diluting
   // the glass-cannon identity the way flat armor/maxHp would.
-  {id:"hunter",name:"Hunter",icon:"🏹",playstyle:"Ranged precision, crit-focused, kites and pierces.",startWeapon:"bow",uniqueBonus:p=>{p.stats.critChance+=0.1;p.stats.moveSpeed*=1.06;p.stats.regen+=0.5;},uniqueDesc:"+10% crit chance, +6% move speed, +0.5 HP regen/s at run start."},
-  {id:"engineer",name:"Engineer",icon:"🗿",playstyle:"Turret/trap zoning, controls space rather than chasing.",startWeapon:"turret_deployer",uniqueBonus:p=>{p.stats.cdrMult=(p.stats.cdrMult||1)*0.9;},uniqueDesc:"-10% cooldown on summon/trap weapons at run start."},
-  {id:"necromancer",name:"Necromancer",icon:"💀",playstyle:"Minion army, scales with summon count and duration.",startWeapon:"necro_staff",uniqueBonus:p=>{p.stats.summonDmgMult=(p.stats.summonDmgMult||1)*1.2;},uniqueDesc:"+20% minion damage at run start."},
+  {id:"hunter",name:"Hunter",icon:"🏹",color:"#8aff6b",playstyle:"Ranged precision, crit-focused, kites and pierces.",startWeapon:"bow",uniqueBonus:p=>{p.stats.critChance+=0.1;p.stats.moveSpeed*=1.06;p.stats.regen+=0.5;},uniqueDesc:"+10% crit chance, +6% move speed, +0.5 HP regen/s at run start."},
+  {id:"engineer",name:"Engineer",icon:"🗿",color:"#7ee0ff",playstyle:"Turret/trap zoning, controls space rather than chasing.",startWeapon:"turret_deployer",uniqueBonus:p=>{p.stats.cdrMult=(p.stats.cdrMult||1)*0.9;},uniqueDesc:"-10% cooldown on summon/trap weapons at run start."},
+  {id:"necromancer",name:"Necromancer",icon:"💀",color:"#ff6bcf",playstyle:"Minion army, scales with summon count and duration.",startWeapon:"necro_staff",uniqueBonus:p=>{p.stats.summonDmgMult=(p.stats.summonDmgMult||1)*1.2;},uniqueDesc:"+20% minion damage at run start."},
 ];
+// Player body/ring color by class — falls back to Mage's violet (the old universal default)
+// for any unrecognized id, same fallback pattern weaponColor() uses.
+function characterColor(id){ const c=CHARACTERS.find(x=>x.id===id); return (c&&c.color)||"#b98cff"; }
 
 /* =========================================================================
    PART 2 — CONTENT LAYER DATA (enemies, bosses, events, talents, achievements)
@@ -1390,7 +1402,11 @@ function weaponFire(wid, lvl, dt){
   if(def.type==="beam"){
     const range = weaponRange(def.base.range);
     const target = nearestEnemy(player.x, player.y, range);
-    player.beamTarget = target; player.beamRange = range;
+    // Keyed per-weapon (not a single shared field) so equipping more than one beam weapon at once
+    // actually draws more than one beam — previously the last beam weapon processed each frame
+    // silently overwrote every earlier one's target, so only one beam line ever rendered.
+    player.beamTargets = player.beamTargets||{};
+    player.beamTargets[wid] = target ? {target, tier:weaponVisualTier(lvl)} : null;
     if(target){
       player.weaponTimers[wid+"_tick"] = (player.weaponTimers[wid+"_tick"]||0) - dt;
       if(player.weaponTimers[wid+"_tick"]<=0){
@@ -1410,7 +1426,7 @@ function weaponFire(wid, lvl, dt){
           });
         }
         player.weaponTimers[wid+"_tick"] = def.base.tick;
-        spawnParticle(target.x,target.y,"#ff6f9c");
+        spawnParticle(target.x,target.y,weaponColor(wid));
       }
       player.weaponTimers[wid+"_sfx"]=(player.weaponTimers[wid+"_sfx"]||0)-dt;
       if(player.weaponTimers[wid+"_sfx"]<=0){ SFX.laserHum(); player.weaponTimers[wid+"_sfx"]=0.45; }
@@ -1422,7 +1438,7 @@ function weaponFire(wid, lvl, dt){
       const radius = weaponRadius(def.base.radius);
       const heal = (def.base.healPerSec + (def.perLevel.healPerSec||0)*(lvl-1)) * (player.stats.holyMult||1) * (evo==="radiant_field"?1.5:1);
       player.hp = Math.min(player.maxHp, player.hp + heal*dt);
-      player.auraRadius = player.auraRadius||{}; player.auraRadius[wid]=radius;
+      player.auraRadius = player.auraRadius||{}; player.auraRadius[wid]={radius,tier:weaponVisualTier(lvl)};
       // Radiant Field: burns undead-tagged enemies (tank/support share no undead tag in this
       // roster, so we treat any enemy with id containing "zombie"/"revenant"/"wraith"/"lich"-family
       // as undead for this effect) standing in the aura.
@@ -1443,7 +1459,7 @@ function weaponFire(wid, lvl, dt){
         forEachEnemyNear(player.x,player.y,radius,e=>{ dealDamage(e,dmg,wid); if(evo==="bramble_god"){ e.burning=true; e.burnT=Math.max(e.burnT||0,2); e.burnDps=Math.max(e.burnDps||0,dmg*0.3); } });
         player.weaponTimers[wid+"_tick"]=0.5;
       }
-      player.auraRadius = player.auraRadius||{}; player.auraRadius[wid]=radius;
+      player.auraRadius = player.auraRadius||{}; player.auraRadius[wid]={radius,tier:weaponVisualTier(lvl)};
     }
     return;
   }
@@ -1497,8 +1513,10 @@ function weaponFire(wid, lvl, dt){
     if(wid==="poison_cloud" && evo==="plague_zone") player.stats.poisonSpread = true;
     // Absolute Zero: enemies under 30% HP caught in the field are fully frozen (near-total slow).
     if(wid==="frost_field" && evo==="absolute_zero") forEachEnemyNear(player.x,player.y,radius,e=>{ if(e.hp/e.maxHp<0.3){ e.slowed=true; e.slowT=Math.max(e.slowT||0,2.5); e.frozenSolid=true; } });
-    novaPulses.push({x:player.x,y:player.y,radius,life:0.4,maxLife:0.4,
-      color: wid==="fire_nova"?"#ff9d4d": wid==="frost_field"?"#8fd8ff":"#8aff6b"});
+    novaPulses.push({x:player.x,y:player.y,radius,life:0.4,maxLife:0.4,color:weaponColor(wid)});
+    // Second, slightly-delayed inner ring at higher levels — a leveled-up nova visibly pulses
+    // twice instead of just growing a bigger single ring.
+    if(weaponVisualTier(lvl)>=3) novaPulses.push({x:player.x,y:player.y,radius:radius*0.6,life:0.55,maxLife:0.55,color:weaponColor(wid)});
     if(wid==="fire_nova") SFX.novaBurst(); else if(wid==="poison_cloud") SFX.chainZap(); else SFX.novaBurst();
     return;
   }
@@ -1527,7 +1545,7 @@ function weaponFire(wid, lvl, dt){
       const again = nearestEnemy(player.x,player.y,jumpRange*1.4);
       if(again && !hit.has(again)){ dealDamage(again, dmg*0.6, wid); arcPoints.push({x:player.x,y:player.y},{x:again.x,y:again.y}); }
     }
-    if(arcPoints.length>1){ chainArcs.push({points:arcPoints,life:0.18,maxLife:0.18,color:weaponColor(wid)}); SFX.chainZap(); }
+    if(arcPoints.length>1){ chainArcs.push({points:arcPoints,life:0.18,maxLife:0.18,color:weaponColor(wid),width:2+weaponVisualTier(lvl)*0.9}); SFX.chainZap(); }
     return;
   }
   if(player.weaponTimers[wid]>0) return;
@@ -1545,7 +1563,7 @@ function weaponFire(wid, lvl, dt){
         if(!e.dead && e.hp>0 && e.hp/e.maxHp<0.15) dealDamage(e, e.hp+9999, wid);
       }
     });
-    player.swordFx={r:radius,t:0.22,color:weaponColor(wid)}; SFX.swordSwing();
+    player.swordFx={r:radius,t:0.22,color:weaponColor(wid),width:3+weaponVisualTier(lvl)*1.4,evolved:!!evo}; SFX.swordSwing();
     return;
   }
   if(def.type==="projectile"){
@@ -1567,10 +1585,12 @@ function weaponFire(wid, lvl, dt){
     // but we also let it fire more projectiles per volley to sell "uncapped".
     const pierce = (def.base.pierce||0)+(player.stats.bonusPierce||0);
     const baseAng = Math.atan2(target.y-player.y,target.x-player.x);
+    const tier = weaponVisualTier(lvl);
     for(let i=0;i<count;i++){
       const spread=(i-(count-1)/2)*0.16, ang=baseAng+spread;
       spawnBullet({owner:"player",x:player.x,y:player.y,vx:Math.cos(ang)*def.base.speed,vy:Math.sin(ang)*def.base.speed,
-        dmg,radius:5,life:def.base.life||1.1,color:weaponColor(wid),pierce,weaponId:wid,forceCrit,detonate});
+        dmg,radius:5+tier*0.7,life:def.base.life||1.1,color:weaponColor(wid),pierce,weaponId:wid,forceCrit,detonate,
+        shape:PROJECTILE_SHAPES[wid],evolved:!!evo});
     }
     SFX.bowShot();
     return;
@@ -1583,6 +1603,7 @@ function spawnBullet(props){
   if(bullets.length>=MAX_BULLETS) return null;
   const b = bulletPool.pop() || {};
   b.traveled=0; b.returning=false; b.weaponId=undefined; b.pierce=0; b.forceCrit=false; b.detonate=false;
+  b.shape=undefined; b.evolved=false;
   Object.assign(b, props);
   if(b.owner==="player"){ if(!b.hitset) b.hitset=new Set(); else b.hitset.clear(); }
   bullets.push(b);
@@ -2924,13 +2945,22 @@ function render(){
   const grid=80, startX=Math.floor(camera.x/grid)*grid, endX=camera.x+viewW+grid, startY=Math.floor(camera.y/grid)*grid, endY=camera.y+viewH+grid;
   ctx2d.beginPath(); for(let x=startX;x<endX;x+=grid){ctx2d.moveTo(x,startY);ctx2d.lineTo(x,endY);} for(let y=startY;y<endY;y+=grid){ctx2d.moveTo(startX,y);ctx2d.lineTo(endX,y);} ctx2d.stroke();
   ctx2d.strokeStyle="rgba(185,140,255,0.25)"; ctx2d.lineWidth=4; ctx2d.strokeRect(0,0,WORLD.w,WORLD.h);
-  for(const z of zones){ ctx2d.beginPath(); ctx2d.fillStyle= z.tag==="lightning"?"rgba(255,224,92,0.18)": z.tag==="boss"?"rgba(255,77,94,0.15)": z.tag==="burnzone"?"rgba(255,120,60,0.18)": z.slowOnly?"rgba(140,80,40,0.15)":"rgba(140,255,120,0.14)"; ctx2d.arc(z.x,z.y,z.radius,0,7); ctx2d.fill(); }
+  for(const z of zones){
+    ctx2d.beginPath();
+    // Player-placed zones (traps, Inferno's burn patch) are colored per-weapon instead of lumped
+    // into 2-3 generic tag buckets, so e.g. Spike Trap/Tesla Coil/Glacier Totem read as distinct
+    // even though they share the "physical"/"lightning" tag. Enemy-sourced zones (boss attacks,
+    // trail hazards) keep the tag-based fallback since they have no owning player weapon.
+    if(z.ownerWeapon){ ctx2d.fillStyle=weaponColor(z.ownerWeapon); ctx2d.globalAlpha=0.16; }
+    else { ctx2d.fillStyle= z.tag==="boss"?"rgba(255,77,94,0.15)": z.slowOnly?"rgba(140,80,40,0.15)":"rgba(140,255,120,0.14)"; }
+    ctx2d.arc(z.x,z.y,z.radius,0,7); ctx2d.fill(); ctx2d.globalAlpha=1;
+  }
   for(const o of orbs){ ctx2d.beginPath(); ctx2d.fillStyle = o.type==="xp"?"#7cff6b": o.type==="gold"?"#ffb347": o.type==="crystal"?"#7ee0ff":"#ff9ecb"; ctx2d.shadowColor=ctx2d.fillStyle; ctx2d.shadowBlur=glow(8); ctx2d.arc(o.x,o.y,o.radius,0,7); ctx2d.fill(); }
   ctx2d.shadowBlur=0;
   // Chain-lightning arcs and area-burst pulses (see updateJuice fix above) — actually drawn now.
   for(const c of chainArcs){
     const alpha=clamp(c.life/c.maxLife,0,1); ctx2d.beginPath();
-    ctx2d.strokeStyle = c.color||"#ffe15c"; ctx2d.globalAlpha=alpha*0.85; ctx2d.lineWidth=3; ctx2d.shadowColor=c.color||"#ffe15c"; ctx2d.shadowBlur=glow(10);
+    ctx2d.strokeStyle = c.color||"#ffe15c"; ctx2d.globalAlpha=alpha*0.85; ctx2d.lineWidth=c.width||3; ctx2d.shadowColor=c.color||"#ffe15c"; ctx2d.shadowBlur=glow(10);
     ctx2d.moveTo(c.points[0].x,c.points[0].y);
     for(let i=1;i<c.points.length;i++) ctx2d.lineTo(c.points[i].x,c.points[i].y);
     ctx2d.stroke(); ctx2d.globalAlpha=1; ctx2d.shadowBlur=0;
@@ -2940,10 +2970,42 @@ function render(){
     ctx2d.beginPath(); ctx2d.strokeStyle=n.color; ctx2d.globalAlpha=alpha*0.8; ctx2d.lineWidth=4;
     ctx2d.arc(n.x,n.y,n.radius*grow,0,7); ctx2d.stroke(); ctx2d.globalAlpha=1;
   }
-  if(player.swordFx){ const alpha=player.swordFx.t/0.22; ctx2d.beginPath(); ctx2d.strokeStyle=player.swordFx.color||"#b98cff"; ctx2d.globalAlpha=alpha*0.7; ctx2d.lineWidth=6; ctx2d.arc(player.x,player.y,player.swordFx.r,0,Math.PI*2); ctx2d.stroke(); ctx2d.globalAlpha=1; }
-  if(player.beamTarget && enemies.includes(player.beamTarget)){ const t=player.beamTarget; ctx2d.beginPath(); ctx2d.strokeStyle="#ff6f9c"; ctx2d.lineWidth=3; ctx2d.shadowColor="#ff6f9c"; ctx2d.shadowBlur=glow(12); ctx2d.moveTo(player.x,player.y); ctx2d.lineTo(t.x,t.y); ctx2d.stroke(); ctx2d.shadowBlur=0; }
-  if(player.auraRadius){ for(const k of Object.keys(player.auraRadius)){ ctx2d.beginPath(); ctx2d.strokeStyle= k==="holy_aura"?"rgba(255,255,255,0.28)":"rgba(140,255,80,0.24)"; ctx2d.lineWidth=2; ctx2d.arc(player.x,player.y,player.auraRadius[k],0,7); ctx2d.stroke(); } }
-  for(const m of minions){ ctx2d.beginPath(); ctx2d.fillStyle="#8fffcf"; ctx2d.shadowColor="#8fffcf"; ctx2d.shadowBlur=glow(8); ctx2d.arc(m.x,m.y,m.radius,0,7); ctx2d.fill(); }
+  if(player.swordFx){
+    const fx=player.swordFx, alpha=fx.t/0.22;
+    ctx2d.beginPath(); ctx2d.strokeStyle=fx.color||"#b98cff"; ctx2d.globalAlpha=alpha*0.7; ctx2d.lineWidth=fx.width||6;
+    ctx2d.arc(player.x,player.y,fx.r,0,Math.PI*2); ctx2d.stroke();
+    // Evolved melee weapons leave a brighter white afterimage ring just inside the main swing.
+    if(fx.evolved){ ctx2d.strokeStyle="#ffffff"; ctx2d.globalAlpha=alpha*0.45; ctx2d.lineWidth=Math.max(2,(fx.width||6)*0.4); ctx2d.beginPath(); ctx2d.arc(player.x,player.y,fx.r*0.85,0,Math.PI*2); ctx2d.stroke(); }
+    ctx2d.globalAlpha=1;
+  }
+  if(player.beamTargets){
+    for(const wid of Object.keys(player.beamTargets)){
+      const bt = player.beamTargets[wid]; if(!bt || !enemies.includes(bt.target)) continue;
+      const t=bt.target, color=weaponColor(wid);
+      ctx2d.beginPath(); ctx2d.strokeStyle=color; ctx2d.lineWidth=2+bt.tier*0.6; ctx2d.shadowColor=color; ctx2d.shadowBlur=glow(12);
+      if(wid==="arc_lance") ctx2d.setLineDash([9,5]); // jagged/pulsing look, distinct from the other two beams' solid lines
+      ctx2d.moveTo(player.x,player.y); ctx2d.lineTo(t.x,t.y); ctx2d.stroke();
+      ctx2d.setLineDash([]); ctx2d.shadowBlur=0;
+    }
+  }
+  if(player.auraRadius){
+    for(const k of Object.keys(player.auraRadius)){
+      const a = player.auraRadius[k];
+      ctx2d.beginPath(); ctx2d.strokeStyle=weaponColor(k); ctx2d.globalAlpha=0.28; ctx2d.lineWidth=2+a.tier*0.5;
+      ctx2d.arc(player.x,player.y,a.radius,0,7); ctx2d.stroke();
+      // Higher-level auras pulse a second, tighter inner ring instead of just growing radius.
+      if(a.tier>=3){ ctx2d.globalAlpha=0.16; ctx2d.beginPath(); ctx2d.arc(player.x,player.y,a.radius*0.82,0,7); ctx2d.stroke(); }
+      ctx2d.globalAlpha=1;
+    }
+  }
+  for(const m of minions){
+    // Colored per-summon-weapon (Necro Staff/Spirit Wolves/Turret Deployer/Swarm Hive used to all
+    // render as the same flat green dot) and topped with the weapon's own icon, already stored on
+    // the minion but never actually drawn — so each summon type reads as itself at a glance.
+    const mc = m.weaponId==="raised" ? "#c8c8d8" : weaponColor(m.weaponId);
+    ctx2d.beginPath(); ctx2d.fillStyle=mc; ctx2d.shadowColor=mc; ctx2d.shadowBlur=glow(8); ctx2d.arc(m.x,m.y,m.radius,0,7); ctx2d.fill();
+    if(m.icon && quality!=='low'){ ctx2d.font="12px sans-serif"; ctx2d.textAlign="center"; ctx2d.shadowBlur=0; ctx2d.fillText(m.icon,m.x,m.y-m.radius-6); }
+  }
   ctx2d.shadowBlur=0;
   for(const e of enemies){
     ctx2d.beginPath(); ctx2d.fillStyle=e.hitFlash>0?"#ffffff":e.color; ctx2d.shadowColor=e.glow; ctx2d.shadowBlur=glow(e.boss?26:(e.elite?18:10));
@@ -3008,12 +3070,16 @@ function render(){
     } else {
       ctx2d.beginPath(); ctx2d.arc(b.x,b.y,b.radius,0,7); ctx2d.fill();
     }
+    // Evolved weapons get a bright white-hot core ring on every shot — a constant, at-a-glance
+    // "this weapon evolved" tell in combat, not just a changed name/icon in the level-up menu.
+    if(b.evolved){ ctx2d.beginPath(); ctx2d.strokeStyle="#ffffff"; ctx2d.lineWidth=1.4; ctx2d.globalAlpha=0.8; ctx2d.arc(b.x,b.y,b.radius*0.55,0,7); ctx2d.stroke(); ctx2d.globalAlpha=1; }
   }
   ctx2d.shadowBlur=0;
   for(const p of particles){ ctx2d.globalAlpha=clamp(p.life/p.maxLife,0,1); ctx2d.fillStyle=p.color; ctx2d.fillRect(p.x-2,p.y-2,4,4); }
   ctx2d.globalAlpha=1;
-  ctx2d.beginPath(); ctx2d.fillStyle="#fff"; ctx2d.shadowColor="#b98cff"; ctx2d.shadowBlur=glow(16); ctx2d.arc(player.x,player.y,player.radius,0,7); ctx2d.fill(); ctx2d.shadowBlur=0;
-  ctx2d.beginPath(); ctx2d.strokeStyle="#b98cff"; ctx2d.lineWidth=2; ctx2d.arc(player.x,player.y,player.radius+4,0,7); ctx2d.stroke();
+  const pc = characterColor(player.character);
+  ctx2d.beginPath(); ctx2d.fillStyle="#fff"; ctx2d.shadowColor=pc; ctx2d.shadowBlur=glow(16); ctx2d.arc(player.x,player.y,player.radius,0,7); ctx2d.fill(); ctx2d.shadowBlur=0;
+  ctx2d.beginPath(); ctx2d.strokeStyle=pc; ctx2d.lineWidth=2; ctx2d.arc(player.x,player.y,player.radius+4,0,7); ctx2d.stroke();
   ctx2d.font="bold 13px 'JetBrains Mono', monospace"; ctx2d.textAlign="center";
   for(const f of floaters){ ctx2d.globalAlpha=clamp(f.life/0.6,0,1); ctx2d.fillStyle=f.color; ctx2d.fillText(f.text,f.x,f.y); }
   ctx2d.globalAlpha=1;
@@ -3294,7 +3360,8 @@ function renderCharSelect(){
   CHARACTERS.forEach(c=>{
     const el=document.createElement('div'); el.className='card';
     const w=WEAPONS[c.startWeapon];
-    el.innerHTML=`<div class="icon">${c.icon}</div><div class="name">${c.name}</div><div class="desc">${c.playstyle}</div>
+    el.style.borderColor = (c.color||"#3a3f52")+"55";
+    el.innerHTML=`<div class="icon" style="color:${c.color||'inherit'}; text-shadow:0 0 12px ${c.color||'transparent'};">${c.icon}</div><div class="name">${c.name}</div><div class="desc">${c.playstyle}</div>
       <div class="tag">STARTS WITH ${w.icon} ${w.name}</div><div class="playstyle">${c.uniqueDesc}</div>`;
     el.onclick=()=>{ SFX.uiClick(); selectedCharacter=c.id; startRun(); };
     wrap.appendChild(el);
