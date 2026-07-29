@@ -383,13 +383,11 @@ const WEAPONS = {
   blood_blade:{name:"Blood Blade",icon:"🗡",type:"melee",tags:["bleed","lifesteal"],base:{dmg:16,cd:0.8,radius:70,pierce:99},perLevel:{dmg:6,radius:4},maxLevel:8,evolvesInto:"crimson_executioner"},
   chain_hook:{name:"Chain Hook",icon:"⛓",type:"melee",tags:["control","pull"],base:{dmg:12,cd:1.4,radius:150},perLevel:{dmg:5,radius:10},maxLevel:8,evolvesInto:"gravity_chain"},
   warhammer:{name:"Warhammer",icon:"🔨",type:"melee",tags:["stagger","knockback"],base:{dmg:34,cd:1.7,radius:90},perLevel:{dmg:12,radius:6},maxLevel:8,evolvesInto:"seismic_maul"},
-  // searchRadius/life (added alongside the pre-existing speed) replace what used to be one flat
-  // 900-unit target search + fixed 2.2s bullet life shared by every projectile weapon regardless of
-  // identity — see weaponFire()'s projectile branch. Values below are sized so each weapon's real
-  // reach (speed*life) clears its own searchRadius with modest margin, and archetypes read distinctly:
-  // plasma_rifle is a close spray, bow/shuriken are mid-range, railgun is the deliberate long-reach outlier.
-  bow:{name:"Bow",icon:"🏹",type:"projectile",tags:["physical"],base:{dmg:9,cd:0.55,speed:520,pierce:1,count:1,searchRadius:420,life:1.3},perLevel:{dmg:4,count:0.34},maxLevel:8,evolvesInto:"void_sniper"},
-  plasma_rifle:{name:"Plasma Rifle",icon:"🔫",type:"projectile",tags:["fire","burst"],base:{dmg:6,cd:0.14,speed:640,pierce:0,count:1,searchRadius:320,life:0.8},perLevel:{dmg:2.4},maxLevel:8,evolvesInto:"annihilator"},
+  // searchRadius/life size each projectile weapon's real reach (speed*life) to clear its own
+  // searchRadius with modest margin — plasma_rifle is a close spray, bow/shuriken are mid-range,
+  // railgun is the deliberate long-reach outlier.
+  bow:{name:"Bow",icon:"🏹",type:"projectile",tags:["physical"],base:{dmg:13,cd:0.46,speed:520,pierce:1,count:1,searchRadius:420,life:1.3},perLevel:{dmg:5,count:0.34},maxLevel:8,evolvesInto:"void_sniper"},
+  plasma_rifle:{name:"Plasma Rifle",icon:"🔫",type:"projectile",tags:["fire","burst"],base:{dmg:6,cd:0.19,speed:640,pierce:0,count:1,searchRadius:320,life:0.8},perLevel:{dmg:2.4},maxLevel:8,evolvesInto:"annihilator"},
   railgun:{name:"Railgun",icon:"🎯",type:"projectile",tags:["physical","crit"],base:{dmg:36,cd:1.6,speed:900,pierce:6,count:1,searchRadius:620,life:1.0},perLevel:{dmg:15,pierce:1},maxLevel:8,evolvesInto:"world_ender"},
   shuriken_storm:{name:"Shuriken Storm",icon:"✳",type:"projectile",tags:["bleed","crowd"],base:{dmg:5,cd:0.45,speed:460,pierce:2,count:3,searchRadius:360,life:1.1},perLevel:{dmg:2,count:0.5},maxLevel:8,evolvesInto:"blade_maelstrom"},
   laser_array:{name:"Laser Array",icon:"🔺",type:"beam",tags:["single_target","sustained"],base:{dps:26,range:260,tick:0.2},perLevel:{dps:11},maxLevel:8,evolvesInto:"quantum_beam"},
@@ -405,6 +403,16 @@ const WEAPONS = {
   holy_aura:{name:"Holy Aura",icon:"✨",type:"aura",tags:["holy","support"],base:{healPerSec:1.2,radius:110},perLevel:{healPerSec:0.4},maxLevel:8,evolvesInto:"radiant_field"},
   thorn_aura:{name:"Thorn Aura",icon:"🌵",type:"aura",tags:["reflect","poison"],base:{reflectPct:0.25,radius:90},perLevel:{reflectPct:0.03},maxLevel:8,evolvesInto:"bramble_god"},
   chain_lightning:{name:"Chain Lightning",icon:"⚡",type:"chain",tags:["lightning","crowd"],base:{dmg:10,cd:1.1,jumps:3,jumpRange:260},perLevel:{dmg:4,jumps:0.5},maxLevel:8,evolvesInto:"maelstrom_of_ruin"},
+  whip:{name:"Whip",icon:"🪢",type:"melee",tags:["bleed","reach"],base:{dmg:9,cd:0.45,radius:140},perLevel:{dmg:3.5,radius:8},maxLevel:8,evolvesInto:"tempest_lash"},
+  twin_daggers:{name:"Twin Daggers",icon:"🔪",type:"melee",tags:["physical","crit"],base:{dmg:7,cd:0.3,radius:50},perLevel:{dmg:3,radius:2.5},maxLevel:8,evolvesInto:"thousand_cuts"},
+  javelin:{name:"Javelin",icon:"🪃",type:"projectile",tags:["physical","pierce"],base:{dmg:24,cd:1.0,speed:600,pierce:5,count:1,searchRadius:480,life:1.3},perLevel:{dmg:10},maxLevel:8,evolvesInto:"world_piercer"},
+  hand_cannon:{name:"Hand Cannon",icon:"💥",type:"projectile",tags:["physical","burst"],base:{dmg:30,cd:0.9,speed:520,pierce:1,count:1,searchRadius:380,life:1.0},perLevel:{dmg:13},maxLevel:8,evolvesInto:"cataclysm_barrel"},
+  gauss_needle:{name:"Gauss Needle",icon:"📌",type:"projectile",tags:["physical","swarm"],base:{dmg:4,cd:0.22,speed:560,pierce:1,count:2,searchRadius:360,life:1.0},perLevel:{dmg:1.8,count:0.4},maxLevel:8,evolvesInto:"diamond_hailstorm"},
+  arc_lance:{name:"Arc Lance",icon:"🔱",type:"beam",tags:["lightning","single_target"],base:{dps:32,range:230,tick:0.15},perLevel:{dps:13},maxLevel:8,evolvesInto:"singularity_beam"},
+  void_rift:{name:"Void Rift",icon:"🕳",type:"area",tags:["poison","slow"],base:{dmg:13,cd:2.0,radius:125},perLevel:{dmg:5.5,radius:6},maxLevel:8,evolvesInto:"event_horizon"},
+  swarm_hive:{name:"Swarm Hive",icon:"🐝",type:"summon",tags:["summon","swarm","beast"],base:{minionDmg:4,cd:5,maxMinions:4},perLevel:{minionDmg:1.6,maxMinions:0.3},maxLevel:8,evolvesInto:"hive_overmind"},
+  glacier_totem:{name:"Glacier Totem",icon:"🧊",type:"trap",tags:["frost","control"],base:{dmg:15,cd:3.4,radius:125},perLevel:{dmg:6},maxLevel:8,evolvesInto:"absolute_glacier"},
+  storm_chain:{name:"Storm Chain",icon:"🌩",type:"chain",tags:["lightning","crowd"],base:{dmg:8,cd:0.9,jumps:4,jumpRange:230},perLevel:{dmg:3.5,jumps:0.4},maxLevel:8,evolvesInto:"thunderstorm_cascade"},
 };
 // Global weapon rework/nerf pass: the player was reported as too strong overall.
 // Rather than hand-tuning 20 separate weapons' dmg/dps fields (error-prone and
@@ -427,6 +435,8 @@ const WEAPON_COLORS = {
   railgun:"#7ee0ff", shuriken_storm:"#dfe3ee", laser_array:"#ff6f9c", prism_beam:"#b98cff", fire_nova:"#ff9d4d",
   frost_field:"#8fd8ff", poison_cloud:"#8aff6b", necro_staff:"#c86bff", spirit_wolves:"#e0b48a", turret_deployer:"#8a8f9e",
   spike_trap:"#ff8a4d", tesla_coil:"#ffe15c", holy_aura:"#ffffff", thorn_aura:"#8aff6b", chain_lightning:"#ffe15c",
+  whip:"#ff8a4d", twin_daggers:"#dfe3ee", javelin:"#c8c8d8", hand_cannon:"#ffb347", gauss_needle:"#7ee0ff",
+  arc_lance:"#ffe15c", void_rift:"#b98cff", swarm_hive:"#e0b48a", glacier_totem:"#8fd8ff", storm_chain:"#ffe15c",
 };
 function weaponColor(wid){ return WEAPON_COLORS[wid] || "#ffd479"; }
 
@@ -451,12 +461,22 @@ const EVOLUTIONS = {
   radiant_field:{from:"holy_aura",catalyst:"world_tree_leaf",name:"Radiant Field",icon:"🌟",desc:"Heals and burns undead further."},
   bramble_god:{from:"thorn_aura",catalyst:"thorned_crown",name:"Bramble God",icon:"👹",desc:"Reflect also poisons."},
   maelstrom_of_ruin:{from:"chain_lightning",catalyst:"storm_rune",name:"Maelstrom of Ruin",icon:"⛈",desc:"Chains never decay."},
+  tempest_lash:{from:"whip",catalyst:"coiling_fang",name:"Tempest Lash",icon:"🌪",desc:"Wider arc, enemies bleed longer."},
+  thousand_cuts:{from:"twin_daggers",catalyst:"blade_dancer_charm",name:"Thousand Cuts",icon:"🌀",desc:"Blades strike in a blur."},
+  world_piercer:{from:"javelin",catalyst:"piercing_totem",name:"World Piercer",icon:"🌍",desc:"Pierces without limit."},
+  cataclysm_barrel:{from:"hand_cannon",catalyst:"reloaders_grip",name:"Cataclysm Barrel",icon:"☄",desc:"Devastating point-blank blasts."},
+  diamond_hailstorm:{from:"gauss_needle",catalyst:"swift_needle_case",name:"Diamond Hailstorm",icon:"💎",desc:"A relentless needle storm."},
+  singularity_beam:{from:"arc_lance",catalyst:"focusing_lens",name:"Singularity Beam",icon:"🌌",desc:"Collapses matter into pure damage."},
+  event_horizon:{from:"void_rift",catalyst:"collapsed_star",name:"Event Horizon",icon:"🕳",desc:"The rift grows and lingers."},
+  hive_overmind:{from:"swarm_hive",catalyst:"queens_pheromone",name:"Hive Overmind",icon:"👑",desc:"The swarm thinks as one."},
+  absolute_glacier:{from:"glacier_totem",catalyst:"permafrost_idol",name:"Absolute Glacier",icon:"🏔",desc:"An ever-expanding field of ice."},
+  thunderstorm_cascade:{from:"storm_chain",catalyst:"static_charm",name:"Thunderstorm Cascade",icon:"⚡",desc:"Lightning cascades further and faster."},
 };
 
 const CARDS = [
   {id:"heavy_bullets",cat:"offensive",name:"Heavy Bullets",tags:["damage"],stackable:true,maxStacks:5,desc:"+16% damage with all weapons.",apply:p=>p.stats.dmgMult*=1.16},
   {id:"rapid_fire",cat:"offensive",name:"Rapid Fire",tags:["speed"],stackable:true,maxStacks:5,desc:"+14% attack speed.",apply:p=>p.stats.atkSpeedMult*=1.14},
-  {id:"precision",cat:"offensive",name:"Precision",tags:["crit"],stackable:true,maxStacks:4,desc:"+8% crit chance.",apply:p=>p.stats.critChance=Math.min(0.6,p.stats.critChance+0.08)},
+  {id:"precision",cat:"offensive",name:"Precision",tags:["crit"],stackable:true,maxStacks:4,desc:"+8% crit chance.",apply:p=>p.stats.critChance+=0.08},
   {id:"glass_cannon",cat:"offensive",name:"Glass Cannon",tags:["damage","risk"],desc:"+50% damage, -40% max HP.",apply:p=>{p.stats.dmgMult*=1.5;p.maxHp=Math.max(10,Math.floor(p.maxHp*0.6));p.hp=Math.min(p.hp,p.maxHp);}},
   {id:"berserk",cat:"offensive",name:"Berserk",tags:["damage","risk"],desc:"+1% damage per 1% HP missing.",apply:p=>p.stats.berserkScaling=(p.stats.berserkScaling||0)+0.01},
   {id:"executioner",cat:"offensive",name:"Executioner",tags:["crit"],desc:"+40% damage to enemies below 20% HP.",apply:p=>p.stats.executeBonus=(p.stats.executeBonus||0)+0.4},
@@ -490,7 +510,7 @@ const CARDS = [
   {id:"chill_stacking",cat:"elemental",name:"Chill Stacking",tags:["frost"],stackable:true,maxStacks:3,desc:"Slow stacks additively, up to a 60% slow cap.",apply:p=>p.stats.chillCap=Math.min(0.6,(p.stats.chillCap||0.35)+0.1)},
   {id:"storm_caller",cat:"elemental",name:"Storm Caller",tags:["lightning"],stackable:true,maxStacks:2,desc:"+20% chance any hit chains an extra jump.",apply:p=>p.stats.extraChainChance=(p.stats.extraChainChance||0)+0.2},
   {id:"summoner",cat:"build_defining",name:"Summoner",tags:["summon"],desc:"+25% damage and count for summons.",apply:p=>{p.stats.summonDmgMult=(p.stats.summonDmgMult||1)*1.25;p.stats.summonCountMult=(p.stats.summonCountMult||1)*1.25;}},
-  {id:"assassin",cat:"build_defining",name:"Assassin",tags:["crit","speed"],desc:"+15% crit, +15% move speed, -10% max HP.",apply:p=>{p.stats.critChance=Math.min(0.75,p.stats.critChance+0.15);p.stats.moveSpeed*=1.15;p.maxHp=Math.floor(p.maxHp*0.9);}},
+  {id:"assassin",cat:"build_defining",name:"Assassin",tags:["crit","speed"],desc:"+15% crit, +15% move speed, -10% max HP.",apply:p=>{p.stats.critChance+=0.15;p.stats.moveSpeed*=1.15;p.maxHp=Math.floor(p.maxHp*0.9);}},
   {id:"tank_build",cat:"build_defining",name:"Tank Build",tags:["armor","hp"],desc:"+40 max HP, +2 armor, -10% move speed.",apply:p=>{p.maxHp+=40;p.stats.armor+=2;p.stats.moveSpeed*=0.9;}},
   {id:"glass_turret",cat:"build_defining",name:"Glass Turret",tags:["damage","risk"],desc:"+20% damage while standing still.",apply:p=>p.stats.turretMode=true},
   {id:"vampire",cat:"build_defining",name:"Vampire",tags:["lifesteal"],desc:"+8% lifesteal, -15% regen.",apply:p=>{p.stats.lifesteal+=0.08;p.stats.regen*=0.85;}},
@@ -505,7 +525,18 @@ const CARDS = [
   {id:"frozen_heart",cat:"legendary",name:"Frozen Heart of the Void",tags:["frost"],desc:"Frozen enemies shatter on death for AoE damage.",apply:p=>p.stats.frostShatter=true},
   {id:"storm_avatar",cat:"legendary",name:"Storm Avatar",tags:["lightning"],desc:"Chain jumps can strike again from the player.",apply:p=>p.stats.stormAvatar=true},
   {id:"ascendant_soul",cat:"legendary",name:"Ascendant Soul",tags:["all"],desc:"All elemental multipliers +15%, all resource gains +15%.",apply:p=>{["fireMult","frostMult","lightningMult","poisonMult","holyMult"].forEach(k=>p.stats[k]=(p.stats[k]||1)*1.15);p.stats.goldMult*=1.15;p.stats.xpMult*=1.15;}},
+  // Every other card has a low maxStacks, so a long run can exhaust buildCardPool()'s
+  // entire offer list — these three stay available indefinitely so level-ups never go
+  // empty; effDmgMult()/effAtkSpeedMult()'s soft caps (PART 3) still bound the payoff.
+  {id:"ascendant_power",cat:"offensive",name:"Ascendant Power",tags:["damage"],stackable:true,maxStacks:99999,desc:"+5% damage multiplier.",apply:p=>p.stats.dmgMult*=1.05},
+  {id:"ascendant_velocity",cat:"offensive",name:"Ascendant Velocity",tags:["speed"],stackable:true,maxStacks:99999,desc:"+5% attack speed.",apply:p=>p.stats.atkSpeedMult*=1.05},
+  {id:"ascendant_vitality",cat:"defensive",name:"Ascendant Vitality",tags:["hp"],stackable:true,maxStacks:99999,desc:"+10 max HP, heal to full.",apply:p=>{p.maxHp+=10;p.hp=p.maxHp;}},
 ];
+// Rarity tiers derived from each card's existing `cat`, not hand-picked per card —
+// offense/defense/utility are the bread-and-butter picks (common), elemental is a
+// more specialized pivot (uncommon), build_defining reshapes a whole build (rare).
+const CARD_CAT_RARITY = {offensive:"common",defensive:"common",utility:"common",elemental:"uncommon",build_defining:"rare",legendary:"legendary"};
+for(const c of CARDS) c.rarity = CARD_CAT_RARITY[c.cat] || "common";
 
 const PASSIVE_SLOT_TYPES = ["artifact","amulet","ring","relic"];
 const MAX_PASSIVE_SLOTS = 6;
@@ -513,7 +544,7 @@ const MAX_PASSIVE_SLOTS_PER_TYPE = 2; // enforce PASSIVE_SLOT_TYPES: at most 2 i
 const PASSIVES = [
   {id:"vampire_fang",slot:"amulet",name:"Vampire Fang",icon:"🧛",tags:["lifesteal"],desc:"+4% lifesteal.",apply:p=>p.stats.lifesteal+=0.04},
   {id:"broken_clock",slot:"relic",name:"Broken Clock",icon:"🕰",tags:["cooldown"],desc:"-20% cooldown on all weapons.",apply:p=>p.stats.cdrMult=(p.stats.cdrMult||1)*0.8},
-  {id:"demon_eye",slot:"ring",name:"Demon Eye",icon:"👁",tags:["crit"],desc:"+10% crit chance.",apply:p=>p.stats.critChance=Math.min(0.75,p.stats.critChance+0.1)},
+  {id:"demon_eye",slot:"ring",name:"Demon Eye",icon:"👁",tags:["crit"],desc:"+10% crit chance.",apply:p=>p.stats.critChance+=0.1},
   {id:"ancient_battery",slot:"artifact",name:"Ancient Battery",icon:"🔋",tags:["projectile"],desc:"+1 projectile count.",apply:p=>p.stats.bonusProjectiles=(p.stats.bonusProjectiles||0)+1},
   {id:"phoenix_feather",slot:"relic",name:"Phoenix Feather",icon:"🪶",tags:["revive"],desc:"Revive once per run at 50% HP.",apply:p=>p.hasRevive=true},
   {id:"frost_core",slot:"ring",name:"Frost Core",icon:"❄",tags:["frost"],desc:"Attacks apply a 15% slow on hit.",apply:p=>p.stats.slowOnHit=(p.stats.slowOnHit||0)+0.15},
@@ -531,6 +562,17 @@ const PASSIVES = [
   {id:"blood_chalice",slot:"amulet",name:"Blood Chalice",icon:"🩸",tags:["lifesteal"],desc:"Heal 2 HP per kill.",apply:p=>p.stats.hpPerKill=(p.stats.hpPerKill||0)+2},
   {id:"hunters_mark",slot:"ring",name:"Hunter's Mark",icon:"🎯",tags:["elite"],desc:"+15% damage vs elites and bosses.",apply:p=>p.stats.eliteDmgMult=(p.stats.eliteDmgMult||1)*1.15},
   {id:"world_tree_leaf",slot:"relic",name:"World Tree Leaf",icon:"🍃",tags:["regen","holy"],desc:"+0.5 HP/s regen.",apply:p=>p.stats.regen+=0.5},
+  // ---- catalysts for the 10 new weapons above — each also a standalone useful pick. ----
+  {id:"coiling_fang",slot:"ring",name:"Coiling Fang",icon:"🐍",tags:["bleed","lifesteal"],desc:"+3% lifesteal.",apply:p=>p.stats.lifesteal+=0.03},
+  {id:"blade_dancer_charm",slot:"amulet",name:"Blade Dancer's Charm",icon:"💃",tags:["speed"],desc:"+6% attack speed.",apply:p=>p.stats.atkSpeedMult*=1.06},
+  {id:"piercing_totem",slot:"artifact",name:"Piercing Totem",icon:"🗿",tags:["pierce"],desc:"+2 pierce.",apply:p=>p.stats.bonusPierce=(p.stats.bonusPierce||0)+2},
+  {id:"reloaders_grip",slot:"ring",name:"Reloader's Grip",icon:"🤜",tags:["cooldown"],desc:"-8% cooldown on all weapons.",apply:p=>p.stats.cdrMult=(p.stats.cdrMult||1)*0.92},
+  {id:"swift_needle_case",slot:"artifact",name:"Swift Needle Case",icon:"🧵",tags:["projectile"],desc:"+1 projectile count.",apply:p=>p.stats.bonusProjectiles=(p.stats.bonusProjectiles||0)+1},
+  {id:"focusing_lens",slot:"relic",name:"Focusing Lens",icon:"🔍",tags:["arcane"],desc:"+10% damage from arcane weapon types.",apply:p=>p.stats.arcaneDmgMult=(p.stats.arcaneDmgMult||1)*1.1},
+  {id:"collapsed_star",slot:"relic",name:"Collapsed Star",icon:"⭐",tags:["poison"],desc:"+15% to poison/DoT effects.",apply:p=>p.stats.poisonMult=(p.stats.poisonMult||1)*1.15},
+  {id:"queens_pheromone",slot:"amulet",name:"Queen's Pheromone",icon:"🐝",tags:["summon"],desc:"+15% summon count.",apply:p=>p.stats.summonCountMult=(p.stats.summonCountMult||1)*1.15},
+  {id:"permafrost_idol",slot:"artifact",name:"Permafrost Idol",icon:"🧊",tags:["frost"],desc:"+10% to frost/slow effects.",apply:p=>p.stats.frostMult=(p.stats.frostMult||1)*1.1},
+  {id:"static_charm",slot:"ring",name:"Static Charm",icon:"⚡",tags:["lightning"],desc:"+15% chance any hit chains an extra jump.",apply:p=>p.stats.chainOnHitChance=(p.stats.chainOnHitChance||0)+0.15},
 ];
 
 const SYNERGIES = [
@@ -547,7 +589,10 @@ const SYNERGIES = [
 const CHARACTERS = [
   {id:"warrior",name:"Warrior",icon:"🛡",playstyle:"Melee bruiser, high HP, sustained brawling.",startWeapon:"warhammer",uniqueBonus:p=>{p.maxHp+=30;p.hp=p.maxHp;p.stats.armor+=1;},uniqueDesc:"+30 max HP, +1 armor at run start."},
   {id:"mage",name:"Mage",icon:"🔮",playstyle:"Elemental caster, weaves multiple elements together.",startWeapon:"fire_nova",uniqueBonus:p=>{["fireMult","frostMult","lightningMult","poisonMult"].forEach(k=>p.stats[k]=(p.stats[k]||1)*1.15);},uniqueDesc:"+15% to all elemental multipliers at run start."},
-  {id:"hunter",name:"Hunter",icon:"🏹",playstyle:"Ranged precision, crit-focused, kites and pierces.",startWeapon:"bow",uniqueBonus:p=>{p.stats.critChance+=0.1;p.stats.moveSpeed*=1.06;},uniqueDesc:"+10% crit chance, +6% move speed at run start."},
+  // Small regen nudge: crit/move-speed don't help against unmitigated wave-pressure
+  // chip damage, so a direct survivability boost closes the gap without diluting
+  // the glass-cannon identity the way flat armor/maxHp would.
+  {id:"hunter",name:"Hunter",icon:"🏹",playstyle:"Ranged precision, crit-focused, kites and pierces.",startWeapon:"bow",uniqueBonus:p=>{p.stats.critChance+=0.1;p.stats.moveSpeed*=1.06;p.stats.regen+=0.5;},uniqueDesc:"+10% crit chance, +6% move speed, +0.5 HP regen/s at run start."},
   {id:"engineer",name:"Engineer",icon:"🗿",playstyle:"Turret/trap zoning, controls space rather than chasing.",startWeapon:"turret_deployer",uniqueBonus:p=>{p.stats.cdrMult=(p.stats.cdrMult||1)*0.9;},uniqueDesc:"-10% cooldown on summon/trap weapons at run start."},
   {id:"necromancer",name:"Necromancer",icon:"💀",playstyle:"Minion army, scales with summon count and duration.",startWeapon:"necro_staff",uniqueBonus:p=>{p.stats.summonDmgMult=(p.stats.summonDmgMult||1)*1.2;},uniqueDesc:"+20% minion damage at run start."},
 ];
@@ -606,6 +651,11 @@ const ENEMIES_NORMAL_RAW = [
 // react to the extra threat instead of just taking more unavoidable damage.
 const ENEMY_HP_MULT = 1.3;
 const ENEMY_DMG_MULT = 1.12;
+// Per-hit damage-scale cap (spawnEnemy applies Math.min(wave.mult*WAVE_POWER_MULT,
+// ENEMY_DMG_SCALE_CAP) to dmg) — prevents wave.mult alone from ever one-shotting the
+// player at high mult, while raw HP (uncapped) keeps scaling so late enemies still
+// take proportionally longer to kill instead of purely being a damage sponge.
+const ENEMY_DMG_SCALE_CAP = 3.2;
 const ENEMIES_NORMAL = ENEMIES_NORMAL_RAW.map(([id,role,hp,speed,dmg,behavior],i)=>{
   const rc = roleColor(role,i);
   hp = Math.round(hp*ENEMY_HP_MULT); dmg = +(dmg*ENEMY_DMG_MULT).toFixed(1);
@@ -651,7 +701,14 @@ const ENEMIES = {};
 for(const e of ENEMIES_NORMAL) ENEMIES[e.id]=e;
 for(const e of ENEMIES_ELITE) ENEMIES[e.id]=e;
 
-const BOSS_HP_MULT = 1.2, BOSS_DMG_MULT = 1.08; // moderate buff, in line with ENEMY_HP_MULT/ENEMY_DMG_MULT above
+// Boss HP needs to hold up against real player DPS (which can reach 150k+) long
+// enough for their attack patterns to actually play out, not die in one hit.
+// Reward economy is intentionally decoupled from this (see rawHp below) so buffing
+// boss survivability doesn't also inflate gold/xp payouts.
+const BOSS_HP_MULT = 4.5, BOSS_DMG_MULT = 1.2;
+// spawnBoss() takes the max of (this legacy wave.mult-scaled hp) and
+// (playerCP(player)*BOSS_TARGET_FIGHT_SECONDS) — see spawnBoss() for why.
+const BOSS_TARGET_FIGHT_SECONDS = 7;
 const BOSS_ROSTER_RAW = {
   dragon:   { name:"Dragon",         hp:5200,  dmg:34, speed:34, radius:46, color:"#ff4d5e", glow:"#6b1c22" },
   wyvern:   { name:"Wyvern",         hp:8200,  dmg:38, speed:40, radius:44, color:"#ff9d4d", glow:"#7a3d0f" },
@@ -667,7 +724,9 @@ const BOSS_ROSTER_RAW = {
 const BOSS_ROSTER = {};
 for(const key of Object.keys(BOSS_ROSTER_RAW)){
   const b = BOSS_ROSTER_RAW[key];
-  BOSS_ROSTER[key] = Object.assign({}, b, { hp: Math.round(b.hp*BOSS_HP_MULT), dmg: +(b.dmg*BOSS_DMG_MULT).toFixed(1) });
+  // rawHp kept alongside the HP_MULT-scaled hp so spawnBoss can reward xp/gold off
+  // the un-inflated number — boss survivability and boss loot are separate knobs.
+  BOSS_ROSTER[key] = Object.assign({}, b, { hp: Math.round(b.hp*BOSS_HP_MULT), rawHp: b.hp, dmg: +(b.dmg*BOSS_DMG_MULT).toFixed(1) });
 }
 
 const BOSSES = {
@@ -775,6 +834,18 @@ const EVENTS = [
   {id:"shrine_of_ruin",cat:"cursed_shrine",name:"Shrine of Ruin",desc:"Enemies spawn 20% faster, gold gain +40%.",resolve:(p,i,ctx)=>{ctx.applyTemporaryModifier("spawnRate",1.2,Infinity);p.stats.goldMult*=1.4;}},
   {id:"shrine_of_fading",cat:"cursed_shrine",name:"Shrine of Fading",desc:"-15% max HP, all elemental multipliers +20%.",resolve:(p,i,ctx)=>{ctx.applyHpPenalty(p,0.15);["fireMult","frostMult","lightningMult","poisonMult"].forEach(k=>p.stats[k]=(p.stats[k]||1)*1.2);}},
   {id:"shrine_of_the_forgotten",cat:"cursed_shrine",name:"Shrine of the Forgotten",desc:"Lose all gold, gain a guaranteed legendary card.",resolve:(p,i,ctx)=>{p.gold=0;ctx.grantLegendaryCard(p);}},
+  {id:"desperate_trader",cat:"merchant",name:"Desperate Trader",desc:"Convert gold into Soul at a generous rate.",resolve:(p,i,ctx)=>ctx.convertGoldToSoul(p,0.8)},
+  {id:"black_market_smith",cat:"merchant",name:"Black Market Smith",desc:"Pay gold to instantly level up two weapons.",resolve:(p,i,ctx)=>{ctx.offerWeaponLevelForGold(p,150);ctx.offerWeaponLevelForGold(p,150);}},
+  {id:"golden_hoard",cat:"treasure",name:"Golden Hoard",desc:"A large pile of unguarded gold.",resolve:(p,i,ctx)=>ctx.grantGold(p,300)},
+  {id:"hidden_cache",cat:"treasure",name:"Hidden Cache",desc:"Free gold and a guaranteed passive item.",resolve:(p,i,ctx)=>{ctx.grantGold(p,60);ctx.grantRandomPassive(p);}},
+  {id:"crucible_of_flame",cat:"elite_arena",name:"Crucible of Flame",desc:"A burning gauntlet of elites — clear for gold and a passive.",resolve:(p,i,ctx)=>ctx.startArenaWave(p,{count:15,elite:true,rewardGold:250,rewardPassive:true})},
+  {id:"endless_horde",cat:"elite_arena",name:"Endless Horde",desc:"A massive wave rushes in at once.",resolve:(p,i,ctx)=>ctx.startArenaWave(p,{count:25,rewardGold:220})},
+  {id:"the_iron_warden",cat:"mini_boss",name:"The Iron Warden",desc:"A heavily-armored mini-boss appears.",resolve:(p,i,ctx)=>ctx.spawnMiniBoss(p,"thornback",{rewardGold:200})},
+  {id:"phantom_pair",cat:"mini_boss",name:"Phantom Pair",desc:"Two spectral hunters appear together.",resolve:(p,i,ctx)=>{ctx.spawnMiniBoss(p,"phantom_duelist");ctx.spawnMiniBoss(p,"night_hag");}},
+  {id:"gamblers_coin",cat:"risk_reward",name:"Gambler's Coin",desc:"Choice: flip a coin — double your gold, or lose it all.",choice:true,resolve:(p,i,ctx)=>{ if(i!==0) return; if(Math.random()<0.5) p.gold*=2; else p.gold=0; }},
+  {id:"forbidden_tome",cat:"risk_reward",name:"Forbidden Tome",desc:"Choice: -10% max HP for a permanent extra passive slot.",choice:true,resolve:(p,i,ctx)=>{ if(i!==0) return; ctx.applyHpPenalty(p,0.1); p.stats.extraPassiveSlots=(p.stats.extraPassiveSlots||0)+1; }},
+  {id:"shrine_of_greed",cat:"cursed_shrine",name:"Shrine of Greed",desc:"Lose half your current gold, but gold gain is doubled.",resolve:(p,i,ctx)=>{p.gold=Math.floor(p.gold*0.5);p.stats.goldMult*=2;}},
+  {id:"shrine_of_the_swarm",cat:"cursed_shrine",name:"Shrine of the Swarm",desc:"Enemies spawn faster for the rest of the run, but you gain bonus projectiles.",resolve:(p,i,ctx)=>{ctx.applyTemporaryModifier("spawnRate",1.15,Infinity);p.stats.bonusProjectiles=(p.stats.bonusProjectiles||0)+2;}},
 ];
 
 const TALENT_BRANCHES = ["warrior","mage","hunter","survivor"];
@@ -820,7 +891,7 @@ function applyTalentStat(p, statKey, totalPerLevelSum){
     case "aoeRadius": p.stats.aoeRadiusMult=(p.stats.aoeRadiusMult||1)*(1+v); break;
     case "arcaneDmg": p.stats.arcaneDmgMult=(p.stats.arcaneDmgMult||1)*(1+v); break;
     case "critDamage": p.stats.critMult+=v; break;
-    case "critChance": p.stats.critChance=Math.min(0.85,p.stats.critChance+v); break;
+    case "critChance": p.stats.critChance+=v; break;
     case "moveSpeed": p.stats.moveSpeed*=(1+v); break;
     case "pierce": p.stats.bonusPierce=(p.stats.bonusPierce||0)+Math.round(v); break;
     case "range": p.stats.rangeMult=(p.stats.rangeMult||1)*(1+v); break;
@@ -890,20 +961,26 @@ const ACHIEVEMENTS = [
    ========================================================================= */
 const WAVES = [
   {t:0,ids:["slime","bat","rat_swarm"],interval:1.05,mult:1.0},
-  {t:55,ids:["slime","bat","zombie","wolf","spider","mosquito_swarm"],interval:0.82,mult:1.1},
-  {t:130,ids:["zombie","ghost","bat","wraith","spider","skeleton_archer"],interval:0.62,mult:1.3,elite:true,eliteIds:["ogre"],eliteEvery:32},
+  {t:55,ids:["slime","bat","zombie","wolf","spider","mosquito_swarm"],interval:0.82,mult:1.13},
+  {t:130,ids:["zombie","ghost","bat","wraith","spider","skeleton_archer"],interval:0.62,mult:1.25,elite:true,eliteIds:["ogre"],eliteEvery:32},
   {t:220,ids:["zombie","ghost","wraith","harpy","imp","banshee","boar"],interval:0.52,mult:1.5,elite:true,eliteIds:["ogre","shade_elite"],eliteEvery:24,boss:true,bossId:"dragon",bossT:220},
-  {t:310,ids:["ghost","harpy","banshee","boar","frost_sprite"],interval:0.46,mult:1.65,elite:true,eliteIds:["shade_elite","warlord"],eliteEvery:20,boss:true,bossId:"wyvern",bossT:320},
+  {t:310,ids:["ghost","harpy","banshee","boar","frost_sprite"],interval:0.46,mult:1.63,elite:true,eliteIds:["shade_elite","warlord"],eliteEvery:20,boss:true,bossId:"wyvern",bossT:320},
   {t:340,ids:["ghost","witch","harpy","banshee","crypt_crawler","cultist"],interval:0.44,mult:1.75,elite:true,eliteIds:["golem","warlord"],eliteEvery:18,boss:true,bossId:"lich",bossT:420},
   {t:460,ids:["ghost","witch","gargoyle","frost_sprite","myrmidon","tomb_warden"],interval:0.38,mult:2.0,elite:true,eliteIds:["golem","venom_matriarch"],eliteEvery:15,boss:true,bossId:"ancient_tree",bossT:520},
-  {t:600,ids:["revenant","witch","wraith","siren","iron_hound","shadow_stalker"],interval:0.34,mult:2.3,elite:true,eliteIds:["shade_elite","phantom_duelist"],eliteEvery:13},
-  {t:760,ids:["revenant","gargoyle","bog_leech","vulture","screecher","plague_rat"],interval:0.3,mult:2.6,elite:true,eliteIds:["iron_colossus","bloated_horror"],eliteEvery:11,boss:true,bossId:"void_knight",bossT:820},
-  {t:930,ids:["revenant","witch","wraith","tomb_warden","myrmidon"],interval:0.27,mult:3.0,elite:true,eliteIds:["stormcaller_elite","bone_titan"],eliteEvery:10,boss:true,bossId:"machine_god",bossT:1000},
-  {t:1120,ids:["revenant","witch","gargoyle","tomb_warden","crypt_crawler"],interval:0.24,mult:3.4,elite:true,eliteIds:["night_hag","crimson_reaver"],eliteEvery:9,boss:true,bossId:"the_collector",bossT:1200},
-  {t:1320,ids:["revenant","witch","tomb_warden","frost_sprite","siren"],interval:0.22,mult:3.8,elite:true,eliteIds:["glass_wraith","tar_beast"],eliteEvery:8,boss:true,bossId:"frost_queen",bossT:1400},
-  {t:1520,ids:["revenant","witch","tomb_warden","gargoyle"],interval:0.2,mult:4.2,elite:true,eliteIds:["frost_sentinel","blood_priest"],eliteEvery:7,boss:true,bossId:"bloodmoon_alpha",bossT:1620},
-  {t:1720,ids:["revenant","witch","wraith","wolf","iron_hound"],interval:0.18,mult:4.6,elite:true,eliteIds:["warped_ogre","soul_collector"],eliteEvery:6},
-  {t:1900,ids:["revenant","witch","gargoyle","tomb_warden"],interval:0.16,mult:5.0,elite:true,eliteIds:["thornback","abyssal_watcher"],eliteEvery:6,boss:true,bossId:"overlord",bossT:1960},
+  {t:600,ids:["revenant","witch","wraith","siren","iron_hound","shadow_stalker"],interval:0.34,mult:2.25,elite:true,eliteIds:["shade_elite","phantom_duelist"],eliteEvery:13},
+  {t:760,ids:["revenant","gargoyle","bog_leech","vulture","screecher","plague_rat"],interval:0.3,mult:2.5,elite:true,eliteIds:["iron_colossus","bloated_horror"],eliteEvery:11,boss:true,bossId:"void_knight",bossT:820},
+  {t:930,ids:["revenant","witch","wraith","tomb_warden","myrmidon"],interval:0.27,mult:2.75,elite:true,eliteIds:["stormcaller_elite","bone_titan"],eliteEvery:10,boss:true,bossId:"machine_god",bossT:1000},
+  {t:1120,ids:["revenant","witch","gargoyle","tomb_warden","crypt_crawler"],interval:0.24,mult:3.0,elite:true,eliteIds:["night_hag","crimson_reaver"],eliteEvery:9,boss:true,bossId:"the_collector",bossT:1180},
+  // This wave's roster (tomb_warden/frost_sprite/siren) averages lower raw dmg than
+  // the previous wave's, so mult is nudged up slightly to keep per-wave threat
+  // strictly increasing despite the lighter roster.
+  {t:1320,ids:["revenant","witch","tomb_warden","frost_sprite","siren"],interval:0.22,mult:3.25,elite:true,eliteIds:["glass_wraith","tar_beast"],eliteEvery:8,boss:true,bossId:"frost_queen",bossT:1400},
+  {t:1520,ids:["revenant","witch","tomb_warden","gargoyle"],interval:0.2,mult:3.5,elite:true,eliteIds:["frost_sentinel","blood_priest"],eliteEvery:7,boss:true,bossId:"bloodmoon_alpha",bossT:1620},
+  // This wave's roster (wraith/wolf/iron_hound) averages lower raw dmg and mult is
+  // already near ENEMY_DMG_SCALE_CAP, so a tighter spawn interval (not a higher
+  // mult) is what keeps threat increasing here.
+  {t:1720,ids:["revenant","witch","wraith","wolf","iron_hound"],interval:0.155,mult:3.75,elite:true,eliteIds:["warped_ogre","soul_collector"],eliteEvery:6},
+  {t:1900,ids:["revenant","witch","gargoyle","tomb_warden"],interval:0.16,mult:4.0,elite:true,eliteIds:["thornback","abyssal_watcher"],eliteEvery:6,boss:true,bossId:"overlord",bossT:1960},
 ];
 // Post-Overlord "Keep Playing" endless scaling: after the last authored wave entry,
 // `wave.mult`/spawn interval no longer advance on their own (fixed at their final
@@ -922,6 +999,144 @@ const BOSS_INTROS = {
   ancient_tree:"★ THE ANCIENT TREE AWAKENS ★", void_knight:"★ THE VOID KNIGHT MANIFESTS ★", machine_god:"★ THE MACHINE GOD ACTIVATES ★",
   the_collector:"★ THE COLLECTOR ARRIVES ★", frost_queen:"★ THE FROST QUEEN DESCENDS ★", bloodmoon_alpha:"★ BLOODMOON ALPHA HOWLS ★",
 };
+
+/* =========================================================================
+   BALANCE MODEL — single source of truth for "how strong should the player
+   be vs. the enemies at any point in a run." Every other balance knob in this
+   file (weapon numbers, enemy numbers, wave density, the global nerf/buff
+   multipliers, the XP curve) is derived from or checked against this instead
+   of being an independently hand-picked constant.
+
+   playerCP/enemyPressure are deliberately NOT surfaced anywhere in the UI —
+   they're an analytical figure, not a displayed stat, purely for external
+   tooling to replay "what's the CP ratio at minute N" against these tables.
+   Sits here (before PART 5's canvas/DOM setup) so that tooling can extract
+   just this section without pulling in any DOM code.
+
+   softMult/effDmgMult/effAtkSpeedMult/effGoldMult/effXpMult/
+   elementalMultForTags also live here — playerCP() needs to run them against
+   a hypothetical stats object, not just the live player, so they take an
+   optional `stats` param (defaults to the live player). ========================================================================= */
+
+/* ---- Diminishing returns ---------------------------------------------------
+   STAT_CAPS (see PART 9) is only a NaN/Infinity guard, not a balance tool, so
+   every multiplicative source used to compound without limit. These curves
+   keep the first few upgrades fully linear and then soften anything beyond
+   `softStart` toward an asymptote, so a long run keeps improving without the
+   DPS/economy snowball outrunning the enemy power curve. */
+function softMult(v, softStart, k){
+  if(typeof v!=="number" || !isFinite(v)) return softStart;
+  if(v<=softStart) return v;
+  const over = v - softStart;
+  return softStart + (over/(1+over/k));
+}
+// Asymptotes tuned so a strong late-run kill-rate/XP/card-pick feedback loop
+// plateaus instead of snowballing past the target CP ratio.
+function effDmgMult(stats){ return softMult((stats||player.stats).dmgMult, 1.9, 3.2); }
+function effAtkSpeedMult(stats){ return softMult((stats||player.stats).atkSpeedMult, 1.5, 0.9); }
+function effGoldMult(stats){ return softMult((stats||player.stats).goldMult||1, 2.5, 2.5); }
+function effXpMult(stats){ return softMult((stats||player.stats).xpMult||1, 2.5, 2.5); }
+function elementalMultForTags(tags, stats){
+  stats = stats || player.stats;
+  let m=1;
+  if(tags.includes("fire")) m*=stats.fireMult;
+  if(tags.includes("frost")) m*=stats.frostMult;
+  if(tags.includes("lightning")) m*=stats.lightningMult;
+  if(tags.includes("poison")) m*=stats.poisonMult;
+  if(tags.includes("holy")) m*=stats.holyMult;
+  return m;
+}
+
+// Player Combat Power: relative offensive output for one weapon at a given
+// level/stats/evolution state — a flat multi-target factor stands in for AoE/
+// chain hitting several enemies at once, so this is a relative power figure
+// for tuning, not a promise of exact in-game damage-per-second.
+// projectilePerHitMult is shared with the real weaponFire() projectile branch
+// so both stay in sync automatically.
+const CP_MULTI_TARGET_FACTOR = 2.2; // area/trap/chain AoE hitting several enemies at once
+const CP_CHAIN_JUMP_FACTOR = 0.6;   // extra effective targets per chain jump
+// Per-projectile damage multiplier as projectile count rises: count=1 is 100%,
+// count=5 is ~70% each (350 total, not 500) — floored at 40% so extreme
+// bonusProjectiles stacking is heavily diminished, never zeroed.
+function projectilePerHitMult(count){
+  if(count<=1) return 1;
+  return Math.max(0.4, 1 - 0.075*(count-1));
+}
+function weaponCP(def, level, stats, evolved){
+  const dmgMult = effDmgMult(stats) * elementalMultForTags(def.tags||[], stats) * (evolved?(def.evoDmgMult||1.7):1);
+  const critFactor = 1 + (stats.critChance||0)*((stats.critMult||1.65)-1);
+  const cdMult = Math.max(stats.cdrFloor||0.35, (stats.cdrMult||1)/effAtkSpeedMult(stats)) * (evolved?(def.evoCdMult||0.8):1);
+  switch(def.type){
+    case "melee":{ const dmg=(def.base.dmg+(def.perLevel.dmg||0)*(level-1))*dmgMult; const cd=def.base.cd*cdMult; return dmg/cd*critFactor; }
+    case "projectile":{
+      const count=Math.max(1,Math.round(def.base.count+(def.perLevel.count||0)*(level-1)))+(stats.bonusProjectiles||0);
+      const dmg=(def.base.dmg+(def.perLevel.dmg||0)*(level-1))*dmgMult; const cd=def.base.cd*cdMult;
+      return dmg*count*projectilePerHitMult(count)/cd*critFactor;
+    }
+    case "beam":{ const dps=(def.base.dps+(def.perLevel.dps||0)*(level-1))*dmgMult; return dps*critFactor; }
+    case "area": case "trap":{ const dmg=(def.base.dmg+(def.perLevel.dmg||0)*(level-1))*dmgMult; const cd=def.base.cd*cdMult; return dmg/cd*critFactor*CP_MULTI_TARGET_FACTOR; }
+    case "chain":{ const dmg=(def.base.dmg+(def.perLevel.dmg||0)*(level-1))*dmgMult; const cd=def.base.cd*cdMult; const jumps=Math.round(def.base.jumps+(def.perLevel.jumps||0)*(level-1)); return dmg*(1+jumps*CP_CHAIN_JUMP_FACTOR)/cd*critFactor; }
+    case "summon":{ const maxM=Math.round((def.base.maxMinions+(def.perLevel.maxMinions||0)*(level-1))*(stats.summonCountMult||1)); const dmg=(def.base.minionDmg+(def.perLevel.minionDmg||0)*(level-1))*(stats.summonDmgMult||1); return dmg*maxM/0.7; }
+    default: return 0; // aura weapons (holy/thorn) — support, not counted as offense
+  }
+}
+function playerCP(p){
+  let total=0;
+  for(const wid of Object.keys(p.weapons)){
+    const def = (p.evolvedWeapons&&p.evolvedWeapons[wid]) || WEAPONS[wid]; if(!def) continue;
+    total += weaponCP(def, p.weapons[wid], p.stats, !!(p.evolvedWeapons&&p.evolvedWeapons[wid]));
+  }
+  // Same capped-momentum/berserk/turret multipliers dealDamage() applies (PART 7) —
+  // kept in sync here so playerCP doesn't understate a build that leans on them.
+  if(p.momentumStacks) total *= (1+(p.stats.momentumPerKill||0)*Math.min(p.momentumStacks,400));
+  if(p.stats.berserkScaling && p.maxHp) total *= (1+p.stats.berserkScaling*(100*(1-p.hp/p.maxHp)));
+  if(p.stats.turretMode) total *= 1.1; // playerCP has no notion of "standing still" — assume partial uptime
+  return total;
+}
+// Enemy Pressure: required kill-throughput (HP/sec) a playerCP of the same
+// magnitude would need to match to keep the fight "even" — avgHp scaled by
+// wave density (1/interval).
+function enemyPressure(wave){
+  const list = wave.ids.map(id=>ENEMIES[id]).filter(Boolean); if(!list.length) return 1;
+  const avgHp = list.reduce((s,e)=>s+e.hp,0)/list.length * wave.mult;
+  return avgHp / wave.interval;
+}
+// Target Player-CP / Enemy-Pressure ratio at each wave's start time. Starts at
+// parity (no early steamroll), climbs through the power-fantasy window,
+// compresses back down for the final boss and stays tight through Endless.
+const TARGET_CP_RATIO = [
+  {t:0,    ratio:1.00}, {t:55,   ratio:1.05}, {t:130,  ratio:1.15}, {t:220,  ratio:1.30},
+  {t:310,  ratio:1.40}, {t:340,  ratio:1.45}, {t:460,  ratio:1.55}, {t:600,  ratio:1.65},
+  {t:760,  ratio:1.75}, {t:930,  ratio:1.80}, {t:1120, ratio:1.70}, {t:1320, ratio:1.55},
+  {t:1520, ratio:1.40}, {t:1720, ratio:1.25}, {t:1900, ratio:1.15},
+];
+function targetCPRatioAt(t){
+  let r = TARGET_CP_RATIO[0].ratio;
+  for(const kf of TARGET_CP_RATIO){ if(t>=kf.t) r=kf.ratio; else break; }
+  return r;
+}
+// XP curve: replaces the old xpNext = 10*1.16^(level-1) (pure exponential —
+// individually CHEAP at low levels, which combined with fast early kill rate
+// is why a fresh run hit level ~17 by the 0:55 wave transition).
+//
+// Base "wave-pressure" incoming damage is completely unmitigated until the
+// player draws a defensive card (armor/regen/lifesteal all start at 0), so
+// the curve below level 30 must stay fast enough that most runs get several
+// early level-ups — a slower curve here starves everyone of a shot at a
+// defensive pick before chip damage kills them, regardless of how the rest
+// of the curve is tuned. Steepens sharply past level 30 so an endless run
+// can't rack up thousands of levels in minutes once the infinitely-stackable
+// "Ascendant" cards (PART 1) take over — those apply multiplicatively, so
+// unchecked level growth pushes raw stats past effDmgMult()'s soft-cap
+// asymptote almost immediately and DPS stops climbing for the rest of the
+// run. Shared with balance-lab.html's gainXp() so both stay on this curve.
+const XP_CURVE_BREAKPOINT_LEVEL = 30;
+const XP_CURVE_LATE_EXPONENT = 2.6;
+function xpForLevel(level){
+  if(level<=XP_CURVE_BREAKPOINT_LEVEL) return Math.round(6*Math.pow(level,1.05));
+  const atBreakpoint = 6*Math.pow(XP_CURVE_BREAKPOINT_LEVEL,1.05);
+  return Math.round(atBreakpoint*Math.pow(level/XP_CURVE_BREAKPOINT_LEVEL, XP_CURVE_LATE_EXPONENT));
+}
 
 /* =========================================================================
    PART 4 — SAVE / META STATE
@@ -946,6 +1161,11 @@ const ARMORY_ITEMS = [
   {id:"artifact_start_gold",name:"Adventurer's Purse",icon:"👛",desc:"Start each run with 40 bonus gold per level.",cost:2,maxLevel:5,apply:(p,lvl)=>{p.gold+=40*lvl;}},
   {id:"artifact_slot",name:"Void Satchel",icon:"🎒",desc:"+1 weapon slot per level.",cost:8,maxLevel:2,apply:(p,lvl)=>{p.extraWeaponSlots=(p.extraWeaponSlots||0)+lvl;}},
   {id:"artifact_range",name:"Farseer's Lens",icon:"🔭",desc:"+8% attack range per level (camera adjusts automatically).",cost:5,maxLevel:4,apply:(p,lvl)=>{p.stats.rangeMult=(p.stats.rangeMult||1)*(1+0.08*lvl);}},
+  {id:"artifact_crit",name:"Assassin's Signet",icon:"🗡️",desc:"+3% crit chance per level.",cost:4,maxLevel:4,apply:(p,lvl)=>{p.stats.critChance+=0.03*lvl;}},
+  {id:"artifact_armor",name:"Bulwark Sigil",icon:"🔰",desc:"+1 flat armor per level.",cost:3,maxLevel:5,apply:(p,lvl)=>{p.stats.armor+=1*lvl;}},
+  {id:"artifact_xp",name:"Scholar's Tome",icon:"📖",desc:"+8% XP gained per level.",cost:4,maxLevel:4,apply:(p,lvl)=>{p.stats.xpMult=(p.stats.xpMult||1)*(1+0.08*lvl);}},
+  {id:"artifact_speed",name:"Windwalker Boots",icon:"👢",desc:"+4% move speed per level.",cost:3,maxLevel:4,apply:(p,lvl)=>{p.stats.moveSpeed*=(1+0.04*lvl);}},
+  {id:"artifact_passive_slot",name:"Reliquary Frame",icon:"🗃️",desc:"+1 passive slot per level.",cost:9,maxLevel:2,apply:(p,lvl)=>{p.stats.extraPassiveSlots=(p.stats.extraPassiveSlots||0)+lvl;}},
 ];
 function armoryLevel(id){ return (save.armoryUnlocks && save.armoryUnlocks[id]) || 0; }
 function armoryCost(item, currentLevel){ return Math.ceil(item.cost*Math.pow(1.6,currentLevel)); }
@@ -1056,7 +1276,7 @@ function freshStats(){
 function newPlayer(characterId){
   const character = CHARACTERS.find(c=>c.id===characterId) || CHARACTERS[0];
   const p = {
-    x:WORLD.w/2, y:WORLD.h/2, radius:15, hp:100, maxHp:100, level:1, xp:0, xpNext:10,
+    x:WORLD.w/2, y:WORLD.h/2, radius:15, hp:100, maxHp:100, level:1, xp:0, xpNext:xpForLevel(1),
     gold:0, crystals:0, weapons:{}, weaponTimers:{}, stats:freshStats(),
     passives:[], cardsTaken:[], synergiesActive:[], shopPurchases:{}, hasRevive:false, extraWeaponSlots:0,
     disabledWeapons:{}, shield:0, character:characterId, momentumStacks:0,
@@ -1112,36 +1332,14 @@ function nearestEnemy(x,y,maxD){
 }
 function weaponRange(base){ return base*(player.stats.rangeMult||1); }
 function weaponRadius(base){ return base*(player.stats.aoeRadiusMult||1); }
-function elementalMultForTags(tags){
-  let m=1;
-  if(tags.includes("fire")) m*=player.stats.fireMult;
-  if(tags.includes("frost")) m*=player.stats.frostMult;
-  if(tags.includes("lightning")) m*=player.stats.lightningMult;
-  if(tags.includes("poison")) m*=player.stats.poisonMult;
-  if(tags.includes("holy")) m*=player.stats.holyMult;
-  return m;
-}
 function weaponDef(wid){
   return player.evolvedWeapons && player.evolvedWeapons[wid] ? player.evolvedWeapons[wid] : WEAPONS[wid];
 }
 function weaponEvo(wid){ const d=weaponDef(wid); return (d && d.evoId) ? d.evoId : null; }
-
-/* ---- Diminishing returns ---------------------------------------------------
-   STAT_CAPS are only a NaN/Infinity guard, not a balance tool, so every
-   multiplicative source used to compound without limit. These curves keep the
-   first few upgrades fully linear and then soften anything beyond `softStart`
-   toward an asymptote, so a long run keeps improving without the DPS/economy
-   snowball outrunning the enemy power curve. */
-function softMult(v, softStart, k){
-  if(typeof v!=="number" || !isFinite(v)) return softStart;
-  if(v<=softStart) return v;
-  const over = v - softStart;
-  return softStart + (over/(1+over/k));
-}
-function effDmgMult(){ return softMult(player.stats.dmgMult, 2.4, 5.5); }        // was (3,7) — lower ceiling, softer scaling: player nerf
-function effAtkSpeedMult(){ return softMult(player.stats.atkSpeedMult, 1.7, 1.3); } // was (2,1.6)
-function effGoldMult(){ return softMult(player.stats.goldMult||1, 2.5, 2.5); }
-function effXpMult(){ return softMult(player.stats.xpMult||1, 2.5, 2.5); }
+// softMult/effDmgMult/effAtkSpeedMult/effGoldMult/effXpMult/elementalMultForTags
+// now live in the BALANCE MODEL section (end of PART 3, before PART 4) alongside
+// playerCP/enemyPressure, which need the exact same formulas to analyze a
+// hypothetical build instead of only the live player — see that section for why.
 // area / beam / aura / chain / trap weapons are the "arcane" family the mage
 // Ley Attunement talent boosts (previously a dead stat).
 const ARCANE_TYPES = new Set(["area","beam","aura","chain","trap"]);
@@ -1325,7 +1523,9 @@ function weaponFire(wid, lvl, dt){
     const target = nearestEnemy(player.x,player.y,weaponRange(def.base.searchRadius||420));
     if(!target) return;
     const count = Math.max(1,Math.round(def.base.count+(def.perLevel.count||0)*(lvl-1))+(player.stats.bonusProjectiles||0));
-    const dmg = (def.base.dmg+(def.perLevel.dmg||0)*(lvl-1))*dmgMult;
+    // Per-projectile damage falls as count rises instead of extra projectiles being
+    // a pure, uncapped ×count multiplier — see projectilePerHitMult() (BALANCE MODEL).
+    const dmg = (def.base.dmg+(def.perLevel.dmg||0)*(lvl-1))*dmgMult*projectilePerHitMult(count);
     // Void Sniper: infinite pierce (already applied to base.pierce=99 at evolution time) + guaranteed crit.
     // World Ender: always crits and detonates (small AoE) on impact.
     const forceCrit = evo==="void_sniper" || evo==="world_ender";
@@ -1399,14 +1599,12 @@ function performEvolution(wid){
   const evo = EVOLUTIONS[evoId];
   const base = WEAPONS[wid];
   player.evolvedWeapons = player.evolvedWeapons||{};
-  // FIX: previously this baked a flat *1.7 into base.base.dmg (the level-1 base),
-  // which barely moved the needle once perLevel scaling from 7 extra levels was
-  // added on top (~+19% real damage instead of the advertised +70%). evoDmgMult/
-  // evoCdMult are read directly by weaponFire()'s dmgMult/cdMult calculations,
-  // so they correctly multiply the *current, fully-leveled* damage/cooldown.
-  // evoId is also now actually stored on the evolved def — several evolutions
-  // (Quantum Beam / Kaleidoscope / Void Sniper / World Ender / etc.) check for
-  // it to trigger their unique behavior in weaponFire/dealDamage.
+  // evoDmgMult/evoCdMult are read directly by weaponFire()'s dmgMult/cdMult
+  // calculations, so they multiply the *current, fully-leveled* damage/cooldown —
+  // baking the multiplier into base.base.dmg instead would barely move the needle
+  // once perLevel scaling from extra levels is added on top. evoId is stored on
+  // the evolved def since several evolutions (Quantum Beam / Kaleidoscope / Void
+  // Sniper / World Ender / etc.) check for it to trigger unique behavior.
   player.evolvedWeapons[wid] = Object.assign({}, base, { name:evo.name, icon:evo.icon, evolved:true, evoId:evoId,
     base: Object.assign({}, base.base, { pierce:99 }),
     evoDmgMult:1.7, evoCdMult: (evoId==="annihilator") ? 0.35 : 0.8 });
@@ -1502,7 +1700,10 @@ function dealDamage(enemy, dmg, weaponId){
     if(enemy.slowed) dmg *= (player.stats.dmgToSlowedMult||1);
     if(enemy.hp/enemy.maxHp < 0.2) dmg *= (1+(player.stats.executeBonus||0));
     if(player.stats.berserkScaling) dmg *= (1 + player.stats.berserkScaling*(100*(1-player.hp/player.maxHp)));
-    if(player.momentumStacks) dmg *= (1+(player.stats.momentumPerKill||0)*player.momentumStacks);
+    // Capped at 400 stacks (max +5x at momentumPerKill's single-pick 0.01) — without
+    // this, kill counts in the thousands over a long/endless run give Momentum a
+    // completely unbounded damage multiplier.
+    if(player.momentumStacks) dmg *= (1+(player.stats.momentumPerKill||0)*Math.min(player.momentumStacks,400));
     if(player.stats.turretMode && (touchVec.x===0&&touchVec.y===0) && !keys['w']&&!keys['a']&&!keys['s']&&!keys['d']) dmg *= 1.2;
     let forcedCrit=false;
     if(weaponId){ const wdef=weaponDef(weaponId); if(wdef && wdef.evoId && (wdef.evoId==="void_sniper"||wdef.evoId==="world_ender")) forcedCrit=true; }
@@ -1559,9 +1760,6 @@ function killEnemy(enemy){
   if(enemy.elite && Math.random()<0.35){ orbs.push({type:"crystal",x:enemy.x+rand(-8,8),y:enemy.y-rand(4,10),value:Math.ceil(enemy.gold*0.4),radius:5}); }
   if(enemy.elite && Math.random()<0.15){ orbs.push({type:"passive",x:enemy.x,y:enemy.y-16,radius:7}); }
   if(enemy.boss){ orbs.push({type:"passive",x:enemy.x,y:enemy.y-16,radius:8}); player.crystals += 40; }
-  // FIX: event rewards attached to a spawned enemy (_treasureGold from Ancient Vault,
-  // _miniBossReward from the 5 mini_boss events) were set but never read anywhere —
-  // the player fought a buffed enemy for a reward that could never be granted.
   if(enemy._treasureGold){ player.gold += enemy._treasureGold; logEvent(`The guardian falls — ${enemy._treasureGold} gold spills out!`); }
   if(enemy._miniBossReward){
     const r = enemy._miniBossReward;
@@ -1662,7 +1860,7 @@ function spawnEnemy(id, forcedPos, overrides={}){
   const radiusMult = overrides.radiusMult!=null?overrides.radiusMult:1;
   const e = resetEnemyFields(acquireEnemyObject());
   Object.assign(e, { id, name:def.name, x,y, hp:def.hp*scale*hpMult, maxHp:def.hp*scale*hpMult, speed:def.speed,
-    radius:def.radius*radiusMult, dmg:def.dmg*Math.min(scale,2.4), xp:def.xp, gold:def.gold, brain:def.brain,
+    radius:def.radius*radiusMult, dmg:def.dmg*Math.min(scale,ENEMY_DMG_SCALE_CAP), xp:def.xp, gold:def.gold, brain:def.brain,
     color:def.color, glow:def.glow, elite:!!def.elite, boss:false, special:def.special||null,
     isSplit:!!overrides.isSplit, atkCd:0, shootCd:rand(0,1), hitFlash:0,
     chargeCd:rand(1,2.4), chargeState:"idle", chargeDx:0, chargeDy:0, summonCd:rand(2.5,4), swarmPhase:rand(0,Math.PI*2), shield:0,
@@ -1672,20 +1870,27 @@ function spawnEnemy(id, forcedPos, overrides={}){
 function spawnBoss(bossDefId, forcedPos){
   const def = BOSS_ROSTER[bossDefId]; if(!def) return null;
   const wave = currentWave(); const scale = wave.mult*0.85;
+  // HP floor sized directly off the player's real current Combat Power
+  // (BALANCE MODEL's playerCP()) instead of wave.mult alone — wave.mult is
+  // deliberately kept modest so it doesn't also bloat normal-enemy HP, but a
+  // late-game player's real DPS compounds far past what wave.mult implies.
+  // Sizing off playerCP tracks whatever the player's build actually does, so
+  // every boss fight stays roughly BOSS_TARGET_FIGHT_SECONDS long.
+  const cpHp = Math.max(1, playerCP(player)) * BOSS_TARGET_FIGHT_SECONDS;
+  const hp = Math.max(def.hp*scale, cpHp);
   let x,y;
   if(forcedPos){x=forcedPos.x;y=forcedPos.y;} else { const ang=rand(0,Math.PI*2); const r=offscreenSpawnRadius(140); x=clamp(player.x+Math.cos(ang)*r,40,WORLD.w-40); y=clamp(player.y+Math.sin(ang)*r,40,WORLD.h-40); }
   const e = resetEnemyFields(acquireEnemyObject());
-  Object.assign(e, { id:bossDefId, bossDefId, name:def.name, x,y, hp:def.hp*scale, maxHp:def.hp*scale, speed:def.speed, radius:def.radius,
-    dmg:def.dmg*Math.min(scale,3), xp:def.hp/13, gold:def.hp/25, brain:"phaseboss", color:def.color, glow:def.glow,
+  Object.assign(e, { id:bossDefId, bossDefId, name:def.name, x,y, hp, maxHp:hp, speed:def.speed, radius:def.radius,
+    dmg:def.dmg*Math.min(scale,3), xp:def.rawHp/13, gold:def.rawHp/25, brain:"phaseboss", color:def.color, glow:def.glow,
     elite:false, boss:true, isSplit:false, atkCd:0, shootCd:0, hitFlash:0, chargeCd:1.5, chargeState:"idle", chargeDx:0,chargeDy:0,
     shield:0, aiTimer:0 });
   enemies.push(e); return e;
 }
 const MAX_ENEMIES = 1200; // hard ceiling; dynamicMaxEnemies() further scales this down per the (now separate) enemy-density setting
-// FIX: enemy density used to be tied 1:1 to graphics `quality`, so lowering
-// particle/glow detail for performance silently thinned out the game's difficulty
-// too. `enemyDensity` is now its own setting (Settings > Video > Enemy Density),
-// independent from `quality`; dynamicMaxEnemies() reads the density setting only.
+// enemyDensity is a separate setting from graphics `quality` (Settings > Video >
+// Enemy Density) — lowering particle/glow detail for performance shouldn't also
+// thin out difficulty, so dynamicMaxEnemies() reads only the density setting.
 function dynamicMaxEnemies(){ return enemyDensity==='low' ? 400 : enemyDensity==='medium' ? 800 : MAX_ENEMIES; }
 const AI_TICK_INTERVAL = 0.2; // normal enemies re-run their brain logic ~5x/sec instead of 60x/sec; elites/bosses are exempt
 const BOSS_WARNING_LEAD = 4;
@@ -2106,10 +2311,6 @@ function damagePlayer(amount){
     SFX.hurt(); vibrate(30);
   }
   if(player.hp<=0 && state==='playing'){
-    // FIX: reviveChance (Undying talent) used to be written but never read anywhere —
-    // revive was purely a boolean flag (hasRevive) from cards/passives/shop. Undying
-    // now gives a real per-death chance to trigger an emergency revive even without
-    // hasRevive being set, on top of any guaranteed revive sources.
     if((player.stats.deathDefianceCharges||0)>0){ player.stats.deathDefianceCharges--; player.hp=1; player.stats.dmgMult*=2; setTimeout(()=>player.stats.dmgMult/=2,3000); logEvent("Death defied!"); return; }
     if(player.hasRevive){ player.hasRevive=false; player.hp=Math.floor(player.maxHp*0.5); player.gold=0; logEvent("☥ REBORN! Gold reset to 0."); SFX.levelup(); vibrate([0,50,50,50]); return; }
     if((player.stats.reviveChance||0)>0 && Math.random()<player.stats.reviveChance){ player.hp=Math.floor(player.maxHp*0.4); logEvent("Undying talent triggers — you cling to life!"); SFX.levelup(); vibrate([0,50,50,50]); return; }
@@ -2132,7 +2333,7 @@ function updateOrbs(dt){
 }
 function gainXp(v){
   player.xp += v*effXpMult();
-  while(player.xp>=player.xpNext){ player.xp-=player.xpNext; player.level++; player.xpNext=Math.round(10*Math.pow(1.16,player.level-1));
+  while(player.xp>=player.xpNext){ player.xp-=player.xpNext; player.level++; player.xpNext=xpForLevel(player.level);
     if(player.stats.healOnLevelUp) player.hp=Math.min(player.maxHp,player.hp+player.maxHp*player.stats.healOnLevelUp);
     openLevelUp(); }
 }
@@ -2145,11 +2346,8 @@ function buildCardPool(){
     if(!player.weapons[wid]){ if(Object.keys(player.weapons).length<maxWeaponSlots(player)) pool.push({kind:"unlock",wid}); }
     else if(player.weapons[wid]<WEAPONS[wid].maxLevel) pool.push({kind:"levelup",wid});
   }
-  // FIX: this used to push every card in CARDS unconditionally, so a one-shot card
-  // like Glass Cannon or a legendary like Ascendant Soul could be offered — and taken —
-  // an unlimited number of times per run, since nothing here ever checked what the
-  // player already has. Non-stackable cards are now excluded once taken; stackable
-  // cards are excluded once they hit their own maxStacks.
+  // Non-stackable cards are excluded once taken; stackable cards are excluded once
+  // they hit their own maxStacks.
   for(const c of CARDS){
     const takenCount = player.cardsTaken.filter(id=>id===c.id).length;
     if(c.stackable){ if(takenCount < (c.maxStacks||99)) pool.push({kind:"card",card:c}); }
@@ -2157,13 +2355,27 @@ function buildCardPool(){
   }
   return pool;
 }
+// luck (0..1, from Lucky Charm/Fortune's Coin) shifts share away from common
+// toward the other three tiers, proportional to their own base weight, so the
+// total always still sums to 100.
+const RARITY_BASE_WEIGHT = {common:60, uncommon:25, rare:10, legendary:5};
+function rarityWeight(rarity, luck){
+  luck = clamp(luck||0, 0, 1);
+  const base = RARITY_BASE_WEIGHT[rarity] || RARITY_BASE_WEIGHT.common;
+  if(rarity==="common") return base*(1-0.6*luck);
+  const pool = RARITY_BASE_WEIGHT.uncommon+RARITY_BASE_WEIGHT.rare+RARITY_BASE_WEIGHT.legendary;
+  const given = RARITY_BASE_WEIGHT.common*0.6*luck;
+  return base + given*(base/pool);
+}
+function entryRarity(entry){ return entry.kind==="card" ? (entry.card.rarity||"common") : "common"; }
 function weightedPick(pool,n){
   const luck = player.stats.luck||0;
   const copy = pool.slice(); const out=[];
   for(let i=0;i<n && copy.length;i++){
-    let idx;
-    if(Math.random()<luck){ const legendaryIdx = copy.findIndex(x=>x.kind==="card"&&x.card.cat==="legendary"); idx = legendaryIdx>=0?legendaryIdx:(Math.random()*copy.length)|0; }
-    else idx=(Math.random()*copy.length)|0;
+    const weights = copy.map(entry=>rarityWeight(entryRarity(entry), luck));
+    const total = weights.reduce((a,b)=>a+b,0);
+    let r = Math.random()*total, idx=0;
+    for(;idx<weights.length-1;idx++){ if(r<weights[idx]) break; r-=weights[idx]; }
     out.push(copy.splice(idx,1)[0]);
   }
   return out;
@@ -2188,40 +2400,71 @@ function showLevelUpCards(){
   const pool = buildCardPool();
   let n = 3;
   // Reroll Gremlin charges: each spent charge upgrades one level-up to offer a 4th
-  // (better-odds) option instead of doing nothing, fixing the previously-dead
-  // rerollCharges counter from the "Reroll Gremlin" event.
+  // (better-odds) option instead.
   if(rerollCharges>0){ rerollCharges--; n=4; logEvent("Reroll charge used — extra option offered."); }
-  const choices = weightedPick(pool,n);
+  // 1 of the n offers is guaranteed useful — a level-up on a weapon the player
+  // already owns, always a straightforward power increase, unlike a random card
+  // that may not fit the build — before the rest are filled by weighted-random
+  // rarity pick. Falls back to pure random if there's no levelup available.
+  const choices = [];
+  const levelups = pool.filter(e=>e.kind==="levelup");
+  if(levelups.length){
+    const guaranteed = levelups[(Math.random()*levelups.length)|0];
+    choices.push(guaranteed);
+    const rest = pool.filter(e=>e!==guaranteed);
+    choices.push(...weightedPick(rest, n-1));
+  } else {
+    choices.push(...weightedPick(pool, n));
+  }
   const wrap=document.getElementById('cardsWrap'); wrap.innerHTML="";
   choices.forEach(entry=>wrap.appendChild(renderCardEl(entry)));
   show('screen-levelup');
 }
 
+// growth (default 1 = flat) compounds cost per purchase already made this run —
+// (cost * growth^purchased) — so repeat-buying the same item isn't flat-priced
+// forever. Gold income in a run is extremely bimodal: most runs die early with
+// gold still low, but a surviving/snowballing build's gold compounds into the
+// millions by late game — the cheap tier below is priced for a typical
+// early/mid run, the expensive tier gives a swimming-in-gold late build
+// something worth spending it on instead of it just piling up unused.
 const SHOP_ITEMS = [
-  {id:"shop_heal",name:"Health Potion",icon:"🧪",desc:"Restore 40% of Max HP.",cost:50,curr:"gold",max:99,apply:p=>{p.hp=Math.min(p.maxHp,p.hp+p.maxHp*0.4);}},
-  {id:"shop_maxhp",name:"Vitality Elixir",icon:"❤️",desc:"+25 Max HP and heal to full.",cost:120,curr:"gold",max:5,apply:p=>{p.maxHp+=25;p.hp=p.maxHp;}},
-  {id:"shop_dmg",name:"Sharpening Stone",icon:"⚔️",desc:"+12% Damage multiplier.",cost:150,curr:"gold",max:5,apply:p=>{p.stats.dmgMult+=0.12;}},
-  {id:"shop_atkspd",name:"Haste Rune",icon:"⚡",desc:"+12% Attack Speed.",cost:150,curr:"gold",max:5,apply:p=>{p.stats.atkSpeedMult+=0.12;}},
-  {id:"shop_armor",name:"Iron Plating",icon:"🛡️",desc:"+2 Flat Armor.",cost:200,curr:"gold",max:5,apply:p=>{p.stats.armor+=2;}},
-  {id:"shop_regen",name:"Regen Charm",icon:"✚",desc:"+1.0 HP regen/s.",cost:180,curr:"gold",max:5,apply:p=>{p.stats.regen+=1.0;}},
+  {id:"shop_heal",name:"Health Potion",icon:"🧪",desc:"Restore 40% of Max HP.",cost:50,growth:1.15,curr:"gold",max:99,apply:p=>{p.hp=Math.min(p.maxHp,p.hp+p.maxHp*0.4);}},
+  {id:"shop_maxhp",name:"Vitality Elixir",icon:"❤️",desc:"+25 Max HP and heal to full.",cost:120,growth:1.4,curr:"gold",max:5,apply:p=>{p.maxHp+=25;p.hp=p.maxHp;}},
+  {id:"shop_dmg",name:"Sharpening Stone",icon:"⚔️",desc:"+12% Damage multiplier.",cost:150,growth:1.4,curr:"gold",max:5,apply:p=>{p.stats.dmgMult+=0.12;}},
+  {id:"shop_atkspd",name:"Haste Rune",icon:"⚡",desc:"+12% Attack Speed.",cost:150,growth:1.4,curr:"gold",max:5,apply:p=>{p.stats.atkSpeedMult+=0.12;}},
+  {id:"shop_armor",name:"Iron Plating",icon:"🛡️",desc:"+2 Flat Armor.",cost:200,growth:1.4,curr:"gold",max:5,apply:p=>{p.stats.armor+=2;}},
+  {id:"shop_regen",name:"Regen Charm",icon:"✚",desc:"+1.0 HP regen/s.",cost:180,growth:1.4,curr:"gold",max:5,apply:p=>{p.stats.regen+=1.0;}},
+  {id:"shop_lifesteal",name:"Crimson Vial",icon:"🩸",desc:"+2% Lifesteal.",cost:220,growth:1.4,curr:"gold",max:4,apply:p=>{p.stats.lifesteal+=0.02;}},
+  {id:"shop_pickup",name:"Magnet Coil",icon:"🧲",desc:"+20% Pickup radius.",cost:130,growth:1.3,curr:"gold",max:4,apply:p=>{p.stats.pickupRadius*=1.2;}},
   {id:"shop_revive",name:"Ankh of Rebirth",icon:"☥",desc:"Revive at 50% HP once. Gold resets.",cost:600,curr:"gold",max:1,apply:p=>{p.hasRevive=true;}},
-  {id:"shop_passive",name:"Mystery Passive",icon:"🔮",desc:"Equip a random passive item.",cost:8,curr:"crystals",max:99,apply:p=>{equipPassive(randomPassive());}},
-  {id:"shop_evocatalyst",name:"Catalyst Cache",icon:"🌀",desc:"Attempt evolution on all eligible weapons.",cost:12,curr:"crystals",max:99,apply:p=>{checkAllEvolutions();}},
+  {id:"shop_passive",name:"Mystery Passive",icon:"🔮",desc:"Equip a random passive item.",cost:8,growth:1.25,curr:"crystals",max:99,apply:p=>{equipPassive(randomPassive());}},
+  {id:"shop_evocatalyst",name:"Catalyst Cache",icon:"🌀",desc:"Attempt evolution on all eligible weapons.",cost:12,growth:1.25,curr:"crystals",max:99,apply:p=>{checkAllEvolutions();}},
+  // ---- Expensive late-game gold sinks — a surviving/snowballing build has millions
+  // of gold by minute 20-30 with nothing to spend it on; these give that gold a job. ----
+  {id:"shop_maxhp_big",name:"Reinforced Vitality",icon:"💗",desc:"+60 Max HP and heal to full.",cost:2200,growth:1.5,curr:"gold",max:5,apply:p=>{p.maxHp+=60;p.hp=p.maxHp;}},
+  {id:"shop_dmg_big",name:"Berserker's Edge",icon:"🗡️",desc:"+20% Damage multiplier.",cost:3200,growth:1.5,curr:"gold",max:4,apply:p=>{p.stats.dmgMult+=0.2;}},
+  {id:"shop_atkspd_big",name:"Overdrive Core",icon:"🌀",desc:"+20% Attack Speed.",cost:3200,growth:1.5,curr:"gold",max:4,apply:p=>{p.stats.atkSpeedMult+=0.2;}},
+  {id:"shop_armor_big",name:"Fortress Plating",icon:"🏰",desc:"+6 Flat Armor.",cost:2800,growth:1.5,curr:"gold",max:4,apply:p=>{p.stats.armor+=6;}},
+  {id:"shop_goldmult",name:"Golden Idol",icon:"🗿",desc:"+15% Gold gained.",cost:4000,growth:1.6,curr:"gold",max:3,apply:p=>{p.stats.goldMult*=1.15;}},
+  {id:"shop_ascension",name:"Ascension Shard",icon:"💎",desc:"+30% Damage and +30% Attack Speed. Once per run.",cost:25000,curr:"gold",max:1,apply:p=>{p.stats.dmgMult+=0.3;p.stats.atkSpeedMult+=0.3;}},
 ];
+function shopItemCost(item, purchased){ return Math.ceil(item.cost*Math.pow(item.growth||1, purchased)); }
 function renderShop(){
   const wrap=document.getElementById('shopWrap'); wrap.innerHTML="";
   document.getElementById('shopGoldDisplay').textContent=Math.floor(player.gold);
   document.getElementById('shopCrystalDisplay').textContent=Math.floor(player.crystals);
   SHOP_ITEMS.forEach(item=>{
     const purchased=player.shopPurchases[item.id]||0; const maxed=purchased>=item.max;
+    const cost = shopItemCost(item, purchased);
     const wallet = item.curr==="gold"?player.gold:player.crystals;
-    const canAfford = wallet>=item.cost;
+    const canAfford = wallet>=cost;
     const el=document.createElement('div'); el.className='card shop-card';
     el.innerHTML=`<div class="icon">${item.icon}</div><div class="name">${item.name}</div><div class="desc">${item.desc}</div>
-      <div class="price">${maxed?"MAXED":item.cost+" "+(item.curr==="gold"?"GOLD":"CRYSTALS")}</div>
+      <div class="price">${maxed?"MAXED":cost+" "+(item.curr==="gold"?"GOLD":"CRYSTALS")}</div>
       <button class="buy-btn" ${(!canAfford||maxed)?'disabled':''}>${maxed?"MAXED OUT":"BUY"}</button>`;
     el.querySelector('.buy-btn').onclick=()=>{
-      if(maxed) return; if(item.curr==="gold"){ if(player.gold<item.cost) return; player.gold-=item.cost; } else { if(player.crystals<item.cost) return; player.crystals-=item.cost; }
+      if(maxed) return; if(item.curr==="gold"){ if(player.gold<cost) return; player.gold-=cost; } else { if(player.crystals<cost) return; player.crystals-=cost; }
       player.shopPurchases[item.id]=purchased+1; item.apply(player); SFX.uiClick(); SFX.pickupGold(); logEvent(`Bought ${item.name}`); renderShop(); refreshHud();
     };
     wrap.appendChild(el);
@@ -2301,11 +2544,9 @@ function eventCtx(){
     grantCursedWeapon:(p)=>{ const avail=Object.keys(WEAPONS).filter(w=>!p.weapons[w]); if(avail.length){ const w=pick(avail); p.weapons[w]=Math.min(WEAPONS[w].maxLevel,4); p._cursedWeapon=w; logEvent(`Cursed ${WEAPONS[w].name} acquired — it drains your HP.`); } },
     sacrificePassiveForCards:(p,n)=>{ if(p.passives.length){ p.passives.splice((Math.random()*p.passives.length)|0,1); } for(let i=0;i<n;i++){ const pool=buildCardPool().filter(e=>e.kind==="card"); if(!pool.length) break; const entry=pick(pool); entry.card.apply(p); p.cardsTaken.push(entry.card.id); } logEvent("Sacrifice complete — power gained."); },
     applyTemporaryModifier:(key,mult,life,extra)=>{
-      // FIX: this used to apply `extra` multipliers (e.g. goldMult/xpMult *2 from
-      // Bloodmoon Wager) directly and permanently — they never reverted when `life`
-      // ran out, silently turning a "90 second buff" into a permanent one. The extra
-      // multipliers are now stored on the modifier and reverted by updateTempModifiers()
-      // once `life` elapses.
+      // `extra` multipliers (e.g. goldMult/xpMult from Bloodmoon Wager) are stored on
+      // the modifier and reverted by updateTempModifiers() once `life` elapses —
+      // applying them directly and permanently would turn a temporary buff permanent.
       const mod = {key,mult,life,extra:extra||null,_appliedExtra:false};
       tempModifiers.push(mod);
       if(extra){ Object.entries(extra).forEach(([k,v])=>{ if(player.stats[k]!=null) player.stats[k]*=v; }); mod._appliedExtra=true; }
@@ -2375,11 +2616,9 @@ function triggerRandomEvent(forceId){
   show('screen-event');
 }
 function closeEvent(){
-  // FIX: Shrine of Silence promised "+2 passive slots" but disableRandomWeapon()
-  // only ever accepted a duration argument — the second `grantPassiveSlots` option
-  // was silently dropped. Applying it here (once, when the event that requested it
-  // closes) makes the promised bonus slots real; extraPassiveSlots is read by
-  // equipPassive()'s capacity check and shown in the in-game stats screen.
+  // Shrine of Silence's "+2 passive slots" is applied here (once, when the event
+  // that requested it closes); extraPassiveSlots is read by equipPassive()'s
+  // capacity check and shown in the in-game stats screen.
   if(activeEventDef && activeEventDef.id==="shrine_of_silence"){ player.stats.extraPassiveSlots=(player.stats.extraPassiveSlots||0)+2; logEvent("+2 passive slots granted."); }
   activeEventDef=null; checkAchievements(); checkSynergies(); hideAll(); setState('playing'); MUSIC.start();
 }
@@ -2530,11 +2769,8 @@ function updateJuice(dt){
   for(let i=0;i<floaters.length;i++){ const f=floaters[i]; f.y+=f.vy*dt; f.life-=dt;
     if(f.life<=0){ floaterPool.push(f); continue; } floaters[fw++]=f; }
   floaters.length=fw;
-  // FIX: chainArcs (chain-lightning visuals) and novaPulses (area-burst rings) were
-  // pushed on every attack but never had their `life` ticked down, never pruned, and
-  // were never actually drawn — a silent unbounded memory leak for the whole run,
-  // on top of the visual effect simply not existing. Both are now aged out here and
-  // rendered in render() below.
+  // chainArcs (chain-lightning visuals) and novaPulses (area-burst rings) are aged
+  // out here and rendered in render() below.
   let cw=0;
   for(let i=0;i<chainArcs.length;i++){ const c=chainArcs[i]; c.life-=dt; if(c.life<=0) continue; chainArcs[cw++]=c; }
   chainArcs.length=cw;
@@ -3080,7 +3316,7 @@ document.getElementById('btnResume').onclick=()=>{ hideAll(); setState('playing'
 document.getElementById('btnQuitRun').onclick=quitRun;
 document.getElementById('btnAgain').onclick=()=>{ setState('charselect'); renderCharSelect(); show('screen-charselect'); };
 document.getElementById('btnToMenu').onclick=goMenu;
-document.getElementById('btnKeepPlaying').onclick=()=>{ hideAll(); setState('playing'); MUSIC.start(); };
+document.getElementById('btnKeepPlaying').onclick=()=>{ hideAll(); setState('playing'); document.getElementById('hud').classList.remove('hidden'); MUSIC.start(); };
 document.getElementById('btnVictoryMenu').onclick=()=>{ applyRunStatsIncrement(true); save.activeRun=null; persistSave(); goMenu(); };
 document.getElementById('statsBtnHud').onclick=()=>{ SFX.uiClick(); openIngameStats(); };
 document.getElementById('shopBtnHud').onclick=()=>{ SFX.uiClick(); openShop(); };
