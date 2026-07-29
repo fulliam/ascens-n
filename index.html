@@ -139,7 +139,12 @@
   @keyframes toastOut{to{opacity:0; transform:translateY(-10px) scale(0.98);}}
   .synergy-toast{border-color:var(--crystal) !important; box-shadow:0 10px 30px rgba(0,0,0,0.5), 0 0 24px rgba(126,224,255,0.2) !important;}
   .synergy-toast .t-kicker{color:var(--crystal) !important;}
-  .settings-wrap{width:640px; max-width:92vw; max-height:70vh; overflow-y:auto; z-index:2; padding-right:6px;}
+  /* Fixed height (not just max-height) so switching tabs — whose panes each hold a
+     different number of rows — doesn't resize this wrap and shift .settings-tabs
+     above it, since .screen vertically centers its whole column of children. Tall
+     enough for the Data/Video panes (4 rows); overflow-y still saves anything that
+     doesn't fit on very short viewports. */
+  .settings-wrap{width:640px; max-width:92vw; height:420px; max-height:70vh; overflow-y:auto; z-index:2; padding-right:6px;}
   .settings-tabs{display:flex; gap:8px; margin-bottom:14px; z-index:2; flex-wrap:wrap;}
   .settings-tab{flex:1; min-width:70px; text-align:center; font-family:'Rajdhani',sans-serif; font-weight:600; font-size:13px; letter-spacing:1px;
     text-transform:uppercase; padding:9px 6px; border:1px solid var(--line); background:var(--panel); color:var(--dim); cursor:pointer; border-radius:2px; transition:border-color .15s,color .15s;}
@@ -239,7 +244,6 @@
       <button class="btn" id="btnAchievements">Achievements <span id="achProgressChip" class="ach-chip"></span></button>
       <button class="btn" id="btnArmory">Armory <span id="armoryChip" class="ach-chip"></span></button>
       <button class="btn" id="btnSettings">Settings</button>
-      <button class="btn" id="btnReset" style="font-size:12px; opacity:0.5;">Reset Save</button>
     </div>
   </div>
 
@@ -343,6 +347,7 @@
       <div class="settings-tab active" data-tab="controls">Controls</div>
       <div class="settings-tab" data-tab="video">Video</div>
       <div class="settings-tab" data-tab="audio">Sound</div>
+      <div class="settings-tab" data-tab="data">Data</div>
     </div>
     <div class="settings-wrap">
       <div class="settings-pane" id="pane-controls">
@@ -362,6 +367,10 @@
         <div class="setting-row"><div><div class="s-name">SFX Volume</div><div class="s-desc">Volume for hit, weapon and UI sound effects.</div></div><div class="slider-row"><input type="range" id="audioVolume" min="0" max="100" value="100"><span class="slider-val" id="audioVolumeVal">100</span></div></div>
         <div class="setting-row"><div><div class="s-name">Music Volume</div><div class="s-desc">Volume for the background music loop.</div></div><div class="slider-row"><input type="range" id="musicVolume" min="0" max="100" value="35"><span class="slider-val" id="musicVolumeVal">35</span></div></div>
         <div class="setting-row"><div><div class="s-name">Mute</div><div class="s-desc">Quickly silence all sound, including music.</div></div><div class="toggle-switch" id="audioMuted"><div class="knob"></div></div></div>
+      </div>
+      <div class="settings-pane hidden" id="pane-data">
+        <div class="setting-row"><div><div class="s-name">Reset Save</div><div class="s-desc">Erase all Soul, artifacts, and talent progression. This cannot be undone.</div></div>
+          <button class="buy-btn" id="btnReset" style="border-color:#ff4d5e; color:#ff4d5e;">RESET SAVE</button></div>
       </div>
     </div>
     <div class="back-link" id="settingsBack">← BACK</div>
