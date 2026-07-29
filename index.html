@@ -734,6 +734,12 @@ const ENEMY_MUTATIONS = [
   {id:"warded",       name:"Warded",       icon:null, color:"#8fd8ff", unlockT:600, apply:e=>{ e.shield=e.maxHp*0.5; }},
   {id:"regenerating", name:"Regenerating", icon:"💚", color:"#5cbf5c", unlockT:600, apply:e=>{ e.mutRegen=e.maxHp*0.025; }},
   {id:"vampiric",     name:"Vampiric",     icon:"🩸", color:"#c86bff", unlockT:900, apply:e=>{ e.mutVampiric=true; }},
+  // These three add a telegraphed *action*, not just a passive stat modifier — see the
+  // generic per-mutation handling near the top of updateEnemies() (PART 8) and the matching
+  // render additions in render() (PART 12) for how each one is actually staged and drawn.
+  {id:"dasher",  name:"Dasher",  icon:"➡️", color:"#ff8a4d", unlockT:420, apply:e=>{ e.mutDasher=true; e.dashCd=rand(1.5,3); }},
+  {id:"bruiser", name:"Bruiser", icon:"👊", color:"#ffb347", unlockT:420, apply:e=>{ e.mutBruiser=true; }},
+  {id:"quaker",  name:"Quaker",  icon:"🌋", color:"#ff6b3d", unlockT:720, apply:e=>{ e.mutQuaker=true; e.quakeCd=rand(3,5); }},
 ];
 // Chance a given non-elite spawn rolls a mutation, and how many mutation types are
 // unlocked, both ramp up with runTime — 0% before t=180 (opening stays legible),
@@ -1286,7 +1292,7 @@ window.addEventListener('resize', resize); resize();
 const WORLD = { w:4600, h:4600 };
 
 let player, enemies, bullets, orbs, particles, floaters, zones, minions;
-let camera = {x:0,y:0,zoom:null};
+let camera = {x:0,y:0,zoom:null,lagX:0,lagY:0};
 let runTime=0, killCount=0, dpsWindow=[];
 let state = "menu";
 let lastSpawn=0, eliteTimer=0;
@@ -1345,7 +1351,7 @@ function startRun(){
   hideAll();
   player = newPlayer(selectedCharacter);
   enemies=[]; bullets=[]; orbs=[]; particles=[]; floaters=[]; zones=[]; minions=[]; pendingShots=[];
-  chainArcs=[]; novaPulses=[]; camera.zoom=null;
+  chainArcs=[]; novaPulses=[]; camera.zoom=null; camera.lagX=0; camera.lagY=0;
   runTime=0; killCount=0; dpsWindow=[];
   lastSpawn=0; eliteTimer=0; keys={};
   spawnedBossIds=new Set(); warnedBossIds=new Set();
@@ -1884,6 +1890,8 @@ function resetEnemyFields(o){
   o._buffAuraApplied=false; o._sacrificeCd=undefined; o._burstArmed=false;
   o.mutation=null; o.mutationColor=undefined; o.mutationIcon=undefined;
   o.mutArmor=0; o.mutExplode=false; o.mutRegen=0; o.mutVampiric=false;
+  o.mutDasher=false; o.dashCd=undefined; o.dashState="idle"; o.dashDx=0; o.dashDy=0; o.dashT=0; o.dashTelegraph=null;
+  o.mutBruiser=false; o.mutQuaker=false; o.quakeCd=undefined;
   o.dead=false; o.vx=0; o.vy=0;
   return o;
 }
@@ -1958,6 +1966,10 @@ const MAX_ENEMIES = 1600; // hard ceiling; dynamicMaxEnemies() further scales th
 // thin out difficulty, so dynamicMaxEnemies() reads only the density setting.
 function dynamicMaxEnemies(){ return enemyDensity==='low' ? 400 : enemyDensity==='medium' ? 1000 : MAX_ENEMIES; }
 const AI_TICK_INTERVAL = 0.2; // normal enemies re-run their brain logic ~5x/sec instead of 60x/sec; elites/bosses are exempt
+// Wind-up window (seconds) before a dash/charge actually fires — during this window
+// e.dashTelegraph is populated and render() draws a dotted line + arrowhead so the player
+// has a real chance to read and dodge the coming dash, instead of it firing with no warning.
+const DASH_TELEGRAPH_LEAD = 0.5;
 const BOSS_WARNING_LEAD = 4;
 
 /* ---- Formation spawns -------------------------------------------------
@@ -2225,6 +2237,39 @@ function updateEnemies(dt){
     const speedMult = (e.slowed? (e.frozenSolid?0.05:0.5) : 1) * (1-Math.min(0.9,(player.stats.globalSlow||0)));
     const dx=player.x-e.x, dy=player.y-e.y, d=Math.hypot(dx,dy)||1;
 
+    // Dasher mutation: independent of brain type (so even chase/swarm/ranged roles can roll
+    // it), with the same telegraph-then-lunge shape as the charge brain below. Only actively
+    // dashing overrides normal brain movement this frame — during the wind-up the enemy still
+    // moves/acts per its own brain, it's just also showing the telegraph.
+    let skipBrain=false;
+    if(e.mutDasher){
+      if(e.dashState==="dashing"){
+        e.x+=e.dashDx*e.speed*3.4*dt*speedMult; e.y+=e.dashDy*e.speed*3.4*dt*speedMult;
+        e.dashT-=dt;
+        if(d<e.radius+player.radius+8){
+          damagePlayer(e.dmg*1.3); if(e.mutVampiric) e.hp=Math.min(e.maxHp,e.hp+e.dmg*0.6); if(e.mutBruiser) applyKnockback(e.x,e.y,70);
+          e.dashState="idle"; e.dashCd=rand(2.5,4);
+        } else if(e.dashT<=0){ e.dashState="idle"; e.dashCd=rand(2.5,4); }
+        e.x=clamp(e.x,e.radius,WORLD.w-e.radius); e.y=clamp(e.y,e.radius,WORLD.h-e.radius);
+        skipBrain=true;
+      } else {
+        e.dashCd-=dt;
+        if(e.dashCd<=DASH_TELEGRAPH_LEAD) e.dashTelegraph={dx:dx/d,dy:dy/d,t:Math.max(0,e.dashCd),maxT:DASH_TELEGRAPH_LEAD};
+        if(e.dashCd<=0){ e.dashState="dashing"; e.dashDx=dx/d; e.dashDy=dy/d; e.dashT=0.35; e.dashTelegraph=null; }
+      }
+    }
+    // Quaker mutation: periodically marks the player's current position with a growing
+    // fissure (armT below is a pure telegraph window in updateZones() — no damage until it
+    // expires), then erupts. Doesn't interrupt the enemy's own movement/brain.
+    if(e.mutQuaker){
+      e.quakeCd-=dt;
+      if(e.quakeCd<=0){
+        const crackAngles=[]; for(let i=0;i<5;i++) crackAngles.push(rand(0,Math.PI*2));
+        zones.push({x:player.x,y:player.y,radius:85,dmg:e.dmg*1.8,life:1.6,maxLife:1.6,armT:0.9,tickCd:0,tag:"quake",crackAngles,targetsPlayer:true});
+        e.quakeCd=rand(4,6);
+      }
+    }
+
     // AI throttling: normal fodder (chase/keep_distance/swarm) only re-picks its
     // movement direction a few times per second — the cached e.vx/e.vy is applied
     // every frame in between so motion still looks smooth. Bosses, elites, and the
@@ -2237,7 +2282,9 @@ function updateEnemies(dt){
       if(doTick) e.aiTimer = AI_TICK_INTERVAL*rand(0.85,1.15);
     }
 
-    if(e.brain==="phaseboss"){
+    if(skipBrain){
+      // actively dashing this frame — position already updated above, nothing else to do
+    } else if(e.brain==="phaseboss"){
       const defs = BOSSES[e.bossDefId];
       if(defs){
         if(e.chargeState==="charging"){
@@ -2253,7 +2300,7 @@ function updateEnemies(dt){
       if(doTick){ e.vx=(dx/d)*e.speed; e.vy=(dy/d)*e.speed; }
       e.x += e.vx*dt*speedMult; e.y += e.vy*dt*speedMult;
       e.atkCd -= dt;
-      if(d < e.radius+player.radius+6 && e.atkCd<=0){ damagePlayer(e.dmg); if(e.mutVampiric) e.hp=Math.min(e.maxHp,e.hp+e.dmg*0.5); e.atkCd=0.6; }
+      if(d < e.radius+player.radius+6 && e.atkCd<=0){ damagePlayer(e.dmg); if(e.mutVampiric) e.hp=Math.min(e.maxHp,e.hp+e.dmg*0.5); if(e.mutBruiser) applyKnockback(e.x,e.y,55); e.atkCd=0.6; }
     } else if(e.brain==="keep_distance_shoot"){
       if(doTick){
         const desired=260; let mx=0,my=0;
@@ -2265,9 +2312,15 @@ function updateEnemies(dt){
       if(e.shootCd<=0){ bullets.push({owner:"enemy",x:e.x,y:e.y,vx:(dx/d)*260,vy:(dy/d)*260,dmg:e.dmg,radius:5,life:3,color:"#8fd8ff",pierce:0}); e.shootCd=1.6; }
     } else if(e.brain==="charge"){
       e.chargeCd -= dt;
-      if(e.chargeState==="idle"){ e.x+=(dx/d)*e.speed*0.5*dt*speedMult; e.y+=(dy/d)*e.speed*0.5*dt*speedMult; if(e.chargeCd<=0){ e.chargeState="charging"; e.chargeDx=dx/d; e.chargeDy=dy/d; e.chargeCd=0.5; } }
+      if(e.chargeState==="idle"){
+        e.x+=(dx/d)*e.speed*0.5*dt*speedMult; e.y+=(dy/d)*e.speed*0.5*dt*speedMult;
+        // Telegraph the last DASH_TELEGRAPH_LEAD seconds before commit — direction keeps
+        // tracking the player right up until it locks in at the "charging" transition below.
+        if(e.chargeCd<=DASH_TELEGRAPH_LEAD) e.dashTelegraph={dx:dx/d,dy:dy/d,t:Math.max(0,e.chargeCd),maxT:DASH_TELEGRAPH_LEAD};
+        if(e.chargeCd<=0){ e.chargeState="charging"; e.chargeDx=dx/d; e.chargeDy=dy/d; e.chargeCd=0.5; e.dashTelegraph=null; }
+      }
       else if(e.chargeState==="charging"){ e.x+=e.chargeDx*e.speed*3.2*dt*speedMult; e.y+=e.chargeDy*e.speed*3.2*dt*speedMult;
-        if(d<e.radius+player.radius+8){ damagePlayer(e.dmg*1.4); if(e.mutVampiric) e.hp=Math.min(e.maxHp,e.hp+e.dmg*0.7); e.chargeState="cooldown"; e.chargeCd=1.4; } else if(e.chargeCd<=0){ e.chargeState="cooldown"; e.chargeCd=1.0; } }
+        if(d<e.radius+player.radius+8){ damagePlayer(e.dmg*1.4); if(e.mutVampiric) e.hp=Math.min(e.maxHp,e.hp+e.dmg*0.7); if(e.mutBruiser) applyKnockback(e.x,e.y,70); e.chargeState="cooldown"; e.chargeCd=1.4; } else if(e.chargeCd<=0){ e.chargeState="cooldown"; e.chargeCd=1.0; } }
       else { if(e.chargeCd<=0){ e.chargeState="idle"; e.chargeCd=rand(1.4,2.4); } }
     } else if(e.brain==="swarm"){
       e.swarmPhase += dt*3;
@@ -2278,7 +2331,7 @@ function updateEnemies(dt){
         e.vx=(ddx/dd)*e.speed; e.vy=(ddy/dd)*e.speed;
       }
       e.x+=e.vx*dt*speedMult; e.y+=e.vy*dt*speedMult;
-      e.atkCd-=dt; if(d<e.radius+player.radius+6 && e.atkCd<=0){ damagePlayer(e.dmg); if(e.mutVampiric) e.hp=Math.min(e.maxHp,e.hp+e.dmg*0.5); e.atkCd=0.5; }
+      e.atkCd-=dt; if(d<e.radius+player.radius+6 && e.atkCd<=0){ damagePlayer(e.dmg); if(e.mutVampiric) e.hp=Math.min(e.maxHp,e.hp+e.dmg*0.5); if(e.mutBruiser) applyKnockback(e.x,e.y,55); e.atkCd=0.5; }
     } else if(e.brain==="summon"){
       const desired=300;
       if(d<desired-20){ e.x-=(dx/d)*e.speed*dt*speedMult; e.y-=(dy/d)*e.speed*dt*speedMult; } else if(d>desired+20){ e.x+=(dx/d)*e.speed*dt*speedMult; e.y+=(dy/d)*e.speed*dt*speedMult; }
@@ -2304,7 +2357,12 @@ function updateMinions(dt){
 }
 function updateZones(dt){
   for(let i=zones.length-1;i>=0;i--){
-    const z=zones[i]; z.life-=dt; z.tickCd-=dt;
+    const z=zones[i]; z.life-=dt;
+    // armT is a pure telegraph window (Quaker mutation's ground fissure) — no damage ticks at
+    // all while it's counting down, render() draws the crack pattern instead. Once it expires
+    // the zone behaves exactly like any other for its remaining life.
+    if(z.armT>0){ z.armT-=dt; if(z.life<=0) zones.splice(i,1); continue; }
+    z.tickCd-=dt;
     if(z.tickCd<=0){
       z.tickCd=0.5;
       if(z.targetsPlayer){ const d=Math.hypot(player.x-z.x,player.y-z.y); if(d<z.radius) damagePlayer(z.dmg*0.5); }
@@ -2396,6 +2454,16 @@ function damagePlayer(amount){
     if((player.stats.reviveChance||0)>0 && Math.random()<player.stats.reviveChance){ player.hp=Math.floor(player.maxHp*0.4); logEvent("Undying talent triggers — you cling to life!"); SFX.levelup(); vibrate([0,50,50,50]); return; }
     die();
   }
+}
+// Physically shoves the player away from (fromX,fromY) by `dist`, then feeds the same offset
+// into camera.lagX/lagY (decayed each frame in render()) so the camera briefly stays behind
+// instead of instantly recentering — the player visibly gets shoved, then the view catches up.
+function applyKnockback(fromX, fromY, dist){
+  const dx=player.x-fromX, dy=player.y-fromY, d=Math.hypot(dx,dy)||1;
+  const pushX=(dx/d)*dist, pushY=(dy/d)*dist;
+  player.x=clamp(player.x+pushX, player.radius, WORLD.w-player.radius);
+  player.y=clamp(player.y+pushY, player.radius, WORLD.h-player.radius);
+  camera.lagX=(camera.lagX||0)-pushX; camera.lagY=(camera.lagY||0)-pushY;
 }
 function updateOrbs(dt){
   for(let i=orbs.length-1;i>=0;i--){
@@ -2939,13 +3007,34 @@ function render(){
   const zoom = camera.zoom;
   const viewW = w/zoom, viewH = h/zoom;
   const shakeX=camera.shake?rand(-camera.shake,camera.shake):0, shakeY=camera.shake?rand(-camera.shake,camera.shake):0;
-  camera.x=player.x-viewW/2+shakeX; camera.y=player.y-viewH/2+shakeY;
+  // Knockback lag: applyKnockback() offsets these so the camera briefly stays behind the
+  // player's new (pushed) position instead of instantly recentering, then decays back to 0 —
+  // reads as "the hit shoved you, and the camera is catching back up" instead of a teleport.
+  camera.lagX *= 0.88; camera.lagY *= 0.88;
+  if(Math.abs(camera.lagX)<0.5) camera.lagX=0; if(Math.abs(camera.lagY)<0.5) camera.lagY=0;
+  camera.x=player.x-viewW/2+shakeX+camera.lagX; camera.y=player.y-viewH/2+shakeY+camera.lagY;
   ctx2d.save(); ctx2d.scale(zoom,zoom); ctx2d.translate(-camera.x,-camera.y);
   ctx2d.strokeStyle="rgba(255,255,255,0.035)"; ctx2d.lineWidth=1;
   const grid=80, startX=Math.floor(camera.x/grid)*grid, endX=camera.x+viewW+grid, startY=Math.floor(camera.y/grid)*grid, endY=camera.y+viewH+grid;
   ctx2d.beginPath(); for(let x=startX;x<endX;x+=grid){ctx2d.moveTo(x,startY);ctx2d.lineTo(x,endY);} for(let y=startY;y<endY;y+=grid){ctx2d.moveTo(startX,y);ctx2d.lineTo(endX,y);} ctx2d.stroke();
   ctx2d.strokeStyle="rgba(185,140,255,0.25)"; ctx2d.lineWidth=4; ctx2d.strokeRect(0,0,WORLD.w,WORLD.h);
   for(const z of zones){
+    if(z.tag==="quake"){
+      // Quaker mutation's ground fissure: while armT>0 it's a pure warning (growing dashed
+      // ring + jagged crack lines, zero damage) — once armed it flashes a solid orange burst
+      // for the rest of its life, matching when updateZones() actually starts dealing damage.
+      if(z.armT>0){
+        const warnT=1-clamp(z.armT/0.9,0,1);
+        ctx2d.strokeStyle="#ff6b3d"; ctx2d.globalAlpha=0.35+warnT*0.5; ctx2d.lineWidth=2; ctx2d.setLineDash([6,6]);
+        ctx2d.beginPath(); ctx2d.arc(z.x,z.y,z.radius*(0.4+warnT*0.6),0,7); ctx2d.stroke(); ctx2d.setLineDash([]);
+        ctx2d.strokeStyle="#ffb347"; ctx2d.lineWidth=1.5; ctx2d.globalAlpha=0.5+warnT*0.4;
+        for(const ang of z.crackAngles){ ctx2d.beginPath(); ctx2d.moveTo(z.x,z.y); ctx2d.lineTo(z.x+Math.cos(ang)*z.radius*warnT,z.y+Math.sin(ang)*z.radius*warnT); ctx2d.stroke(); }
+        ctx2d.globalAlpha=1;
+      } else {
+        ctx2d.beginPath(); ctx2d.fillStyle="#ff6b3d"; ctx2d.globalAlpha=clamp(z.life/0.7,0,0.4); ctx2d.arc(z.x,z.y,z.radius,0,7); ctx2d.fill(); ctx2d.globalAlpha=1;
+      }
+      continue;
+    }
     ctx2d.beginPath();
     // Player-placed zones (traps, Inferno's burn patch) are colored per-weapon instead of lumped
     // into 2-3 generic tag buckets, so e.g. Spike Trap/Tesla Coil/Glacier Totem read as distinct
@@ -3027,6 +3116,19 @@ function render(){
       if(e._marked){ ctx2d.fillText("🎯",iconX,iconY); iconX+=14; }
       if(e.staggerT>0){ ctx2d.fillText("💫",iconX,iconY); iconX+=14; }
       if(e.mutationIcon){ ctx2d.fillText(e.mutationIcon,iconX,iconY); iconX+=14; }
+    }
+    // Dash telegraph: a dotted line + arrowhead along the coming dash direction, growing
+    // brighter/longer as the wind-up nears its end — gives a real read-and-dodge window
+    // instead of the charge/dasher lunge firing with no warning.
+    if(e.dashTelegraph){
+      const tel=e.dashTelegraph, urgency=1-clamp(tel.t/tel.maxT,0,1), len=(60+urgency*70);
+      const tx=e.x+tel.dx*len, ty=e.y+tel.dy*len;
+      ctx2d.strokeStyle="#ff3b3b"; ctx2d.globalAlpha=0.35+urgency*0.5; ctx2d.lineWidth=2; ctx2d.setLineDash([7,6]);
+      ctx2d.beginPath(); ctx2d.moveTo(e.x,e.y); ctx2d.lineTo(tx,ty); ctx2d.stroke(); ctx2d.setLineDash([]);
+      const ang=Math.atan2(tel.dy,tel.dx);
+      ctx2d.save(); ctx2d.translate(tx,ty); ctx2d.rotate(ang); ctx2d.fillStyle="#ff3b3b";
+      ctx2d.beginPath(); ctx2d.moveTo(10,0); ctx2d.lineTo(-6,-6); ctx2d.lineTo(-6,6); ctx2d.closePath(); ctx2d.fill();
+      ctx2d.restore(); ctx2d.globalAlpha=1;
     }
   }
   for(const b of bullets){
