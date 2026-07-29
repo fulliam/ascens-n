@@ -677,9 +677,18 @@ const ENEMY_DMG_MULT = 1.12;
 // player at high mult, while raw HP (uncapped) keeps scaling so late enemies still
 // take proportionally longer to kill instead of purely being a damage sponge.
 const ENEMY_DMG_SCALE_CAP = 3.2;
+// Player base moveSpeed is 230 (freshStats), and every melee/tank enemy's raw speed in
+// ENEMIES_NORMAL_RAW sits well below that (35-165) — meaning the chase brain can never
+// actually close distance on a player who just holds a direction, regardless of weapon
+// power. A multiplier (not a flat floor) keeps the roster's relative pacing intact — the
+// intentionally-lumbering tanks (zombie, tomb_warden) stay comparatively slow, they're just
+// no longer trivially, permanently outrun. swarm/assassin/ranged roles are already paced
+// close to or above player speed and are left untouched.
+const ENEMY_CHASE_SPEED_MULT = 1.6;
 const ENEMIES_NORMAL = ENEMIES_NORMAL_RAW.map(([id,role,hp,speed,dmg,behavior],i)=>{
   const rc = roleColor(role,i);
   hp = Math.round(hp*ENEMY_HP_MULT); dmg = +(dmg*ENEMY_DMG_MULT).toFixed(1);
+  if(role==="melee"||role==="tank") speed = Math.round(speed*ENEMY_CHASE_SPEED_MULT);
   return { id,name:id.replace(/_/g," ").replace(/\b\w/g,c=>c.toUpperCase()), role, hp, speed, dmg,
     xp:Math.max(1,Math.round(hp/6)), gold:Math.max(1,Math.round(hp/14)),
     brain:brainForRole(role), radius:{melee:13,ranged:11,tank:20,swarm:9,assassin:10,support:14}[role]||12,
@@ -737,7 +746,10 @@ const ENEMY_MUTATIONS = [
   // These three add a telegraphed *action*, not just a passive stat modifier — see the
   // generic per-mutation handling near the top of updateEnemies() (PART 8) and the matching
   // render additions in render() (PART 12) for how each one is actually staged and drawn.
-  {id:"dasher",  name:"Dasher",  icon:"➡️", color:"#ff8a4d", unlockT:420, apply:e=>{ e.mutDasher=true; e.dashCd=rand(1.5,3); }},
+  // unlockT:180 (not 420) — this is the one mutation that actually lets a slow/chase-brain
+  // enemy catch a kiting player (a telegraphed burst past its normal speed), so it should be
+  // available as early as any mutation can occur at all, not held back further.
+  {id:"dasher",  name:"Dasher",  icon:"➡️", color:"#ff8a4d", unlockT:180, apply:e=>{ e.mutDasher=true; e.dashCd=rand(1.5,3); }},
   {id:"bruiser", name:"Bruiser", icon:"👊", color:"#ffb347", unlockT:420, apply:e=>{ e.mutBruiser=true; }},
   {id:"quaker",  name:"Quaker",  icon:"🌋", color:"#ff6b3d", unlockT:720, apply:e=>{ e.mutQuaker=true; e.quakeCd=rand(3,5); }},
 ];
@@ -1010,27 +1022,29 @@ const ACHIEVEMENTS = [
    PART 3 — WAVE DIRECTOR (extends the base timeline to weave in all 10 bosses)
    ========================================================================= */
 const WAVES = [
-  {t:0,ids:["slime","bat","rat_swarm"],interval:1.05,mult:1.0},
-  {t:55,ids:["slime","bat","zombie","wolf","spider","mosquito_swarm"],interval:0.82,mult:1.13},
-  {t:130,ids:["zombie","ghost","bat","wraith","spider","skeleton_archer"],interval:0.62,mult:1.25,elite:true,eliteIds:["ogre"],eliteEvery:32},
-  {t:220,ids:["zombie","ghost","wraith","harpy","imp","banshee","boar"],interval:0.52,mult:1.5,elite:true,eliteIds:["ogre","shade_elite"],eliteEvery:24,boss:true,bossId:"dragon",bossT:220},
-  {t:310,ids:["ghost","harpy","banshee","boar","frost_sprite"],interval:0.46,mult:1.63,elite:true,eliteIds:["shade_elite","warlord"],eliteEvery:20,boss:true,bossId:"wyvern",bossT:320},
-  {t:340,ids:["ghost","witch","harpy","banshee","crypt_crawler","cultist"],interval:0.44,mult:1.75,elite:true,eliteIds:["golem","warlord"],eliteEvery:18,boss:true,bossId:"lich",bossT:420},
-  {t:460,ids:["ghost","witch","gargoyle","frost_sprite","myrmidon","tomb_warden"],interval:0.38,mult:2.0,elite:true,eliteIds:["golem","venom_matriarch"],eliteEvery:15,boss:true,bossId:"ancient_tree",bossT:520},
-  {t:600,ids:["revenant","witch","wraith","siren","iron_hound","shadow_stalker"],interval:0.34,mult:2.25,elite:true,eliteIds:["shade_elite","phantom_duelist"],eliteEvery:13},
-  {t:760,ids:["revenant","gargoyle","bog_leech","vulture","screecher","plague_rat"],interval:0.3,mult:2.5,elite:true,eliteIds:["iron_colossus","bloated_horror"],eliteEvery:11,boss:true,bossId:"void_knight",bossT:820},
-  {t:930,ids:["revenant","witch","wraith","tomb_warden","myrmidon"],interval:0.27,mult:2.75,elite:true,eliteIds:["stormcaller_elite","bone_titan"],eliteEvery:10,boss:true,bossId:"machine_god",bossT:1000},
-  {t:1120,ids:["revenant","witch","gargoyle","tomb_warden","crypt_crawler"],interval:0.24,mult:3.0,elite:true,eliteIds:["night_hag","crimson_reaver"],eliteEvery:9,boss:true,bossId:"the_collector",bossT:1180},
-  // This wave's roster (tomb_warden/frost_sprite/siren) averages lower raw dmg than
-  // the previous wave's, so mult is nudged up slightly to keep per-wave threat
-  // strictly increasing despite the lighter roster.
-  {t:1320,ids:["revenant","witch","tomb_warden","frost_sprite","siren"],interval:0.22,mult:3.25,elite:true,eliteIds:["glass_wraith","tar_beast"],eliteEvery:8,boss:true,bossId:"frost_queen",bossT:1400},
-  {t:1520,ids:["revenant","witch","tomb_warden","gargoyle"],interval:0.2,mult:3.5,elite:true,eliteIds:["frost_sentinel","blood_priest"],eliteEvery:7,boss:true,bossId:"bloodmoon_alpha",bossT:1620},
+  {t:0,ids:["slime","bat","rat_swarm","spider"],interval:1.05,mult:1.0},
+  {t:55,ids:["slime","bat","zombie","wolf","spider","mosquito_swarm","imp","rat_swarm"],interval:0.82,mult:1.13},
+  {t:130,ids:["zombie","ghost","bat","wraith","spider","skeleton_archer","golem_pup","boar"],interval:0.62,mult:1.25,elite:true,eliteIds:["ogre"],eliteEvery:32},
+  {t:220,ids:["zombie","ghost","wraith","harpy","imp","banshee","boar","cultist","mosquito_swarm"],interval:0.52,mult:1.5,elite:true,eliteIds:["ogre","shade_elite"],eliteEvery:24,boss:true,bossId:"dragon",bossT:220},
+  {t:310,ids:["ghost","harpy","banshee","boar","frost_sprite","skeleton_archer","witch"],interval:0.46,mult:1.63,elite:true,eliteIds:["shade_elite","warlord"],eliteEvery:20,boss:true,bossId:"wyvern",bossT:320},
+  {t:340,ids:["ghost","witch","harpy","banshee","crypt_crawler","cultist","wraith","frost_sprite"],interval:0.44,mult:1.75,elite:true,eliteIds:["golem","warlord"],eliteEvery:18,boss:true,bossId:"lich",bossT:420},
+  {t:460,ids:["ghost","witch","gargoyle","frost_sprite","myrmidon","tomb_warden","crypt_crawler","banshee"],interval:0.38,mult:2.0,elite:true,eliteIds:["golem","venom_matriarch"],eliteEvery:15,boss:true,bossId:"ancient_tree",bossT:520},
+  {t:600,ids:["revenant","witch","wraith","siren","iron_hound","shadow_stalker","gargoyle","myrmidon"],interval:0.34,mult:2.25,elite:true,eliteIds:["shade_elite","phantom_duelist"],eliteEvery:13},
+  {t:760,ids:["revenant","gargoyle","bog_leech","vulture","screecher","plague_rat","wraith","siren"],interval:0.3,mult:2.5,elite:true,eliteIds:["iron_colossus","bloated_horror"],eliteEvery:11,boss:true,bossId:"void_knight",bossT:820},
+  {t:930,ids:["revenant","witch","wraith","tomb_warden","myrmidon","iron_hound","boar","harpy"],interval:0.27,mult:2.75,elite:true,eliteIds:["stormcaller_elite","bone_titan"],eliteEvery:10,boss:true,bossId:"machine_god",bossT:1000},
+  {t:1120,ids:["revenant","witch","gargoyle","tomb_warden","crypt_crawler","banshee","bog_leech","shadow_stalker"],interval:0.24,mult:3.0,elite:true,eliteIds:["night_hag","crimson_reaver"],eliteEvery:9,boss:true,bossId:"the_collector",bossT:1180},
+  // This wave's roster averages lower raw dmg than the previous wave's, and mult (post
+  // WAVE_POWER_MULT) is already past ENEMY_DMG_SCALE_CAP, so raising mult further wouldn't
+  // raise avgDmg at all — interval is tightened instead (spawn density) to keep per-wave
+  // threat strictly increasing. Re-tightened again after widening this wave's roster added
+  // wraith/vulture/screecher, which pulled the average down further than mult alone.
+  {t:1320,ids:["revenant","witch","tomb_warden","frost_sprite","siren","wraith","vulture","screecher"],interval:0.185,mult:3.25,elite:true,eliteIds:["glass_wraith","tar_beast"],eliteEvery:8,boss:true,bossId:"frost_queen",bossT:1400},
+  {t:1520,ids:["revenant","witch","tomb_warden","gargoyle","iron_hound","myrmidon","crypt_crawler","plague_rat"],interval:0.2,mult:3.5,elite:true,eliteIds:["frost_sentinel","blood_priest"],eliteEvery:7,boss:true,bossId:"bloodmoon_alpha",bossT:1620},
   // This wave's roster (wraith/wolf/iron_hound) averages lower raw dmg and mult is
   // already near ENEMY_DMG_SCALE_CAP, so a tighter spawn interval (not a higher
   // mult) is what keeps threat increasing here.
-  {t:1720,ids:["revenant","witch","wraith","wolf","iron_hound"],interval:0.155,mult:3.75,elite:true,eliteIds:["warped_ogre","soul_collector"],eliteEvery:6},
-  {t:1900,ids:["revenant","witch","gargoyle","tomb_warden"],interval:0.16,mult:4.0,elite:true,eliteIds:["thornback","abyssal_watcher"],eliteEvery:6,boss:true,bossId:"overlord",bossT:1960},
+  {t:1720,ids:["revenant","witch","wraith","wolf","iron_hound","gargoyle","harpy","boar"],interval:0.155,mult:3.75,elite:true,eliteIds:["warped_ogre","soul_collector"],eliteEvery:6},
+  {t:1900,ids:["revenant","witch","gargoyle","tomb_warden","wraith","siren","frost_sprite","shadow_stalker"],interval:0.16,mult:4.0,elite:true,eliteIds:["thornback","abyssal_watcher"],eliteEvery:6,boss:true,bossId:"overlord",bossT:1960},
 ];
 // Post-Overlord "Keep Playing" endless scaling: after the last authored wave entry,
 // `wave.mult`/spawn interval no longer advance on their own (fixed at their final
@@ -1083,7 +1097,12 @@ function softMult(v, softStart, k){
 // Asymptotes tuned so a strong late-run kill-rate/XP/card-pick feedback loop
 // plateaus instead of snowballing past the target CP ratio.
 function effDmgMult(stats){ return softMult((stats||player.stats).dmgMult, 1.9, 3.2); }
-function effAtkSpeedMult(stats){ return softMult((stats||player.stats).atkSpeedMult, 1.5, 0.9); }
+// Softened again (1.3,0.75 → 1.15,0.55; asymptote ~2.05x → ~1.70x — original was 1.5,0.9/2.4x).
+// cdMult (which this feeds) now also gates beam tick rate and both aura tick rates (see
+// weaponFire()'s beam/aura branches, PART 6) — they used to be flat, unaffected by attack
+// speed at all, so this cap previously did nothing for Laser Array/Prism Beam/Arc Lance/
+// Holy Aura's Radiant Field burn/Thorn Aura.
+function effAtkSpeedMult(stats){ return softMult((stats||player.stats).atkSpeedMult, 1.15, 0.55); }
 function effGoldMult(stats){ return softMult((stats||player.stats).goldMult||1, 2.5, 2.5); }
 function effXpMult(stats){ return softMult((stats||player.stats).xpMult||1, 2.5, 2.5); }
 function elementalMultForTags(tags, stats){
@@ -1309,7 +1328,10 @@ let eventTimer=0, activeEventDef=null, tempModifiers=[]; // {key,mult,life,extra
 let rerollCharges=0;
 
 function freshStats(){
-  return { dmgMult:1, atkSpeedMult:1, moveSpeed:230, pickupRadius:70, armor:0, regen:0, goldMult:1,
+  // moveSpeed trimmed 230→210: a slower base makes the chase-brain rubber-band (targets
+  // player.stats.moveSpeed*1.08, PART 8) kick in sooner in absolute terms too, on top of just
+  // being less room to permanently kite before any enemy is even a factor.
+  return { dmgMult:1, atkSpeedMult:1, moveSpeed:210, pickupRadius:70, armor:0, regen:0, goldMult:1,
     lifesteal:0, xpMult:1, critChance:0, critMult:1.65,
     fireMult:1, frostMult:1, lightningMult:1, poisonMult:1, holyMult:1, cdrMult:1, eliteDmgMult:1, soulMult:1,
     summonDmgMult:1, summonCountMult:1, summonDurationMult:1, bonusPierce:0, bonusProjectiles:0,
@@ -1326,7 +1348,7 @@ function freshStats(){
 function newPlayer(characterId){
   const character = CHARACTERS.find(c=>c.id===characterId) || CHARACTERS[0];
   const p = {
-    x:WORLD.w/2, y:WORLD.h/2, radius:15, hp:100, maxHp:100, level:1, xp:0, xpNext:xpForLevel(1),
+    x:WORLD.w/2, y:WORLD.h/2, vx:0, vy:0, radius:15, hp:100, maxHp:100, level:1, xp:0, xpNext:xpForLevel(1),
     gold:0, crystals:0, weapons:{}, weaponTimers:{}, stats:freshStats(),
     passives:[], cardsTaken:[], synergiesActive:[], shopPurchases:{}, hasRevive:false, extraWeaponSlots:0,
     disabledWeapons:{}, shield:0, character:characterId, momentumStacks:0,
@@ -1431,7 +1453,10 @@ function weaponFire(wid, lvl, dt){
             hit.add(e); dealDamage(e, dps*def.base.tick*0.6*elemental, wid); spawnParticle(e.x,e.y,"#ffd479",2);
           });
         }
-        player.weaponTimers[wid+"_tick"] = def.base.tick;
+        // cdMult (attack speed) previously only gated melee/projectile/area/trap/chain/summon
+        // cooldowns — beams ticked at a flat def.base.tick regardless, so attack-speed
+        // investment silently did nothing for Laser Array/Prism Beam/Arc Lance.
+        player.weaponTimers[wid+"_tick"] = def.base.tick*cdMult;
         spawnParticle(target.x,target.y,weaponColor(wid));
       }
       player.weaponTimers[wid+"_sfx"]=(player.weaponTimers[wid+"_sfx"]||0)-dt;
@@ -1452,7 +1477,9 @@ function weaponFire(wid, lvl, dt){
         player.weaponTimers[wid+"_undead"] = (player.weaponTimers[wid+"_undead"]||0)-dt;
         if(player.weaponTimers[wid+"_undead"]<=0){
           forEachEnemyNear(player.x,player.y,radius,e=>{ if(/zombie|revenant|wraith|skeleton|ghost|banshee|lich|golem|shade/.test(e.id)) dealDamage(e, 6*dmgMult, wid); });
-          player.weaponTimers[wid+"_undead"]=0.5;
+          // Both aura tick rates below also now scale with cdMult (attack speed) — they used to
+          // be flat 0.5s regardless, same gap as beams above.
+          player.weaponTimers[wid+"_undead"]=0.5*cdMult;
         }
       }
     } else if(wid==="thorn_aura"){
@@ -1463,7 +1490,7 @@ function weaponFire(wid, lvl, dt){
       if(player.weaponTimers[wid+"_tick"]<=0){
         const dmg = 4 * dmgMult;
         forEachEnemyNear(player.x,player.y,radius,e=>{ dealDamage(e,dmg,wid); if(evo==="bramble_god"){ e.burning=true; e.burnT=Math.max(e.burnT||0,2); e.burnDps=Math.max(e.burnDps||0,dmg*0.3); } });
-        player.weaponTimers[wid+"_tick"]=0.5;
+        player.weaponTimers[wid+"_tick"]=0.5*cdMult;
       }
       player.auraRadius = player.auraRadius||{}; player.auraRadius[wid]={radius,tier:weaponVisualTier(lvl)};
     }
@@ -1892,6 +1919,7 @@ function resetEnemyFields(o){
   o.mutArmor=0; o.mutExplode=false; o.mutRegen=0; o.mutVampiric=false;
   o.mutDasher=false; o.dashCd=undefined; o.dashState="idle"; o.dashDx=0; o.dashDy=0; o.dashT=0; o.dashTelegraph=null;
   o.mutBruiser=false; o.mutQuaker=false; o.quakeCd=undefined;
+  o.chaseTime=0;
   o.dead=false; o.vx=0; o.vy=0;
   return o;
 }
@@ -2004,10 +2032,30 @@ function spawnFormation(ids, shape){
     for(let k=0;k<clusters;k++){ const ang=baseAngle+k*(Math.PI/2), perp=ang+Math.PI/2;
       for(let j=0;j<perCluster;j++){ const off=(j-(perCluster-1)/2)*46;
         positions.push({x:cx+Math.cos(ang)*distance+Math.cos(perp)*off, y:cy+Math.sin(ang)*distance+Math.sin(perp)*off}); } }
-  } else { // double_ring — a layered inner+outer ring, the biggest/densest formation
+  } else if(shape==='double_ring'){ // a layered inner+outer ring, the biggest/densest formation
     const inner=8, outer=14;
     for(let i=0;i<inner;i++){ const ang=baseAngle+(i/inner)*Math.PI*2; positions.push({x:cx+Math.cos(ang)*distance,y:cy+Math.sin(ang)*distance}); }
     for(let i=0;i<outer;i++){ const ang=baseAngle+(i/outer)*Math.PI*2+0.15; positions.push({x:cx+Math.cos(ang)*(distance+90),y:cy+Math.sin(ang)*(distance+90)}); }
+  } else if(shape==='star'){
+    const points=5;
+    for(let i=0;i<points*2;i++){ const ang=baseAngle+(i/(points*2))*Math.PI*2; const r=(i%2===0)?distance:distance*0.55;
+      positions.push({x:cx+Math.cos(ang)*r,y:cy+Math.sin(ang)*r}); }
+  } else if(shape==='wall'){ // a dense straight barrier, tighter-packed than 'line'
+    const n=14; const perp=baseAngle+Math.PI/2;
+    for(let i=0;i<n;i++){ const off=(i-n/2)*34; positions.push({x:cx+Math.cos(baseAngle)*distance+Math.cos(perp)*off, y:cy+Math.sin(baseAngle)*distance+Math.sin(perp)*off}); }
+  } else if(shape==='helix'){ // two interleaved spirals, offset by half a turn
+    const n=10;
+    for(let i=0;i<n;i++){ const ang=baseAngle+i*0.5, r=distance+i*22; positions.push({x:cx+Math.cos(ang)*r,y:cy+Math.sin(ang)*r}); }
+    for(let i=0;i<n;i++){ const ang=baseAngle+Math.PI+i*0.5, r=distance+i*22; positions.push({x:cx+Math.cos(ang)*r,y:cy+Math.sin(ang)*r}); }
+  } else if(shape==='diamond'){ // 4 spokes of stacked clusters at diamond-point angles
+    const spokes=4, perSpoke=4;
+    for(let k=0;k<spokes;k++){ const ang=baseAngle+k*(Math.PI/2)+Math.PI/4;
+      for(let j=0;j<perSpoke;j++){ const r=distance+j*20; positions.push({x:cx+Math.cos(ang)*r,y:cy+Math.sin(ang)*r}); } }
+  } else { // chevron_rows — the 'v' wedge repeated 3 rows deep
+    const rows=3, perRow=6; const perp=baseAngle+Math.PI/2;
+    for(let r=0;r<rows;r++){ const rowDist=distance+r*70;
+      for(let i=0;i<perRow;i++){ const side=i%2===0?1:-1; const depth=Math.floor(i/2);
+        positions.push({x:cx+Math.cos(baseAngle)*rowDist+Math.cos(perp)*side*depth*48, y:cy+Math.sin(baseAngle)*rowDist+Math.sin(perp)*side*depth*48}); } }
   }
   let spawned=0;
   for(const pos of positions){
@@ -2016,7 +2064,7 @@ function spawnFormation(ids, shape){
   }
   return spawned;
 }
-const FORMATION_SHAPES = ['ring','v','line','pincer','spiral','cross','double_ring'];
+const FORMATION_SHAPES = ['ring','v','line','pincer','spiral','cross','double_ring','star','wall','helix','diamond','chevron_rows'];
 function updateSpawns(dt){
   const wave = currentWave();
   const spawnMult = tempModifiers.filter(m=>m.key==="spawnRate").reduce((a,m)=>a*m.mult,1);
@@ -2297,7 +2345,27 @@ function updateEnemies(dt){
         updateBossPhase(e, defs, bossCtx(dt));
       }
     } else if(e.brain==="chase"){
-      if(doTick){ e.vx=(dx/d)*e.speed; e.vy=(dy/d)*e.speed; }
+      // Rubber-band catch-up: the longer this enemy has been unable to close within contact
+      // range, the more its effective speed leans toward the player's own CURRENT speed
+      // (+8% margin) instead of its own base value. Tracking the player's real speed directly
+      // — not a fixed multiplier — is what makes catch-up inevitable no matter how much
+      // moveSpeed a build has stacked (STAT_CAPS.moveSpeed goes up to 820): a flat multiplier
+      // can always be outrun by investing further, this can't, since the target moves with it.
+      // Resets to 0 (no bonus) once actually close, so it's pure "can't ever catch up" pressure,
+      // not a permanent buff.
+      e.chaseTime = d>e.radius+player.radius+40 ? (e.chaseTime||0)+dt : 0;
+      const catchUp = Math.min(1, (e.chaseTime||0)/30);
+      const effSpeed = e.speed + (Math.max(e.speed,player.stats.moveSpeed*1.08)-e.speed)*catchUp;
+      // Predictive intercept: aim slightly ahead of the player's current heading instead of
+      // straight at their current position. "Walk toward where they are right now" always lags
+      // a moving target by definition. Contact-damage below still checks the real distance
+      // `d`, only the movement heading is predicted.
+      if(doTick){
+        const leadT=0.35;
+        const px=player.x+(player.vx||0)*leadT, py=player.y+(player.vy||0)*leadT;
+        const pdx=px-e.x, pdy=py-e.y, pd=Math.hypot(pdx,pdy)||1;
+        e.vx=(pdx/pd)*effSpeed; e.vy=(pdy/pd)*effSpeed;
+      }
       e.x += e.vx*dt*speedMult; e.y += e.vy*dt*speedMult;
       e.atkCd -= dt;
       if(d < e.radius+player.radius+6 && e.atkCd<=0){ damagePlayer(e.dmg); if(e.mutVampiric) e.hp=Math.min(e.maxHp,e.hp+e.dmg*0.5); if(e.mutBruiser) applyKnockback(e.x,e.y,55); e.atkCd=0.6; }
@@ -2429,7 +2497,11 @@ function updatePlayer(dt){
   if(keys['w']||keys['arrowup']) dy-=1; if(keys['s']||keys['arrowdown']) dy+=1;
   if(keys['a']||keys['arrowleft']) dx-=1; if(keys['d']||keys['arrowright']) dx+=1;
   dx+=touchVec.x; dy+=touchVec.y;
-  if(dx||dy){ const len=Math.hypot(dx,dy); player.x=clamp(player.x+(dx/len)*player.stats.moveSpeed*dt,player.radius,WORLD.w-player.radius); player.y=clamp(player.y+(dy/len)*player.stats.moveSpeed*dt,player.radius,WORLD.h-player.radius); }
+  if(dx||dy){
+    const len=Math.hypot(dx,dy);
+    player.vx=(dx/len)*player.stats.moveSpeed; player.vy=(dy/len)*player.stats.moveSpeed;
+    player.x=clamp(player.x+player.vx*dt,player.radius,WORLD.w-player.radius); player.y=clamp(player.y+player.vy*dt,player.radius,WORLD.h-player.radius);
+  } else { player.vx=0; player.vy=0; }
   let regen = player.stats.regen; if(player._curseActive) regen*=0.3;
   if(regen>0) player.hp=Math.min(player.maxHp,player.hp+regen*dt);
   if(player.stats.shieldCd>0){ player._shieldTimer=(player._shieldTimer??player.stats.shieldCd)-dt; if(player._shieldTimer<=0){ player.shield=Math.min(40,player.shield+30); player._shieldTimer=player.stats.shieldCd; } }
@@ -3437,7 +3509,7 @@ function updateContinueButton(){
 function continueRun(){
   if(!save.activeRun) return; hideAll();
   const snap=save.activeRun;
-  player = { x:snap.player.x, y:snap.player.y, radius:snap.player.radius||15, hp:snap.player.hp, maxHp:snap.player.maxHp, level:snap.player.level,
+  player = { x:snap.player.x, y:snap.player.y, vx:0, vy:0, radius:snap.player.radius||15, hp:snap.player.hp, maxHp:snap.player.maxHp, level:snap.player.level,
     xp:snap.player.xp, xpNext:snap.player.xpNext, gold:snap.player.gold, crystals:snap.player.crystals||0,
     weapons:Object.assign({},snap.player.weapons), weaponTimers:{}, stats:Object.assign(freshStats(),snap.player.stats),
     passives:snap.player.passives||[], cardsTaken:snap.player.cardsTaken||[], synergiesActive:snap.player.synergiesActive||[],
