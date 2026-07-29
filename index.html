@@ -1303,6 +1303,7 @@ function newPlayer(characterId){
     gold:0, crystals:0, weapons:{}, weaponTimers:{}, stats:freshStats(),
     passives:[], cardsTaken:[], synergiesActive:[], shopPurchases:{}, hasRevive:false, extraWeaponSlots:0,
     disabledWeapons:{}, shield:0, character:characterId, momentumStacks:0,
+    lifestealHealedThisSec:0, lifestealWindowStart:0,
   };
   for(const branch of TALENT_BRANCHES) for(const line of TALENT_STAT_LINES[branch]){
     const lvl = talentLevel(branch, line.key);
@@ -1743,8 +1744,11 @@ function dealDamage(enemy, dmg, weaponId){
     dpsWindow.push({t:runTime,dmg});
     spawnFloater(enemy.x,enemy.y-10,Math.round(dmg), crit?"#ffe15c":(isEliteOrBoss?"#ffb347":"#fff"));
     if(player.stats.lifesteal>0){
-      const healed = Math.min(player.maxHp-player.hp, dmg*player.stats.lifesteal);
-      player.hp=Math.min(player.maxHp,player.hp+dmg*player.stats.lifesteal);
+      if(runTime-player.lifestealWindowStart>=1){ player.lifestealWindowStart=runTime; player.lifestealHealedThisSec=0; }
+      const budget = Math.max(0, LIFESTEAL_HPS_CAP-player.lifestealHealedThisSec);
+      const healed = Math.min(player.maxHp-player.hp, dmg*player.stats.lifesteal, budget);
+      player.hp=Math.min(player.maxHp,player.hp+healed);
+      player.lifestealHealedThisSec += healed;
       // Vampiric Build synergy: lifesteal grants a shield equal to a fraction of the healed amount.
       if(player.stats.lifestealShield>0 && healed>0) player.shield=Math.min(player.maxHp*0.5, player.shield+healed*player.stats.lifestealShield);
     }
@@ -2298,6 +2302,14 @@ function updateZones(dt){
    chance, near-zero cooldowns, thousands of projectiles. Enforced every frame
    rather than at each mutation site, so it's a single source of truth and
    self-heals if a bad number ever slips through (e.g. from a future card). */
+// Absolute ceiling on lifesteal healing throughput, in flat HP/sec — separate from
+// STAT_CAPS.lifesteal below, which only caps the *percentage* stat (45%). dmg*lifesteal
+// scales with the player's own ever-growing DPS, so even a capped percentage against
+// a 100k+ DPS build heals thousands of HP/sec — enough to fully out-heal any wave or
+// boss threat in the game, which is why almost no runs died to anything past the
+// first ~5 minutes (see CLAUDE.md's aliveFraction-flat finding). This cap is a flat
+// number, not scaled to player.maxHp, so stacking HP cards can't inflate it back out.
+const LIFESTEAL_HPS_CAP = 100;
 const STAT_CAPS = {
   dmgMult:[0,32], atkSpeedMult:[0.1,6], cdrMult:[0.18,3], critChance:[0,0.8], critMult:[1,4.5],
   damageReduction:[0,0.55], arcaneDmgMult:[0.2,4], reviveChance:[0,0.4], chillCap:[0.1,0.6], burnStacks:[1,4],
@@ -3253,7 +3265,8 @@ function continueRun(){
     weapons:Object.assign({},snap.player.weapons), weaponTimers:{}, stats:Object.assign(freshStats(),snap.player.stats),
     passives:snap.player.passives||[], cardsTaken:snap.player.cardsTaken||[], synergiesActive:snap.player.synergiesActive||[],
     shopPurchases:Object.assign({},snap.player.shopPurchases||{}), hasRevive:!!snap.player.hasRevive, extraWeaponSlots:snap.player.extraWeaponSlots||0,
-    disabledWeapons:{}, shield:0, character:snap.player.character||"warrior", momentumStacks:0, evolvedWeapons:{} };
+    disabledWeapons:{}, shield:0, character:snap.player.character||"warrior", momentumStacks:0, evolvedWeapons:{},
+    lifestealHealedThisSec:0, lifestealWindowStart:0 };
   for(const wid of Object.keys(player.weapons)) performEvolution(wid);
   enemies=[]; bullets=[]; orbs=[]; particles=[]; floaters=[]; zones=[]; minions=[]; pendingShots=[]; chainArcs=[]; novaPulses=[];
   runTime=snap.runTime||0; killCount=snap.killCount||0; dpsWindow=[]; lastSpawn=0; eliteTimer=0; keys={};
