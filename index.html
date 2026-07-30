@@ -63,6 +63,18 @@
   }
   #screen-menu .title, #screen-victory .title{animation:glitchRgb 4.5s infinite;}
   #screen-meta .title, #screen-achievements .title{animation:glitchScan 6s infinite;}
+  /* Third, distinct style for pause specifically — a "frozen feed" judder (brief
+     horizontal tear + brightness snap) rather than color-split or a scan wipe,
+     since "paused" reads naturally as a frozen video signal rather than either of
+     the other two metaphors already in use elsewhere. */
+  #screen-pause .title{animation:glitchFreeze 3.8s infinite;}
+  @keyframes glitchFreeze{
+    0%,90%,100%{transform:translateX(0); filter:none;}
+    91%{transform:translateX(-3px); filter:brightness(1.4);}
+    92%{transform:translateX(2px);}
+    93%{transform:translateX(0); filter:brightness(0.7);}
+    94%{transform:translateX(-1px); filter:none;}
+  }
   /* Kickers "breathe" everywhere (subtle, cheap, always-on since it's just an
      opacity/letter-spacing drift — not a burst effect like the titles above). */
   .kicker{animation:kickerBreathe 3.6s ease-in-out infinite;}
@@ -107,7 +119,8 @@
   @keyframes valPulse{0%{transform:scale(1.4); color:var(--xp);} 100%{transform:scale(1); color:inherit;}}
   .dot{width:8px; height:8px; border-radius:50%;}
   .timer{font-family:'JetBrains Mono',monospace; font-size:24px; letter-spacing:2px; color:var(--text); text-align:center;}
-  .timer .phase{display:block; font-size:10px; letter-spacing:3px; color:var(--accent); text-align:center; margin-top:2px;}
+  .timer .phase{display:block; font-size:10px; letter-spacing:3px; color:var(--accent); text-align:center; margin-top:2px; transition:color .3s, text-shadow .3s;}
+  .timer .phase.phase-reveal{color:var(--gold); text-shadow:0 0 10px rgba(255,179,71,0.7); letter-spacing:4px;}
   .hud-bottom{position:absolute; bottom:0; left:0; right:0; padding:14px calc(20px + var(--safe-right)) calc(14px + var(--safe-bottom)) calc(20px + var(--safe-left)); display:flex; flex-direction:column; gap:8px; align-items:center;}
   .ability-hud{position:absolute; right:calc(20px + var(--safe-right)); bottom:calc(96px + var(--safe-bottom)); z-index:7; display:flex; flex-direction:column; gap:12px; pointer-events:auto;}
   .ability-btn{position:relative; width:52px; height:52px; border-radius:50%; background:var(--panel); border:2px solid var(--line); display:flex; align-items:center; justify-content:center; font-size:22px; cursor:pointer; user-select:none; transition:border-color .15s;}
@@ -133,8 +146,19 @@
   .event-log div{opacity:0; animation:login .25s forwards, logout .4s 2.6s forwards;}
   @keyframes login{to{opacity:1;}}
   @keyframes logout{to{opacity:0;}}
-  .pause-hint{display:flex; align-items:center; justify-content:center; font-family:'JetBrains Mono',monospace; font-size:13px; color:var(--dim); pointer-events:auto; cursor:pointer; border:1px solid var(--line); background:var(--panel); padding:6px 9px; border-radius:2px;}
-  .pause-hint:hover{color:var(--text); border-color:var(--accent);}
+  /* Unified HUD action cluster (fullscreen/pause/stats/shop/fusion) — previously
+     just four separate bordered boxes with no shared identity beyond re-using the
+     same class. A connecting rail on the left reads them as one console panel,
+     and a rare synchronized flicker (all icons glitch on the same cycle, not
+     independently) ties them to the game's existing glitch aesthetic without
+     being distracting — same "rare burst, not constant" rule as the title
+     effects elsewhere. */
+  .hud-action-panel{display:flex; flex-direction:column; gap:8px; position:relative; padding-left:8px;}
+  .hud-action-panel::before{content:''; position:absolute; left:0; top:2px; bottom:2px; width:2px; background:linear-gradient(180deg,var(--accent),transparent); opacity:0.5;}
+  .pause-hint{display:flex; align-items:center; justify-content:center; font-family:'JetBrains Mono',monospace; font-size:13px; color:var(--dim); pointer-events:auto; cursor:pointer; border:1px solid var(--line); background:var(--panel); padding:6px 9px; border-radius:2px;
+    transition:border-color .15s, box-shadow .15s, color .15s; animation:hudIconGlitch 7s infinite;}
+  .pause-hint:hover{color:var(--text); border-color:var(--accent); box-shadow:0 0 10px rgba(185,140,255,0.35);}
+  @keyframes hudIconGlitch{0%,96%,100%{filter:none;} 97%{filter:brightness(1.6) hue-rotate(25deg);} 98%{filter:none;}}
   #fusionBtnHud:not(.hidden){border-color:var(--gold); animation:fusionPulse 1.4s ease-in-out infinite;}
   @keyframes fusionPulse{0%,100%{box-shadow:0 0 0 rgba(255,179,71,0);} 50%{box-shadow:0 0 14px rgba(255,179,71,0.65);}}
   .fusion-card{width:280px;}
@@ -400,7 +424,7 @@
         <div class="passive-row" id="passiveRow" style="margin-top:6px;"></div>
       </div>
       <div class="timer"><span id="timerVal">00:00</span><span class="phase" id="phaseVal">DISCOVERY</span></div>
-      <div style="display:flex; flex-direction:column; gap:8px;">
+      <div class="hud-action-panel">
         <div class="pause-hint" id="fullscreenBtnHud" style="pointer-events:auto;" title="Fullscreen">⛶</div>
         <div class="pause-hint" id="pauseBtn" style="pointer-events:auto;" title="Pause">⏸</div>
         <div class="pause-hint" id="statsBtnHud" style="pointer-events:auto;" title="Character Stats">📊</div>
@@ -1792,7 +1816,7 @@ function startRun(){
   player = newPlayer(selectedCharacter);
   enemies=[]; bullets=[]; orbs=[]; particles=[]; floaters=[]; zones=[]; minions=[]; pendingShots=[];
   chainArcs=[]; novaPulses=[]; camera.zoom=null; camera.lagX=0; camera.lagY=0;
-  runTime=0; killCount=0; dpsWindow=[];
+  runTime=0; killCount=0; dpsWindow=[]; lastPhaseName=null;
   lastSpawn=0; eliteTimer=0; keys={};
   spawnedBossIds=new Set(); warnedBossIds=new Set();
   appliedKills=0; appliedGold=0; autosaveTimer=AUTOSAVE_INTERVAL;
@@ -3771,7 +3795,8 @@ function refreshHud(){
   if(lastKillVal!==null && killCount>lastKillVal) pulseValue(killEl);
   lastKillVal=killCount;
   document.getElementById('timerVal').textContent=fmtTime(runTime);
-  document.getElementById('phaseVal').textContent=currentPhase().name;
+  const curPhaseName=currentPhase().name;
+  if(curPhaseName!==lastPhaseName){ lastPhaseName=curPhaseName; revealPhaseText(document.getElementById('phaseVal'),curPhaseName); }
   document.getElementById('fusionBtnHud').classList.toggle('hidden', !player.fusionsAvailable.length);
   const lowHp = player.hp/player.maxHp<0.25;
   if(lowHp) SFX.startHeartbeat(); else SFX.stopHeartbeat();
@@ -3826,6 +3851,26 @@ let lastWeaponSig=null;
 // re-trigger pattern so the CSS animation restarts even on back-to-back gains.
 let lastGoldVal=null, lastKillVal=null;
 function pulseValue(el){ el.classList.remove('val-pulse'); void el.offsetWidth; el.classList.add('val-pulse'); }
+// Custom text animation for the wave/phase name (only ~9 of these per run, each a
+// real narrative beat — "MACHINE UPRISING", "THE FINAL STAND" etc — so unlike the
+// gold/kill pulse above this gets a heavier one-shot scramble-reveal instead of a
+// quick pulse. Runs on an interval, not requestAnimationFrame, since it's driven
+// by its own fixed-step reveal schedule rather than the render loop.
+let lastPhaseName=null, phaseRevealTimer=null;
+const PHASE_REVEAL_GLYPHS="!<>-_\\/[]{}=+*^#~ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+function revealPhaseText(el,finalText){
+  if(phaseRevealTimer) clearInterval(phaseRevealTimer);
+  const totalFrames=14; let frame=0;
+  el.classList.add('phase-reveal');
+  phaseRevealTimer=setInterval(()=>{
+    frame++;
+    const revealCount=Math.floor((frame/totalFrames)*finalText.length);
+    let out="";
+    for(let i=0;i<finalText.length;i++) out += (finalText[i]===' '||i<revealCount) ? finalText[i] : PHASE_REVEAL_GLYPHS[(Math.random()*PHASE_REVEAL_GLYPHS.length)|0];
+    el.textContent=out;
+    if(frame>=totalFrames){ clearInterval(phaseRevealTimer); phaseRevealTimer=null; el.textContent=finalText; setTimeout(()=>el.classList.remove('phase-reveal'),450); }
+  },35);
+}
 function glow(size){ return quality==='low'?0:(quality==='medium'?size*0.6:size); }
 function hexToRgba(hex,a){
   if(!hex || hex[0]!=='#' || hex.length<7) return hex; // best-effort passthrough for non-hex colors (rare)
@@ -4430,7 +4475,7 @@ function continueRun(){
   // still reset (not saved, see doAutosave's comment).
   enemies=[]; bullets=[]; orbs=unpackInfinity(snap.orbs||[]); particles=[]; floaters=[];
   zones=unpackInfinity(snap.zones||[]); minions=unpackInfinity(snap.minions||[]); pendingShots=[]; chainArcs=[]; novaPulses=[];
-  runTime=snap.runTime||0; killCount=snap.killCount||0; dpsWindow=[]; lastSpawn=0; eliteTimer=0; keys={};
+  runTime=snap.runTime||0; killCount=snap.killCount||0; dpsWindow=[]; lastSpawn=0; eliteTimer=0; keys={}; lastPhaseName=null;
   spawnedBossIds=new Set(snap.bossesSpawned||[]);
   // Previously seeded from bossesSpawned (a copy-paste of the line above) as a
   // "warned implies later spawned" approximation — worked except for the window
@@ -4663,9 +4708,11 @@ window.addEventListener('keydown',e=>{ keys[e.key.toLowerCase()]=true; const was
   if(e.code==='Space' && state==='playing'){ e.preventDefault(); tryDash(); }
   if(e.key==='Shift' && state==='playing'){ tryFastHeal(); }
   if(state==='levelup'){
-    const k=e.key.toLowerCase();
-    if(k==='a'||k==='arrowleft'||k==='w'||k==='arrowup'){ e.preventDefault(); focusLevelUpCard(levelUpKbdIndex-1); }
-    else if(k==='d'||k==='arrowright'||k==='s'||k==='arrowdown'){ e.preventDefault(); focusLevelUpCard(levelUpKbdIndex+1); }
+    // Same physical-key fix as movement (CODE_TO_WASD above) — e.key alone made
+    // this silently dead on a Cyrillic layout, since a/d/w/s type as ф/в/ц/ы there.
+    const wasdCode=CODE_TO_WASD[e.code], k=e.key.toLowerCase();
+    if(wasdCode==='a'||k==='arrowleft'||wasdCode==='w'||k==='arrowup'){ e.preventDefault(); focusLevelUpCard(levelUpKbdIndex-1); }
+    else if(wasdCode==='d'||k==='arrowright'||wasdCode==='s'||k==='arrowdown'){ e.preventDefault(); focusLevelUpCard(levelUpKbdIndex+1); }
     else if(e.code==='Space'||e.key==='Enter'){ e.preventDefault(); const cards=document.getElementById('cardsWrap').children; if(cards[levelUpKbdIndex]) cards[levelUpKbdIndex].click(); }
   } });
 window.addEventListener('keyup',e=>{ keys[e.key.toLowerCase()]=false; const wasd=CODE_TO_WASD[e.code]; if(wasd) keys[wasd]=false; });
