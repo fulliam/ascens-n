@@ -5675,14 +5675,22 @@ window.addEventListener('keydown',e=>{ keys[e.key.toLowerCase()]=true; const was
     const wasdCode=CODE_TO_WASD[e.code], k=e.key.toLowerCase();
     if(wasdCode==='a'||k==='arrowleft'||wasdCode==='w'||k==='arrowup'){ e.preventDefault(); focusLevelUpCard(levelUpKbdIndex-1); }
     else if(wasdCode==='d'||k==='arrowright'||wasdCode==='s'||k==='arrowdown'){ e.preventDefault(); focusLevelUpCard(levelUpKbdIndex+1); }
-    else if(e.code==='Space'||e.key==='Enter'){ e.preventDefault(); const cards=document.getElementById('cardsWrap').children; if(cards[levelUpKbdIndex]) cards[levelUpKbdIndex].click(); }
+    else if(e.key==='Enter'){ e.preventDefault(); const cards=document.getElementById('cardsWrap').children; if(cards[levelUpKbdIndex]) cards[levelUpKbdIndex].click(); }
+    // Confirm is Enter-only — Space still needs preventDefault here so a keyboard-
+    // focused card (native <button>-like focus target) doesn't also fire the
+    // browser's own default space-activates-focused-element behavior.
+    else if(e.code==='Space'){ e.preventDefault(); }
   } else if(MENU_NAV_STATES.has(state)){
     const k=e.key, onRange=menuKbdFocusEl && menuKbdFocusEl.tagName==='INPUT';
     if(k==='ArrowUp'){ e.preventDefault(); menuNavMove(-1); }
     else if(k==='ArrowDown'){ e.preventDefault(); menuNavMove(1); }
     else if(k==='ArrowLeft'){ if(onRange) return; e.preventDefault(); menuNavMove(-1); }
     else if(k==='ArrowRight'){ if(onRange) return; e.preventDefault(); menuNavMove(1); }
-    else if(k==='Enter'||e.code==='Space'){ e.preventDefault(); menuNavActivate(); }
+    else if(k==='Enter'){ e.preventDefault(); menuNavActivate(); }
+    // Confirm is Enter-only — Space is deliberately neutralized (not just left
+    // unbound) so a keyboard-focused real <button> doesn't fall back to the
+    // browser's native space-activates-focused-element behavior.
+    else if(e.code==='Space' && !onRange){ e.preventDefault(); }
   } });
 window.addEventListener('keyup',e=>{ keys[e.key.toLowerCase()]=false; const wasd=CODE_TO_WASD[e.code]; if(wasd) keys[wasd]=false; });
 
