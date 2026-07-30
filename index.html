@@ -126,7 +126,20 @@
   .ability-btn{position:relative; width:52px; height:52px; border-radius:50%; background:var(--panel); border:2px solid var(--line); display:flex; align-items:center; justify-content:center; font-size:22px; cursor:pointer; user-select:none; transition:border-color .15s;}
   .ability-btn.ready{border-color:var(--accent); animation:abilityReadyPulse 1.6s ease-in-out infinite;}
   @keyframes abilityReadyPulse{0%,100%{box-shadow:0 0 8px rgba(185,140,255,0.25);} 50%{box-shadow:0 0 16px rgba(185,140,255,0.55);}}
-  .ability-btn .ab-icon{position:relative; z-index:1; filter:drop-shadow(0 1px 2px rgba(0,0,0,0.6));}
+  /* POLISH_PLAN_7 — dash/heal reverted from the POLISH_PLAN_6 SVG set back to
+     themed emoji (💨/❤️) per a later request; the HUD action panel (fullscreen/
+     pause/stats/shop/fusion) keeps the SVG .ui-icon set below, unaffected. Since
+     emoji ignore `color`, the ready/not-ready cooldown signal can't come from a
+     border-color trick here the way it does for those SVG icons — filter (grayscale/
+     brightness/opacity) works on emoji glyphs regardless, so that's the dimming
+     mechanism instead: full brightness only while .ready (see refreshAbilityHud's
+     existing charges>0 / cd<=0 check, unchanged — just a new CSS consumer of it),
+     dim/desaturated otherwise. The .ab-cd ring below already shows *how much*
+     cooldown is left; this adds an at-a-glance *is it usable at all* signal that
+     reads even in peripheral vision, without needing to focus on the ring. */
+  .ability-btn .ab-icon{position:relative; z-index:1; filter:drop-shadow(0 1px 2px rgba(0,0,0,0.6)) grayscale(0.75) brightness(0.6); opacity:0.7; transition:filter .25s, opacity .25s;}
+  .ability-btn.ready .ab-icon{filter:drop-shadow(0 1px 2px rgba(0,0,0,0.6)); opacity:1;}
+  .ui-icon{width:1em; height:1em; display:block; stroke:currentColor; fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round;}
   .ability-btn .ab-cd{position:absolute; inset:0; border-radius:50%; background:transparent; pointer-events:none;}
   .ability-btn .ab-label{position:absolute; bottom:-15px; left:50%; transform:translateX(-50%); font-family:'JetBrains Mono',monospace; font-size:8px; letter-spacing:1px; color:var(--dim); white-space:nowrap;}
   .ability-btn .ab-charges{position:absolute; bottom:-2px; right:-2px; z-index:1; background:var(--accent); color:#000; font-size:8.5px; font-weight:700; border-radius:8px; padding:0 4px; font-family:'JetBrains Mono',monospace;}
@@ -176,6 +189,17 @@
   .cards-wrap{display:flex; flex-wrap:wrap; align-items:stretch; justify-content:center; gap:16px; z-index:2; width:min(92vw,820px); max-height:78vh; overflow-y:auto; padding:4px;}
   .card{width:220px; background:var(--panel); border:1px solid var(--line); border-top:3px solid var(--line); border-radius:6px; padding:16px 15px 18px; cursor:pointer; transition:transform .15s, border-color .15s, box-shadow .15s; display:flex; flex-direction:column; position:relative;}
   .card:hover{border-color:var(--accent); border-top-color:var(--accent); box-shadow:0 12px 30px rgba(185,140,255,0.15);}
+  /* POLISH_PLAN_6 item 2 — :hover doesn't fire reliably from a tap on touch (and
+     can "stick" after the finger lifts on some mobile browsers), so touch users
+     got zero visual response to pressing a card. :active fires on press-down for
+     touch too, same accent treatment as :hover so both input methods read the
+     same. */
+  .card:active{border-color:var(--accent); border-top-color:var(--accent); box-shadow:0 12px 30px rgba(185,140,255,0.15); transform:scale(0.97);}
+  /* Confirm-pick flash — a brief accent-glow pulse on the card actually chosen,
+     right before the screen fades out (afterCardPicked -> hideAll), so the
+     "this is the one I picked" moment reads on mouse and touch alike. */
+  .card.picked{animation:cardPickedPulse .3s ease-out;}
+  @keyframes cardPickedPulse{0%{box-shadow:0 0 0 rgba(185,140,255,0);} 40%{box-shadow:0 0 34px rgba(185,140,255,0.85);} 100%{box-shadow:0 0 34px rgba(185,140,255,0);}}
   /* POLISH_PLAN_2 item 9 — keyboard focus ring for the level-up screen, visually
      distinct from :hover (outline, not border-color) so it stays visible even on
      a rarity-tinted border, and doesn't fight mouse-hover on a different card. */
@@ -237,6 +261,28 @@
   .card.rarity-legendary .rarity-label{border-color:var(--gold); color:var(--gold);}
   .card.rarity-mythic .rarity-label{border-color:var(--artifact); color:var(--artifact); animation:mythicLabel 2.4s ease-in-out infinite;}
   @keyframes mythicLabel{0%,100%{border-color:var(--artifact); color:var(--artifact);} 33%{border-color:var(--accent); color:var(--accent);} 66%{border-color:var(--crystal); color:var(--crystal);}}
+  /* POLISH_PLAN_6 item 3 — class-select is its own layout, deliberately not just
+     .cards-wrap (that container is tuned for level-up's 3-4 fixed-220px cards and
+     collapses to one narrow column once phone-width can't fit two of them side by
+     side — the exact bug being fixed here). renderCharSelect() picks one of two
+     modes at render time and sets the matching modifier class:
+     "fit" — all CHARACTERS in one non-wrapping row, each card's own width
+     computed in JS to whatever divides the available space evenly (see MIN/MAX_W
+     in renderCharSelect). No scroll at all in this mode.
+     "carousel" — used only if even MIN_W-wide cards wouldn't all fit (very narrow
+     viewport, or more classes added later); native overflow-x + scroll-snap so
+     touch gets real inertial swipe for free, scrollbar hidden so it reads as a
+     deliberate carousel rather than "a list that happens to overflow". */
+  .char-select-wrap{width:min(94vw,900px); margin:0 auto; padding:20px 4px 26px;}
+  .char-select-wrap.fit{display:flex; justify-content:center; align-items:stretch; gap:16px;}
+  .char-select-wrap.carousel{display:flex; gap:16px; overflow-x:auto; overflow-y:visible; scroll-snap-type:x mandatory;
+    scrollbar-width:none; -ms-overflow-style:none; padding-left:calc(50% - 90px); padding-right:calc(50% - 90px);}
+  .char-select-wrap.carousel::-webkit-scrollbar{display:none;}
+  .char-card{flex-shrink:0; scroll-snap-align:center; opacity:0; background-repeat:no-repeat; background-size:220% 100%;
+    animation-name:charCardIn, cardShimmer; animation-duration:.45s, 6s; animation-timing-function:ease-out, ease-in-out;
+    animation-iteration-count:1, infinite; animation-fill-mode:forwards, none; animation-delay:var(--char-card-delay,0s), 0s;}
+  @keyframes charCardIn{from{opacity:0; transform:translateY(18px) scale(0.96);} to{opacity:1; transform:translateY(0) scale(1);}}
+  .char-card .playstyle{margin-top:auto; padding-top:8px;}
   /* POLISH_PLAN_2 item 5 — was a plain vertical stack (icon/name/desc/price/buy each
      on their own line); icon+text now sit in one row, price+buy in another
      (price left, buy right) instead of four separate lines. */
@@ -278,10 +324,16 @@
      as a light safety net, not the primary scroll surface anymore (that was the
      old wide horizontal layout's job). */
   .talent-graph-scroll{overflow-x:visible; overflow-y:visible;}
-  .talent-graph{position:relative; width:300px; height:540px; margin:6px auto 0; transition:width .25s, height .25s;}
+  /* POLISH_PLAN_7 — talent tree tinted per class. renderTalentTree() sets
+     --branch-color/--branch-glow/--branch-glow-strong as inline custom
+     properties on #screen-meta (ancestor of both the tab bar and the graph), so
+     every rule below that reads them updates automatically on tab switch — no
+     re-render of static CSS needed, just the one JS assignment per switch. */
+  .talent-graph{position:relative; width:300px; height:540px; margin:6px auto 0; transition:width .25s, height .25s, background .25s;
+    background:radial-gradient(ellipse at 50% 25%, var(--branch-glow,transparent), transparent 65%);}
   .talent-lines{position:absolute; inset:0; width:100%; height:100%; pointer-events:none; overflow:visible;}
   .talent-lines line{stroke:var(--line); stroke-width:2; transition:stroke .2s, x1 .3s, y1 .3s, x2 .3s, y2 .3s;}
-  .talent-lines line.unlocked{stroke:var(--accent);}
+  .talent-lines line.unlocked{stroke:var(--branch-color,var(--accent));}
   /* Compact icon cell (POLISH_PLAN item 6) — replaces the old full-text card; name/
      desc/cost/requires all moved into #gameTooltip so the graph itself stays
      dense and scannable. left/top transition so nodes glide into a new layout
@@ -289,11 +341,11 @@
   .talent-node{position:absolute; width:58px; height:58px; background:var(--panel); border:2px solid var(--line); border-radius:12px;
     cursor:pointer; transition:left .3s, top .3s, border-color .15s, box-shadow .15s, transform .15s, background .15s;
     display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px;}
-  .talent-node:hover:not(.locked){border-color:var(--accent); transform:scale(1.08);}
+  .talent-node:hover:not(.locked){border-color:var(--branch-color,var(--accent)); box-shadow:0 0 14px var(--branch-glow,rgba(185,140,255,0.25)); transform:scale(1.08);}
   .talent-node .tn-icon{font-size:21px; line-height:1;}
   .talent-node .tn-pips{display:flex; gap:2px;}
   .talent-node .pip{width:6px; height:4px; background:var(--line); border-radius:1px;}
-  .talent-node .pip.filled{background:var(--accent);}
+  .talent-node .pip.filled{background:var(--branch-color,var(--accent));}
   .talent-node.maxed{border-color:var(--gold); box-shadow:0 0 16px rgba(255,179,71,0.28);}
   .talent-node.maxed .pip.filled{background:var(--gold);}
   /* Locked: solid dark (not just dimmed) + a dominant lock icon replacing the stat
@@ -303,7 +355,7 @@
   .talent-node.locked .tn-icon{font-size:22px; opacity:0.8;}
   .talent-node.locked .tn-pips{opacity:0.3;}
   .talent-node.just-unlocked{animation:talentUnlockPulse .6s ease-out;}
-  @keyframes talentUnlockPulse{0%{transform:scale(0.7); box-shadow:0 0 0 rgba(185,140,255,0);} 50%{transform:scale(1.22); box-shadow:0 0 26px rgba(185,140,255,0.7);} 100%{transform:scale(1); box-shadow:0 0 0 rgba(185,140,255,0);}}
+  @keyframes talentUnlockPulse{0%{transform:scale(0.7); box-shadow:0 0 0 rgba(185,140,255,0);} 50%{transform:scale(1.22); box-shadow:0 0 26px var(--branch-glow-strong,rgba(185,140,255,0.7));} 100%{transform:scale(1); box-shadow:0 0 0 rgba(185,140,255,0);}}
   /* First custom tooltip component in the game (everything else used the native
      title= attribute) — fixed-positioned near whatever node/element triggered it,
      shown on hover (desktop) or tap (touch, see openTooltip's isTouchDevice
@@ -360,6 +412,10 @@
     text-transform:uppercase; padding:9px 6px; border:1px solid var(--line); background:var(--panel); color:var(--dim); cursor:pointer; border-radius:2px; transition:border-color .15s,color .15s;}
   .settings-tab:hover{color:var(--text);}
   .settings-tab.active{color:var(--accent); border-color:var(--accent); background:var(--panel2);}
+  /* Talent tabs only (extra .talent-tab class, see renderTalentTree) — plain
+     .settings-tab.active (Settings screen's own Controls/Video/Audio/Data tabs)
+     stays the default accent purple, unaffected. */
+  .talent-tab.active{color:var(--branch-color,var(--accent)); border-color:var(--branch-color,var(--accent));}
   .settings-pane{display:flex; flex-direction:column; gap:10px;}
   .settings-pane.hidden{display:none;}
   .setting-row{background:var(--panel); border:1px solid var(--line); border-radius:4px; padding:12px 16px; display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap;}
@@ -429,11 +485,11 @@
       </div>
       <div class="timer"><span id="timerVal">00:00</span><span class="phase" id="phaseVal">DISCOVERY</span></div>
       <div class="hud-action-panel">
-        <div class="pause-hint" id="fullscreenBtnHud" style="pointer-events:auto;" title="Fullscreen">⛶</div>
-        <div class="pause-hint" id="pauseBtn" style="pointer-events:auto;" title="Pause">⏸</div>
-        <div class="pause-hint" id="statsBtnHud" style="pointer-events:auto;" title="Character Stats">📊</div>
-        <div class="pause-hint" id="shopBtnHud" style="pointer-events:auto;" title="In-Game Shop">🛒</div>
-        <div class="pause-hint hidden" id="fusionBtnHud" style="pointer-events:auto;" title="Weapon Fusion Ready">🧬</div>
+        <div class="pause-hint" id="fullscreenBtnHud" style="pointer-events:auto;" title="Fullscreen"><svg class="ui-icon" viewBox="0 0 24 24"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/></svg></div>
+        <div class="pause-hint" id="pauseBtn" style="pointer-events:auto;" title="Pause"><svg class="ui-icon" viewBox="0 0 24 24"><path d="M8 5v14M16 5v14"/></svg></div>
+        <div class="pause-hint" id="statsBtnHud" style="pointer-events:auto;" title="Character Stats"><svg class="ui-icon" viewBox="0 0 24 24"><path d="M5 19V13M12 19V8M19 19V4"/></svg></div>
+        <div class="pause-hint" id="shopBtnHud" style="pointer-events:auto;" title="In-Game Shop"><svg class="ui-icon" viewBox="0 0 24 24"><path d="M3 4h2l2.4 12.4a2 2 0 0 0 2 1.6h7.2a2 2 0 0 0 2-1.6L21 8H6"/><circle cx="9" cy="20" r="1.4"/><circle cx="17" cy="20" r="1.4"/></svg></div>
+        <div class="pause-hint hidden" id="fusionBtnHud" style="pointer-events:auto;" title="Weapon Fusion Ready"><svg class="ui-icon" viewBox="0 0 24 24"><circle cx="9" cy="12" r="6.5"/><circle cx="15" cy="12" r="6.5"/></svg></div>
       </div>
     </div>
     <div class="event-log" id="eventLog"></div>
@@ -444,7 +500,7 @@
     </div>
     <div class="ability-hud" id="abilityHud">
       <div class="ability-btn" id="dashBtn" title="Dash (Space / swipe)"><span class="ab-icon">💨</span><div class="ab-cd" id="dashCd"></div><div class="ab-label">DASH</div></div>
-      <div class="ability-btn" id="healBtn" title="Fast Heal (Shift / tap)"><span class="ab-icon">✚</span><div class="ab-cd" id="healCd"></div><div class="ab-label">HEAL</div></div>
+      <div class="ability-btn" id="healBtn" title="Fast Heal (Shift / tap)"><span class="ab-icon">❤️</span><div class="ab-cd" id="healCd"></div><div class="ab-label">HEAL</div></div>
     </div>
   </div>
 
@@ -472,7 +528,7 @@
   <div class="screen hidden" id="screen-charselect">
     <div class="veil"></div>
     <div class="title-wrap" style="margin-bottom:22px;"><div class="kicker">choose your path</div><div class="title" style="font-size:38px;">SELECT CHARACTER</div></div>
-    <div class="cards-wrap" id="charWrap"></div>
+    <div class="char-select-wrap fit" id="charWrap"></div>
     <div class="back-link" id="charBack">← BACK</div>
   </div>
 
@@ -925,6 +981,14 @@ const CHARACTERS = [
 // Player body/ring color by class — falls back to Mage's violet (the old universal default)
 // for any unrecognized id, same fallback pattern weaponColor() uses.
 function characterColor(id){ const c=CHARACTERS.find(x=>x.id===id); return (c&&c.color)||"#b98cff"; }
+// POLISH_PLAN_7 — talent branch id matches a CHARACTERS id for 5 of 6 branches
+// (reusing characterColor keeps them in sync if a class color ever changes);
+// "survivor" has no CHARACTERS entry (it's the generic/economy branch, open to
+// every class — see TALENT_BRANCHES' own comment), so it gets its own color
+// rather than falling back to characterColor's default (which is mage's purple,
+// i.e. indistinguishable from having no branch color at all).
+const TALENT_BRANCH_COLOR = { warrior:characterColor('warrior'), mage:characterColor('mage'), hunter:characterColor('hunter'),
+  engineer:characterColor('engineer'), necromancer:characterColor('necromancer'), survivor:"#ffb347" };
 
 /* =========================================================================
    PART 2 — CONTENT LAYER DATA (enemies, bosses, events, talents, achievements)
@@ -3328,16 +3392,16 @@ function renderCardEl(entry){
   const el=document.createElement('div'); el.className='card';
   if(entry.kind==="unlock"){ const d=WEAPONS[entry.wid];
     el.innerHTML=`<div class="card-head"><div class="icon">${d.icon}</div><div class="card-head-text"><div class="name">${d.name}</div><div class="tag">NEW WEAPON</div></div></div><div class="desc">Unlocks a new weapon: ${d.type} type.</div>`;
-    el.onclick=()=>{ SFX.uiClick(); player.weapons[entry.wid]=1; logEvent(d.name+" acquired."); afterCardPicked(); }; }
+    el.onclick=()=>{ SFX.uiClick(); pulseCardPick(el); player.weapons[entry.wid]=1; logEvent(d.name+" acquired."); afterCardPicked(); }; }
   else if(entry.kind==="levelup"){ const d=WEAPONS[entry.wid]; const lvl=player.weapons[entry.wid];
     el.innerHTML=`<div class="card-head"><div class="icon">${d.icon}</div><div class="card-head-text"><div class="name">${d.name} +1</div><div class="tag">WEAPON LVL</div></div></div><div class="desc">Level ${lvl} → ${lvl+1}.</div>`;
-    el.onclick=()=>{ SFX.uiClick(); player.weapons[entry.wid]++; logEvent(d.name+" leveled up."); performEvolution(entry.wid); afterCardPicked(); }; }
+    el.onclick=()=>{ SFX.uiClick(); pulseCardPick(el); player.weapons[entry.wid]++; logEvent(d.name+" leveled up."); performEvolution(entry.wid); afterCardPicked(); }; }
   else { const c=entry.card;
     el.className='card rarity-'+(c.rarity||'common');
     const stackNote = c.stackable ? ` <span style="color:var(--dim)">(${player.cardsTaken.filter(id=>id===c.id).length}/${c.maxStacks||99} taken)</span>` : "";
     const rarityTag = c.rarity && c.rarity!=="common" ? `<div class="rarity-label">${c.rarity}</div>` : "";
     el.innerHTML=`${rarityTag}<div class="card-head"><div class="icon">${cardIcon(c.cat)}</div><div class="card-head-text"><div class="name">${c.name}</div><div class="tag cat-${c.cat}">${c.cat.toUpperCase().replace('_',' ')}</div></div></div><div class="desc">${c.desc}${stackNote}</div>`;
-    el.onclick=()=>{ SFX.uiClick(); c.apply(player); player.cardsTaken.push(c.id); if(c.cat==="legendary") runStats.legendaryCardsTaken=(runStats.legendaryCardsTaken||0)+1; logEvent(c.name+" acquired."); afterCardPicked(); }; }
+    el.onclick=()=>{ SFX.uiClick(); pulseCardPick(el); c.apply(player); player.cardsTaken.push(c.id); if(c.cat==="legendary") runStats.legendaryCardsTaken=(runStats.legendaryCardsTaken||0)+1; logEvent(c.name+" acquired."); afterCardPicked(); }; }
   return el;
 }
 function cardIcon(cat){ return {offensive:"⚔",defensive:"🛡",utility:"🧭",elemental:"🌪",build_defining:"🧩",legendary:"⭐"}[cat]||"✦"; }
@@ -3366,7 +3430,12 @@ function showLevelUpCards(){
   const wrap=document.getElementById('cardsWrap'); wrap.innerHTML="";
   choices.forEach(entry=>wrap.appendChild(renderCardEl(entry)));
   show('screen-levelup');
-  levelUpKbdIndex=0; focusLevelUpCard(0);
+  // POLISH_PLAN_6 item 2 — the .kbd-focus outline is only meaningful if there's a
+  // keyboard to move it with; on a touch device it used to sit permanently on
+  // card 0 for no reason (nothing there to navigate). levelUpKbdIndex still
+  // initializes to 0 either way, so a bluetooth keyboard on a tablet still starts
+  // navigation from a sane index the first time an arrow/WASD key is pressed.
+  levelUpKbdIndex=0; if(!isTouchDevice) focusLevelUpCard(0);
 }
 // POLISH_PLAN_2 item 9 — WASD/arrows cycle a keyboard focus ring among the offered
 // cards, Space/Enter confirms via the *same* onclick the mouse path already uses
@@ -3966,6 +4035,10 @@ let lastWeaponSig=null;
 // re-trigger pattern so the CSS animation restarts even on back-to-back gains.
 let lastGoldVal=null, lastKillVal=null;
 function pulseValue(el){ el.classList.remove('val-pulse'); void el.offsetWidth; el.classList.add('val-pulse'); }
+// POLISH_PLAN_6 item 2 — same remove+reflow+add re-trigger as pulseValue(), just
+// on the picked level-up card itself so there's a visible "confirmed" flash
+// before afterCardPicked() fades the screen out.
+function pulseCardPick(el){ el.classList.remove('picked'); void el.offsetWidth; el.classList.add('picked'); }
 // Custom text animation for the wave/phase name (only ~9 of these per run, each a
 // real narrative beat — "MACHINE UPRISING", "THE FINAL STAND" etc — so unlike the
 // gold/kill pulse above this gets a heavier one-shot scramble-reveal instead of a
@@ -4488,8 +4561,17 @@ function applySettings(){
   // simultaneous non-joystick touches (unlikely, but cheap to handle) don't clobber
   // each other.
   const dashTouches=new Map(); const SWIPE_MIN_DIST=36, SWIPE_MAX_TIME=380;
+  // POLISH_PLAN_6 item 1 — a finger landing visually on the ability buttons
+  // (dash/heal) or the HUD action panel (pause/shop/etc) should never be claimed
+  // as a joystick anchor or dash-swipe candidate, even though this capture layer
+  // is a full-screen sibling underneath them. Belt-and-suspenders alongside the
+  // dedicated touchstart handlers on those buttons themselves (below) — this
+  // guards the case where hit-testing or click-synthesis doesn't behave as
+  // expected for a second concurrent finger while the joystick is already held.
+  function isOnInteractiveHud(x,y){ const el=document.elementFromPoint(x,y); return !!(el&&el.closest('.ability-hud, .hud-action-panel')); }
   capture.addEventListener('touchstart',e=>{
     for(const t of e.changedTouches){
+      if(isOnInteractiveHud(t.clientX,t.clientY)) continue;
       if(activeId===null){ activeId=t.identifier; showZoneAt(t.clientX,t.clientY); updateFromPoint(t.clientX,t.clientY); }
       else if(!dashTouches.has(t.identifier)){ dashTouches.set(t.identifier,{x:t.clientX,y:t.clientY,t:performance.now()}); }
     }
@@ -4519,6 +4601,13 @@ function updateFullscreenButtons(){ const fs=isFullscreen(); const toggleBtn=doc
 document.getElementById('fullscreenBtnHud').onclick=()=>{ SFX.uiClick(); toggleFullscreen(); };
 document.getElementById('dashBtn').onclick=()=>tryDash();
 document.getElementById('healBtn').onclick=()=>tryFastHeal();
+// POLISH_PLAN_6 item 1 — mouse/desktop keeps using the synthesized click above;
+// touch gets its own direct touchstart so it doesn't depend on click-synthesis at
+// all, which is unreliable for a second finger tapping this button while another
+// finger is already mid-gesture on the joystick (see setupJoystick's comment).
+[["dashBtn",tryDash],["healBtn",tryFastHeal]].forEach(([id,fn])=>{
+  document.getElementById(id).addEventListener('touchstart',e=>{ e.preventDefault(); e.stopPropagation(); fn(); },{passive:false});
+});
 document.getElementById('fullscreenToggleBtn').onclick=()=>{ SFX.uiClick(); toggleFullscreen(); };
 if(!fullscreenSupported()){ const toggleBtn=document.getElementById('fullscreenToggleBtn'); if(toggleBtn){ toggleBtn.disabled=true; toggleBtn.textContent="UNAVAILABLE"; } const hudBtn=document.getElementById('fullscreenBtnHud'); if(hudBtn) hudBtn.style.opacity='0.35'; }
 function setSegActive(containerId,value){ document.querySelectorAll('#'+containerId+' .seg-btn').forEach(b=>b.classList.toggle('active',b.dataset.val===value)); }
@@ -4607,19 +4696,61 @@ function continueRun(){
   logEvent("Run resumed."); SFX.runStart(); MUSIC.start();
 }
 
+// POLISH_PLAN_6 item 3 — picks "fit" (shrink every card to fit one row, no
+// scroll) vs "carousel" (fixed-width cards, native snap-scroll) based on whether
+// CHARACTERS.length even fits at a comfortable minimum width. Re-run on
+// resize/orientation change (see the listener below renderCharSelect), not just
+// once at open, so rotating the phone mid-screen doesn't leave a stale layout.
+const CHAR_CARD_MIN_W=150, CHAR_CARD_MAX_W=220, CHAR_CARD_CAROUSEL_W=180, CHAR_CARD_GAP=16;
 function renderCharSelect(){
   const wrap=document.getElementById('charWrap'); wrap.innerHTML="";
-  CHARACTERS.forEach(c=>{
-    const el=document.createElement('div'); el.className='card';
+  const n=CHARACTERS.length;
+  const available=Math.min(window.innerWidth*0.94,900);
+  const neededAtMin=n*CHAR_CARD_MIN_W+(n-1)*CHAR_CARD_GAP;
+  const fitAll=available>=neededAtMin;
+  wrap.className='char-select-wrap '+(fitAll?'fit':'carousel');
+  const cardW=fitAll?clamp((available-(n-1)*CHAR_CARD_GAP)/n,CHAR_CARD_MIN_W,CHAR_CARD_MAX_W):CHAR_CARD_CAROUSEL_W;
+  CHARACTERS.forEach((c,i)=>{
+    const el=document.createElement('div'); el.className='card char-card';
+    const color=c.color||'#b98cff';
+    el.style.width=cardW+'px';
+    el.style.setProperty('--char-card-delay',(i*0.07)+'s');
+    el.style.borderTopColor=color;
+    el.style.boxShadow=`0 0 18px ${hexToRgba(color,0.16)} inset`;
+    el.style.backgroundImage=`linear-gradient(115deg, transparent 40%, ${hexToRgba(color,0.16)} 50%, transparent 60%)`;
     const w=WEAPONS[c.startWeapon];
-    el.style.borderColor = (c.color||"#3a3f52")+"55";
-    el.innerHTML=`<div class="icon" style="color:${c.color||'inherit'}; text-shadow:0 0 12px ${c.color||'transparent'};">${c.icon}</div><div class="name">${c.name}</div><div class="desc">${c.playstyle}</div>
-      <div class="tag">STARTS WITH ${w.icon} ${w.name}</div><div class="playstyle">${c.uniqueDesc}</div>`;
+    el.innerHTML=`<div class="card-head"><div class="icon" style="color:${color}; text-shadow:0 0 12px ${color};">${c.icon}</div><div class="card-head-text"><div class="name">${c.name}</div><div class="tag" style="color:${color}; border-color:${color};">STARTS WITH ${w.icon} ${w.name}</div></div></div><div class="desc">${c.playstyle}</div><div class="playstyle">${c.uniqueDesc}</div>`;
     el.onclick=()=>{ SFX.uiClick(); selectedCharacter=c.id; startRun(); };
     wrap.appendChild(el);
   });
+  if(!fitAll) setupCharCarouselTilt(wrap);
+}
+// Coverflow tilt for carousel mode only: reads native scrollLeft (so it rides on
+// the browser's own inertial swipe instead of hand-rolled drag physics) and
+// rotates/scales each card by its distance from the container's horizontal
+// center. rAF-throttled since 'scroll' can fire far faster than one paint.
+function setupCharCarouselTilt(wrap){
+  let ticking=false;
+  function apply(){
+    ticking=false;
+    const mid=wrap.scrollLeft+wrap.clientWidth/2;
+    for(const card of wrap.children){
+      const cardMid=card.offsetLeft+card.offsetWidth/2;
+      const norm=clamp((cardMid-mid)/(wrap.clientWidth/2),-1.4,1.4);
+      card.style.transform=`perspective(700px) rotateY(${(-norm*26).toFixed(1)}deg) scale(${(1-Math.abs(norm)*0.12).toFixed(3)})`;
+      card.style.opacity=(1-Math.abs(norm)*0.35).toFixed(2);
+      card.style.zIndex=String(100-Math.round(Math.abs(norm)*10));
+    }
+  }
+  wrap.addEventListener('scroll',()=>{ if(!ticking){ ticking=true; requestAnimationFrame(apply); } },{passive:true});
+  requestAnimationFrame(apply);
 }
 document.getElementById('btnNewRun').onclick=()=>{ setState('charselect'); renderCharSelect(); show('screen-charselect'); };
+let charSelectResizeTimer=null;
+window.addEventListener('resize',()=>{
+  if(state!=='charselect') return;
+  clearTimeout(charSelectResizeTimer); charSelectResizeTimer=setTimeout(renderCharSelect,150);
+});
 document.getElementById('charBack').onclick=goMenu;
 document.getElementById('btnContinue').onclick=continueRun;
 
@@ -4652,9 +4783,17 @@ function wireTooltip(el, uid, htmlFn){
   });
 }
 function renderTalentTree(activeBranch){
+  // POLISH_PLAN_7 — set once per branch switch on #screen-meta (ancestor of both
+  // the tab bar and the graph below), every --branch-color/-glow/-glow-strong
+  // reference in the CSS updates from this single assignment.
+  const branchColor=TALENT_BRANCH_COLOR[activeBranch]||"#b98cff";
+  const screenMeta=document.getElementById('screen-meta');
+  screenMeta.style.setProperty('--branch-color', branchColor);
+  screenMeta.style.setProperty('--branch-glow', hexToRgba(branchColor,0.18));
+  screenMeta.style.setProperty('--branch-glow-strong', hexToRgba(branchColor,0.7));
   const tabsEl=document.getElementById('talentTabs'); tabsEl.innerHTML="";
   TALENT_BRANCHES.forEach(b=>{
-    const tab=document.createElement('div'); tab.className='settings-tab'+(b===activeBranch?' active':'');
+    const tab=document.createElement('div'); tab.className='settings-tab talent-tab'+(b===activeBranch?' active':'');
     tab.textContent=b.charAt(0).toUpperCase()+b.slice(1);
     tab.onclick=()=>{ hideTooltip(); renderTalentTree(b); };
     tabsEl.appendChild(tab);
