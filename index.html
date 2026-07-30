@@ -3568,7 +3568,7 @@ function renderShop(){
       <button class="buy-btn" ${(!canAfford||maxed)?'disabled':''}>${maxed?"MAXED OUT":"BUY"}</button></div>`;
     el.querySelector('.buy-btn').onclick=()=>{
       if(maxed) return; if(item.curr==="gold"){ if(player.gold<cost) return; player.gold-=cost; } else { if(player.crystals<cost) return; player.crystals-=cost; }
-      player.shopPurchases[item.id]=purchased+1; item.apply(player); SFX.uiClick(); SFX.pickupGold(); logEvent(`Bought ${item.name}`); renderShop(); refreshHud();
+      player.shopPurchases[item.id]=purchased+1; item.apply(player); SFX.uiClick(); SFX.shopBuy(); logEvent(`Bought ${item.name}`); renderShop(); refreshHud();
     };
     wrap.appendChild(el);
   });
@@ -3812,7 +3812,7 @@ function renderMerchantCardOffers(){
     el.querySelector('.buy-btn').onclick=()=>{
       if(player.gold<cost) return; player.gold-=cost; c.apply(player); player.cardsTaken.push(c.id);
       if(c.cat==='legendary') runStats.legendaryCardsTaken=(runStats.legendaryCardsTaken||0)+1;
-      SFX.uiClick(); SFX.pickupGold(); logEvent(`Bought ${c.name} from the merchant.`);
+      SFX.uiClick(); SFX.shopBuy(); logEvent(`Bought ${c.name} from the merchant.`);
       checkSynergies(); checkAchievements(); closeEvent();
     };
     wrap.appendChild(el);
@@ -4691,6 +4691,11 @@ const SFX=(()=>{ let muted=false, volume=1, heartbeatTimer=null;
     stopHeartbeat(){ if(heartbeatTimer){ clearInterval(heartbeatTimer); heartbeatTimer=null; } },
     dash(){ noise({dur:0.1,gain:0.1,filterFreq:2600}); tone({freq:520,slideTo:180,dur:0.12,type:'sawtooth',gain:0.09}); },
     fastHeal(){ tone({freq:480,slideTo:760,dur:0.18,type:'sine',gain:0.13}); tone({freq:760,dur:0.15,type:'triangle',gain:0.08,delay:0.05}); },
+    // "дзынь-дзынь" — a cash-register double-ding, distinct from pickupGold()'s
+    // single quick chime (that one's for picking currency up off the ground;
+    // this is specifically for *spending* it on a purchase) — two bright bell
+    // tones back to back, each sliding up slightly, second one higher-pitched.
+    shopBuy(){ tone({freq:1400,slideTo:1700,dur:0.09,type:'triangle',gain:0.12}); tone({freq:1750,slideTo:2100,dur:0.11,type:'triangle',gain:0.11,delay:0.09}); },
   };
 })();
 const MUSIC=(()=>{ let musicGain=null,volume=0.35,playing=false,schedulerId=null,nextNoteTime=0,step16=0,intense=false;
