@@ -5252,7 +5252,21 @@ function playStripeWipeTransition(onCovered){
     setTimeout(()=>overlay.remove(), STRIPE_WIPE_UNCOVER_MS+STRIPE_WIPE_BARS*STRIPE_WIPE_STAGGER_MS+80);
   }, STRIPE_WIPE_COVER_MS+STRIPE_WIPE_BARS*STRIPE_WIPE_STAGGER_MS);
 }
-function setState(s){ state=s; if(!["playing","levelup","paused","shop","ingame-stats","event","fusion"].includes(s)) document.getElementById('hud').classList.add('hidden'); }
+function setState(s){ state=s; if(!["playing","levelup","paused","shop","ingame-stats","event","fusion"].includes(s)) document.getElementById('hud').classList.add('hidden');
+  // The generic menu keyboard-nav (below, PART 17) calls real el.focus() on buttons/
+  // sliders/cards so arrow keys can roam them. Nothing ever un-focuses that element
+  // when a menu closes — left alone, a still-focused <input type=range> (Settings'
+  // volume sliders) or <button> means arrow keys during actual gameplay both move
+  // the player AND trigger that element's own native default arrow-key behavior
+  // (a focused range input nudges its value on ArrowLeft/Right, since 'playing'
+  // never preventDefault()s arrows — only the menu-nav branch does). Clearing focus
+  // on every transition into 'playing' closes that gap regardless of which menu
+  // screen the player came from.
+  if(s==='playing'){
+    if(menuKbdFocusEl){ menuKbdFocusEl.classList.remove('kbd-focus'); menuKbdFocusEl=null; }
+    if(document.activeElement && document.activeElement!==document.body) document.activeElement.blur();
+  }
+}
 function goMenu(){ setState('menu'); SFX.stopHeartbeat(); MUSIC.stop(); refreshSoulBadges(); updateContinueButton(); show('screen-menu'); }
 function updateContinueButton(){
   const btn=document.getElementById('btnContinue'), info=document.getElementById('continueInfo'), newBtn=document.getElementById('btnNewRun');
