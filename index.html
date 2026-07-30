@@ -313,6 +313,45 @@
     animation-iteration-count:1, infinite; animation-fill-mode:forwards, none; animation-delay:var(--char-card-delay,0s), 0s;}
   @keyframes charCardIn{from{opacity:0; transform:translateY(18px) scale(0.96);} to{opacity:1; transform:translateY(0) scale(1);}}
   .char-card .playstyle{margin-top:auto; padding-top:8px;}
+  /* POLISH_PLAN_11/12 — pick confirmation, before the stripe-wipe transition to
+     the run itself. Uses `transition` (box-shadow only), deliberately NOT the
+     `animation` shorthand — the base .char-card rule already owns a multi-name
+     animation-name list (charCardIn, cardShimmer, via longhand props); a second
+     rule setting `animation:` as a shorthand resets *every* animation longhand
+     to a single value each, which was fighting the base rule's list and reading
+     as a double transition. transition avoids the whole animation-property
+     cascade entirely. Also never touches `transform` — carousel mode's
+     setupCharCarouselTilt() drives that continuously off scroll position
+     (including the scrollIntoView triggered on pick). */
+  .char-card{transition:box-shadow .3s ease-out;}
+  .char-card.char-card-selected{box-shadow:0 0 36px var(--char-select-glow,rgba(185,140,255,0.75)); border-color:var(--char-select-glow,var(--accent)) !important;}
+  .char-select-wrap.locked .char-card:not(.char-card-selected){opacity:0.35; transition:opacity .3s;}
+  /* Striped wipe transition (char select -> run start): a handful of WIDE,
+     diagonally-skewed bars (POLISH_PLAN_12 — wider + no glow/shadow + angled,
+     alternating skew direction per bar so it doesn't read as one flat sheet)
+     grow to fully cover the screen, then (after startRun() has already
+     happened behind it) shrink away to reveal — cover sweeps left-to-right,
+     uncover sweeps right-to-left, so the two halves of the transition read as
+     distinct motions rather than one played backwards. Flat var(--void) fill,
+     no border/box-shadow — a solid wipe, not a glowing one.
+     POLISH_PLAN_13 — snappier "action" timing instead of one smooth cinematic
+     ease: cover phase overshoots slightly past full scale before settling
+     (`cubic-bezier(.34,1.56,.64,1)`, a "back" ease — the punch/impact feel),
+     uncover phase is a fast, clean ease-in snap (no overshoot — scaleY
+     "bouncing" past 0 doesn't read as anything meaningful, just looks broken).
+     Kept to one restrained flourish (the overshoot + a single brief flash
+     below) rather than stacking multiple showy effects. */
+  .stripe-wipe{position:fixed; inset:0; z-index:999; pointer-events:none; overflow:hidden;}
+  .stripe-wipe-bar{position:absolute; top:-10%; height:120%; background:var(--void); transform:skewX(var(--bar-skew,0deg)) scaleY(0); transform-origin:top;}
+  .stripe-wipe.cover .stripe-wipe-bar{transform-origin:top; transform:skewX(var(--bar-skew,0deg)) scaleY(1); transition:transform .24s cubic-bezier(.34,1.56,.64,1);}
+  .stripe-wipe.uncover .stripe-wipe-bar{transform-origin:bottom; transform:skewX(var(--bar-skew,0deg)) scaleY(0); transition:transform .2s cubic-bezier(.55,0,.85,.35);}
+  /* One quick accent flash right as the bars finish covering — the "impact
+     beat" of the transition. Single short keyframe on its own dedicated
+     element (not layered onto .char-card, which already learned the hard way
+     about stacking animations on a busy element — see POLISH_PLAN_12). */
+  .stripe-wipe-flash{position:absolute; inset:0; background:var(--accent); opacity:0; mix-blend-mode:screen;}
+  .stripe-wipe-flash.pulse{animation:stripeWipeFlash .3s ease-out;}
+  @keyframes stripeWipeFlash{0%{opacity:0;} 18%{opacity:0.32;} 100%{opacity:0;}}
   /* POLISH_PLAN_2 item 5 — was a plain vertical stack (icon/name/desc/price/buy each
      on their own line); icon+text now sit in one row, price+buy in another
      (price left, buy right) instead of four separate lines. */
@@ -4702,6 +4741,10 @@ const SFX=(()=>{ let muted=false, volume=1, heartbeatTimer=null;
     // with a soft triangle harmonic on top plus a brief high-passed sparkle,
     // going for "crystalline"/soul-toned rather than "coin".
     talentUpgrade(){ tone({freq:660,slideTo:880,dur:0.12,type:'sine',gain:0.12}); tone({freq:990,dur:0.14,type:'triangle',gain:0.08,delay:0.06}); noise({dur:0.15,gain:0.05,delay:0.02,filterFreq:4500}); },
+    // Character-pick confirm — a weightier "locked in" tone, distinct from the
+    // plain uiClick() tap and from runStart()'s own fanfare (which still plays
+    // separately once startRun() actually fires behind the stripe wipe).
+    charSelect(){ tone({freq:220,slideTo:340,dur:0.16,type:'triangle',gain:0.14}); tone({freq:440,dur:0.2,type:'sine',gain:0.12,delay:0.1}); tone({freq:660,dur:0.18,type:'sine',gain:0.08,delay:0.16}); },
   };
 })();
 const MUSIC=(()=>{ let musicGain=null,volume=0.35,playing=false,schedulerId=null,nextNoteTime=0,step16=0,intense=false;
@@ -4865,6 +4908,56 @@ function show(id){
   next.classList.add('screen-in');
   requestAnimationFrame(()=>requestAnimationFrame(()=>next.classList.remove('screen-in')));
 }
+// POLISH_PLAN_11/12/13 — the character-select -> run-start transition
+// specifically: a fuller "loading screen" wipe (a handful of wide,
+// diagonally-skewed bars growing to fully cover, then shrinking away to
+// reveal) rather than the plain cross-fade every other screen switch uses —
+// covers the screen, runs `onCovered` (startRun()) while hidden, then
+// uncovers. Wide (few, fat bars, not many thin ones), no glow (flat
+// var(--void) fill, see CSS — no border/box-shadow), alternating diagonal
+// skew per bar, and the two phases sweep in opposite stagger order (cover:
+// left-to-right, uncover: right-to-left) so they read as genuinely different
+// motions, not one played backwards.
+// POLISH_PLAN_13 — tightened timing/stagger for a snappier "action" cascade
+// (was a slower, more cinematic 55ms/420ms) + a single brief accent flash at
+// the exact moment of full coverage (the "impact beat" — see .stripe-wipe-
+// flash in CSS). The overshoot itself lives in the CSS transition's easing
+// curve (cubic-bezier "back" ease on the cover phase), not here.
+const STRIPE_WIPE_BARS = 6, STRIPE_WIPE_SKEW_DEG = 24, STRIPE_WIPE_COVER_MS = 240, STRIPE_WIPE_UNCOVER_MS = 200, STRIPE_WIPE_STAGGER_MS = 40;
+function playStripeWipeTransition(onCovered){
+  const overlay=document.createElement('div'); overlay.className='stripe-wipe';
+  const bars=[];
+  // Pixel-based, not percent — a skewX shift scales with the bar's *height* in
+  // real pixels, while left/width naturally want to be in terms of *width*.
+  // On a tall narrow phone (height >> width) a fixed angle can shift a bar's
+  // edge by close to the full viewport width, so the overlap margin has to be
+  // computed from the actual skew geometry, not a flat percentage guess.
+  const vw=window.innerWidth, vh=window.innerHeight;
+  const skewShiftPx=vh*1.2*Math.tan(STRIPE_WIPE_SKEW_DEG*Math.PI/180); // *1.2 for the bar's own 120%-height CSS extension
+  const unitPx=vw/STRIPE_WIPE_BARS, widthPx=unitPx+skewShiftPx;
+  for(let i=0;i<STRIPE_WIPE_BARS;i++){
+    const bar=document.createElement('div'); bar.className='stripe-wipe-bar';
+    bar.style.left=(i*unitPx-skewShiftPx/2)+'px'; bar.style.width=widthPx+'px';
+    bar.style.setProperty('--bar-skew', (i%2===0 ? -STRIPE_WIPE_SKEW_DEG : STRIPE_WIPE_SKEW_DEG)+'deg');
+    overlay.appendChild(bar); bars.push(bar);
+  }
+  const flash=document.createElement('div'); flash.className='stripe-wipe-flash'; overlay.appendChild(flash);
+  document.body.appendChild(overlay);
+  bars.forEach((b,i)=>b.style.transitionDelay=(i*STRIPE_WIPE_STAGGER_MS/1000)+'s'); // cover: left-to-right
+  requestAnimationFrame(()=>requestAnimationFrame(()=>overlay.classList.add('cover')));
+  setTimeout(()=>{
+    // Snap the char-select screen away instantly instead of letting startRun()'s
+    // own hideAll() cross-fade it underneath the (already fully opaque) wipe —
+    // two overlapping transition effects for one action was the "double
+    // transition" bug: this makes sure only the wipe itself is ever visible.
+    const cs=document.getElementById('screen-charselect'); if(cs) cs.classList.add('hidden');
+    flash.classList.add('pulse');
+    onCovered();
+    bars.forEach((b,i)=>b.style.transitionDelay=((STRIPE_WIPE_BARS-1-i)*STRIPE_WIPE_STAGGER_MS/1000)+'s'); // uncover: right-to-left
+    overlay.classList.remove('cover'); overlay.classList.add('uncover');
+    setTimeout(()=>overlay.remove(), STRIPE_WIPE_UNCOVER_MS+STRIPE_WIPE_BARS*STRIPE_WIPE_STAGGER_MS+80);
+  }, STRIPE_WIPE_COVER_MS+STRIPE_WIPE_BARS*STRIPE_WIPE_STAGGER_MS);
+}
 function setState(s){ state=s; if(!["playing","levelup","paused","shop","ingame-stats","event","fusion"].includes(s)) document.getElementById('hud').classList.add('hidden'); }
 function goMenu(){ setState('menu'); SFX.stopHeartbeat(); MUSIC.stop(); refreshSoulBadges(); updateContinueButton(); show('screen-menu'); }
 function updateContinueButton(){
@@ -4923,6 +5016,7 @@ function renderCharSelect(){
   const fitAll=available>=neededAtMin;
   wrap.className='char-select-wrap '+(fitAll?'fit':'carousel');
   const cardW=fitAll?clamp((available-(n-1)*CHAR_CARD_GAP)/n,CHAR_CARD_MIN_W,CHAR_CARD_MAX_W):CHAR_CARD_CAROUSEL_W;
+  let locked=false;
   CHARACTERS.forEach((c,i)=>{
     const el=document.createElement('div'); el.className='card char-card';
     const color=c.color||'#b98cff';
@@ -4933,7 +5027,21 @@ function renderCharSelect(){
     el.style.backgroundImage=`linear-gradient(115deg, transparent 40%, ${hexToRgba(color,0.16)} 50%, transparent 60%)`;
     const w=WEAPONS[c.startWeapon];
     el.innerHTML=`<div class="card-head"><div class="icon" style="color:${color}; text-shadow:0 0 12px ${color};">${c.icon}</div><div class="card-head-text"><div class="name">${c.name}</div><div class="tag" style="color:${color}; border-color:${color};">STARTS WITH ${w.icon} ${w.name}</div></div></div><div class="desc">${c.playstyle}</div><div class="playstyle">${c.uniqueDesc}</div>`;
-    el.onclick=()=>{ SFX.uiClick(); selectedCharacter=c.id; startRun(); };
+    // POLISH_PLAN_11 — pick sequence: scroll the card into view + confirm glow +
+    // sound, THEN (after a beat to actually register) the stripe wipe covers the
+    // screen, startRun() happens behind it, then it uncovers into the run.
+    // `locked` is a closure var shared by every card created in this render pass
+    // (not module-level) so it naturally resets the next time this screen opens.
+    el.onclick=()=>{
+      if(locked) return; locked=true;
+      wrap.classList.add('locked');
+      SFX.charSelect();
+      el.style.setProperty('--char-select-glow', hexToRgba(color,0.85));
+      el.classList.add('char-card-selected');
+      el.scrollIntoView({behavior:'smooth', inline:'center', block:'nearest'});
+      selectedCharacter=c.id;
+      setTimeout(()=>{ playStripeWipeTransition(startRun); }, 550);
+    };
     wrap.appendChild(el);
   });
   if(!fitAll) setupCharCarouselTilt(wrap);
