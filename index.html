@@ -33,6 +33,32 @@
     background:linear-gradient(180deg,#fff, #b98cff 140%); -webkit-background-clip:text; background-clip:text; color:transparent;
     text-shadow:0 0 60px rgba(185,140,255,0.25);}
   .subtitle{margin-top:10px; font-size:13px; color:var(--dim); letter-spacing:1px; max-width:520px;}
+  /* POLISH_PLAN items 8-9 — glitch is deliberately rare-burst, not constant (see
+     the 93-100% "hold" ranges below): a title that glitches nonstop is just noisy,
+     not "not boring". Two distinct styles, applied only to contemplative screens
+     (menu/victory/talent/achievements) — never on a screen with a timed decision
+     (level-up, shop, fusion, event) where a stable read matters more than flavor.
+     Menu/victory already lean on this game's "corrupted machine" identity (see
+     the menu's own "ASCENSёON"/"he11o wor1_D" copy) — this just animates it. */
+  @keyframes glitchRgb{
+    0%,93%,100%{text-shadow:0 0 60px rgba(185,140,255,0.25);}
+    94%{text-shadow:-2px 0 #ff3b3b, 2px 0 #4dd9ff, 0 0 60px rgba(185,140,255,0.25);}
+    95%{text-shadow:2px 0 #ff3b3b, -2px 0 #4dd9ff, 0 0 60px rgba(185,140,255,0.25);}
+    96%{text-shadow:0 0 60px rgba(185,140,255,0.25);}
+    97%{text-shadow:-1px 0 #ff3b3b, 1px 0 #4dd9ff, 0 0 60px rgba(185,140,255,0.25);}
+  }
+  @keyframes glitchScan{
+    0%,96%,100%{opacity:1; clip-path:inset(0 0 0 0);}
+    97%{opacity:0.7; clip-path:inset(20% 0 35% 0);}
+    98%{opacity:1; clip-path:inset(55% 0 8% 0);}
+    99%{opacity:0.85; clip-path:inset(0 0 0 0);}
+  }
+  #screen-menu .title, #screen-victory .title{animation:glitchRgb 4.5s infinite;}
+  #screen-meta .title, #screen-achievements .title{animation:glitchScan 6s infinite;}
+  /* Kickers "breathe" everywhere (subtle, cheap, always-on since it's just an
+     opacity/letter-spacing drift — not a burst effect like the titles above). */
+  .kicker{animation:kickerBreathe 3.6s ease-in-out infinite;}
+  @keyframes kickerBreathe{0%,100%{opacity:0.8; letter-spacing:4px;} 50%{opacity:1; letter-spacing:5px;}}
   .menu-col{position:relative; z-index:2; display:flex; flex-direction:column; gap:10px; width:290px;}
   .btn{appearance:none; border:1px solid var(--line); background:var(--panel); color:var(--text);
     font-family:'Rajdhani',sans-serif; font-weight:600; font-size:16px; letter-spacing:2px;
@@ -55,6 +81,11 @@
   .hud-top{position:absolute; top:0; left:0; right:0; z-index:8; display:flex; justify-content:space-between; align-items:flex-start;
     padding:calc(16px + var(--safe-top)) calc(20px + var(--safe-right)) 16px calc(20px + var(--safe-left));}
   .hp-wrap{width:250px;}
+  /* POLISH_PLAN item 10 — low-HP pulse, toggled in refreshHud() at the same <25%
+     threshold that already triggers SFX.startHeartbeat(), so the visual and the
+     audio cue agree instead of only one of them existing. */
+  .hp-wrap.low-hp .bar-track{animation:lowHpPulse 0.9s ease-in-out infinite;}
+  @keyframes lowHpPulse{0%,100%{box-shadow:0 0 0 rgba(255,60,60,0);} 50%{box-shadow:0 0 14px rgba(255,60,60,0.85);}}
   .bar-track{width:100%; height:15px; background:#1a1c24; border:1px solid var(--line); border-radius:3px; overflow:hidden; position:relative;}
   .bar-fill{height:100%; transition:width .12s linear;}
   .hp-fill{background:linear-gradient(90deg,#8b1c2c,var(--hp));}
@@ -64,13 +95,16 @@
   .hp-row{display:flex; align-items:center; margin-bottom:6px;}
   .resource-row{display:flex; gap:10px; font-family:'JetBrains Mono',monospace; font-size:12px; flex-wrap:wrap; max-width:340px;}
   .res-chip{display:flex; align-items:center; gap:6px; background:var(--panel); border:1px solid var(--line); padding:5px 9px; border-radius:2px;}
+  .val-pulse{animation:valPulse 0.3s ease-out; display:inline-block;}
+  @keyframes valPulse{0%{transform:scale(1.4); color:var(--xp);} 100%{transform:scale(1); color:inherit;}}
   .dot{width:8px; height:8px; border-radius:50%;}
   .timer{font-family:'JetBrains Mono',monospace; font-size:24px; letter-spacing:2px; color:var(--text); text-align:center;}
   .timer .phase{display:block; font-size:10px; letter-spacing:3px; color:var(--accent); text-align:center; margin-top:2px;}
   .hud-bottom{position:absolute; bottom:0; left:0; right:0; padding:14px calc(20px + var(--safe-right)) calc(14px + var(--safe-bottom)) calc(20px + var(--safe-left)); display:flex; flex-direction:column; gap:8px; align-items:center;}
   .ability-hud{position:absolute; right:calc(20px + var(--safe-right)); bottom:calc(96px + var(--safe-bottom)); z-index:7; display:flex; flex-direction:column; gap:12px; pointer-events:auto;}
   .ability-btn{position:relative; width:52px; height:52px; border-radius:50%; background:var(--panel); border:2px solid var(--line); display:flex; align-items:center; justify-content:center; font-size:22px; cursor:pointer; user-select:none; transition:border-color .15s;}
-  .ability-btn.ready{border-color:var(--accent); box-shadow:0 0 12px rgba(185,140,255,0.3);}
+  .ability-btn.ready{border-color:var(--accent); animation:abilityReadyPulse 1.6s ease-in-out infinite;}
+  @keyframes abilityReadyPulse{0%,100%{box-shadow:0 0 8px rgba(185,140,255,0.25);} 50%{box-shadow:0 0 16px rgba(185,140,255,0.55);}}
   .ability-btn .ab-icon{position:relative; z-index:1; filter:drop-shadow(0 1px 2px rgba(0,0,0,0.6));}
   .ability-btn .ab-cd{position:absolute; inset:0; border-radius:50%; background:transparent; pointer-events:none;}
   .ability-btn .ab-label{position:absolute; bottom:-15px; left:50%; transform:translateX(-50%); font-family:'JetBrains Mono',monospace; font-size:8px; letter-spacing:1px; color:var(--dim); white-space:nowrap;}
@@ -78,7 +112,7 @@
   .xp-track{width:min(560px,70vw); height:10px;}
   .weapon-row{display:flex; gap:6px; flex-wrap:wrap; justify-content:center; max-width:90vw;}
   .wpn-icon{width:34px; height:34px; border:1px solid var(--line); background:var(--panel); border-radius:4px; display:flex; align-items:center; justify-content:center; font-size:15px; position:relative;}
-  .wpn-icon.evolved{border-color:var(--gold); box-shadow:0 0 10px rgba(255,179,71,0.35) inset;}
+  .wpn-icon.evolved{border-color:var(--gold); box-shadow:0 0 10px rgba(255,179,71,0.35) inset; filter:drop-shadow(0 0 4px rgba(255,179,71,0.7));}
   .wpn-icon .wlvl{position:absolute; bottom:-2px; right:-2px; background:var(--accent); color:#000; font-size:8.5px; font-weight:700; border-radius:8px; padding:0 4px; font-family:'JetBrains Mono',monospace;}
   .passive-row{display:flex; gap:6px;}
   .psv-icon{width:26px; height:26px; border:1px solid var(--soul); background:var(--panel); border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:12px;}
@@ -116,14 +150,34 @@
   .card.rarity-uncommon{border-top-color:var(--xp);}
   .card.rarity-rare{border-top-color:var(--crystal); box-shadow:0 0 18px rgba(126,224,255,0.14) inset;}
   .card.rarity-rare .name{color:var(--crystal);}
-  .card.rarity-legendary{border-top-color:var(--gold); box-shadow:0 0 22px rgba(255,179,71,0.2) inset;}
+  .card.rarity-legendary{border-top-color:var(--gold); animation:legendaryGlow 2.2s ease-in-out infinite;}
+  @keyframes legendaryGlow{0%,100%{box-shadow:0 0 22px rgba(255,179,71,0.2) inset;} 50%{box-shadow:0 0 30px rgba(255,179,71,0.4) inset;}}
   .card.rarity-legendary .name{color:var(--gold);}
   .card.rarity-legendary:hover{border-top-color:var(--gold);}
+  /* Mythic (5th tier, above legendary) is the only rarity that animates — reserved for a
+     handful of cards that are already design-wise "beyond legendary" (ascendant_* — see where
+     c.rarity is set). Cycles through the existing palette (artifact pink/accent purple/crystal
+     cyan) rather than new hues, so it still reads as part of the same system. */
+  .card.rarity-mythic{animation:mythicBorder 2.4s ease-in-out infinite;}
+  .card.rarity-mythic .name{background:linear-gradient(90deg,var(--artifact),var(--accent),var(--crystal),var(--artifact));
+    background-size:300% 100%; -webkit-background-clip:text; background-clip:text; color:transparent; animation:mythicText 3s linear infinite;}
+  @keyframes mythicBorder{
+    0%,100%{border-top-color:var(--artifact); box-shadow:0 0 26px rgba(255,158,203,0.3) inset;}
+    33%{border-top-color:var(--accent); box-shadow:0 0 26px rgba(185,140,255,0.3) inset;}
+    66%{border-top-color:var(--crystal); box-shadow:0 0 26px rgba(126,224,255,0.3) inset;}}
+  @keyframes mythicText{0%{background-position:0% 50%;} 100%{background-position:300% 50%;}}
   .rarity-label{position:absolute; top:-9px; right:10px; font-family:'JetBrains Mono',monospace; font-size:8px; letter-spacing:1.5px; padding:1px 6px; border-radius:8px; background:var(--panel); border:1px solid var(--line); color:var(--dim); text-transform:uppercase;}
   .card.rarity-uncommon .rarity-label{border-color:var(--xp); color:var(--xp);}
   .card.rarity-rare .rarity-label{border-color:var(--crystal); color:var(--crystal);}
   .card.rarity-legendary .rarity-label{border-color:var(--gold); color:var(--gold);}
+  .card.rarity-mythic .rarity-label{border-color:var(--artifact); color:var(--artifact); animation:mythicLabel 2.4s ease-in-out infinite;}
+  @keyframes mythicLabel{0%,100%{border-color:var(--artifact); color:var(--artifact);} 33%{border-color:var(--accent); color:var(--accent);} 66%{border-color:var(--crystal); color:var(--crystal);}}
   .shop-card{ padding:10px 9px; width:100%; }
+  /* !important to win over whatever .rarity-* border-top color is also on the element (locked
+     items keep their rarity class for when they unlock, but should read as locked first). */
+  .shop-card.locked{ background:#0a0b10; border-top-color:var(--line) !important; box-shadow:none !important; cursor:not-allowed; }
+  .shop-card.locked .icon{ opacity:0.7; }
+  .shop-card.locked .name, .shop-card.locked .desc{ color:var(--dim); }
   .shop-card:hover:not(:disabled){ transform:none !important; }
   .shop-card .icon{ font-size:18px; margin-bottom:4px; }
   .shop-card .name{ font-family:'Rajdhani',sans-serif; font-weight:700; font-size:13px; margin-bottom:2px; line-height:1.1; }
@@ -147,23 +201,45 @@
      would hide the very text explaining why it's locked — .meta-wrap's own
      overflow-y:auto is the fallback if that pushes past the graph's box. */
   .talent-graph-scroll{overflow-x:auto; overflow-y:visible; touch-action:pan-x;}
-  .talent-graph{position:relative; width:600px; height:390px; margin:6px auto 0;}
+  .talent-graph{position:relative; width:900px; height:390px; margin:6px auto 0; transition:width .25s, height .25s;}
   .talent-lines{position:absolute; inset:0; width:100%; height:100%; pointer-events:none; overflow:visible;}
-  .talent-lines line{stroke:var(--line); stroke-width:2; transition:stroke .2s;}
+  .talent-lines line{stroke:var(--line); stroke-width:2; transition:stroke .2s, x1 .3s, y1 .3s, x2 .3s, y2 .3s;}
   .talent-lines line.unlocked{stroke:var(--accent);}
-  .talent-node{position:absolute; width:132px; background:var(--panel); border:2px solid var(--line); border-radius:8px;
-    padding:9px 10px; cursor:pointer; transition:border-color .15s, opacity .15s, box-shadow .15s; display:flex; flex-direction:column; gap:4px;}
-  .talent-node:hover:not(.locked){border-color:var(--accent);}
-  .talent-node.locked{opacity:0.4; filter:grayscale(0.7); cursor:not-allowed;}
-  .talent-node.maxed{border-color:var(--gold); box-shadow:0 0 16px rgba(255,179,71,0.22);}
-  .talent-node .tn-name{font-family:'Rajdhani',sans-serif; font-weight:700; font-size:12.5px; padding-right:14px;}
-  .talent-node .tn-desc{font-size:9.5px; color:var(--dim); line-height:1.3;}
-  .talent-node .tn-pips{display:flex; gap:3px; margin-top:2px;}
-  .talent-node .pip{flex:1; height:5px; background:var(--line); border-radius:2px;}
+  /* Compact icon cell (POLISH_PLAN item 6) — replaces the old full-text card; name/
+     desc/cost/requires all moved into #talentTooltip so the graph itself stays
+     dense and scannable. left/top transition so nodes glide into a new layout
+     (item 5's longer chains) instead of jumping. */
+  .talent-node{position:absolute; width:58px; height:58px; background:var(--panel); border:2px solid var(--line); border-radius:12px;
+    cursor:pointer; transition:left .3s, top .3s, border-color .15s, box-shadow .15s, transform .15s, background .15s;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px;}
+  .talent-node:hover:not(.locked){border-color:var(--accent); transform:scale(1.08);}
+  .talent-node .tn-icon{font-size:21px; line-height:1;}
+  .talent-node .tn-pips{display:flex; gap:2px;}
+  .talent-node .pip{width:6px; height:4px; background:var(--line); border-radius:1px;}
   .talent-node .pip.filled{background:var(--accent);}
+  .talent-node.maxed{border-color:var(--gold); box-shadow:0 0 16px rgba(255,179,71,0.28);}
   .talent-node.maxed .pip.filled{background:var(--gold);}
-  .talent-node .tn-lock{position:absolute; top:8px; right:9px; font-size:11px;}
-  .talent-node .tn-buy{margin-top:2px; align-self:flex-start; font-size:9.5px; padding:3px 7px;}
+  /* Locked: solid dark (not just dimmed) + a dominant lock icon replacing the stat
+     icon entirely — info isn't hidden, just gated behind the tooltip (always
+     works, even locked, per the request). */
+  .talent-node.locked{background:#0a0b10; border-color:var(--line); cursor:not-allowed;}
+  .talent-node.locked .tn-icon{font-size:22px; opacity:0.8;}
+  .talent-node.locked .tn-pips{opacity:0.3;}
+  .talent-node.just-unlocked{animation:talentUnlockPulse .6s ease-out;}
+  @keyframes talentUnlockPulse{0%{transform:scale(0.7); box-shadow:0 0 0 rgba(185,140,255,0);} 50%{transform:scale(1.22); box-shadow:0 0 26px rgba(185,140,255,0.7);} 100%{transform:scale(1); box-shadow:0 0 0 rgba(185,140,255,0);}}
+  /* First custom tooltip component in the game (everything else used the native
+     title= attribute) — fixed-positioned near whatever node/element triggered it,
+     shown on hover (desktop) or tap (touch, see openTalentTooltip's isTouchDevice
+     branch) so it "always works" even for a locked node the player can't buy yet. */
+  #talentTooltip{position:fixed; z-index:60; max-width:210px; background:linear-gradient(180deg,#1c1e28,#141821);
+    border:1px solid var(--accent); border-radius:6px; padding:10px 12px; pointer-events:none; opacity:0;
+    transform:translateY(4px); transition:opacity .12s, transform .12s; box-shadow:0 10px 30px rgba(0,0,0,0.5);}
+  #talentTooltip.show{opacity:1; transform:translateY(0);}
+  #talentTooltip .tt-name{font-family:'Rajdhani',sans-serif; font-weight:700; font-size:13.5px; color:#fff;}
+  #talentTooltip .tt-desc{font-size:11px; color:var(--dim); margin-top:4px; line-height:1.4;}
+  #talentTooltip .tt-tier{font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--accent); margin-top:6px;}
+  #talentTooltip .tt-cost{font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--soul); margin-top:3px;}
+  #talentTooltip .tt-req{font-size:10px; color:#ff8a4d; margin-top:6px; line-height:1.4;}
   .buy-btn{font-family:'JetBrains Mono',monospace; font-size:12.5px; border:1px solid var(--soul); color:var(--soul); background:transparent; padding:7px 12px; border-radius:2px; cursor:pointer; white-space:nowrap;}
   .buy-btn:hover:not(:disabled){background:rgba(92,225,230,0.1);}
   .buy-btn:disabled{opacity:0.3; cursor:not-allowed; border-color:var(--dim); color:var(--dim);}
@@ -191,6 +267,7 @@
     animation:toastIn .35s cubic-bezier(.2,.9,.3,1) forwards, toastOut .4s ease-in 3.6s forwards;}
   .ach-toast .t-icon{font-size:22px;} .ach-toast .t-kicker{font-family:'JetBrains Mono',monospace; font-size:9px; letter-spacing:2px; color:var(--gold);}
   .ach-toast .t-name{font-family:'Rajdhani',sans-serif; font-weight:700; font-size:15px; color:#fff;}
+  .ach-toast .t-reward{font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--gold); margin-top:2px;}
   @keyframes toastIn{from{opacity:0; transform:translateY(-16px) scale(0.96);} to{opacity:1; transform:translateY(0) scale(1);}}
   @keyframes toastOut{to{opacity:0; transform:translateY(-10px) scale(0.98);}}
   .synergy-toast{border-color:var(--crystal) !important; box-shadow:0 10px 30px rgba(0,0,0,0.5), 0 0 24px rgba(126,224,255,0.2) !important;}
@@ -364,7 +441,7 @@
 
   <div class="screen hidden" id="screen-death">
     <div class="veil"></div>
-    <div class="title-wrap" style="margin-bottom:6px;"><div class="kicker" id="deathKicker">run ended</div><div class="title" style="font-size:44px;">YOU FELL</div></div>
+    <div class="title-wrap" style="margin-bottom:6px;"><div class="kicker" id="deathKicker">run ended</div><div class="title" id="deathTitle" style="font-size:44px;">YOU FELL</div></div>
     <div class="stats-grid" id="deathStats"></div>
     <div class="soul-gain" id="soulGain"></div>
     <div class="menu-col"><button class="btn primary" id="btnAgain">Run Again</button><button class="btn" id="btnToMenu">Return to Base</button></div>
@@ -453,6 +530,7 @@
 </div>
 
 <div id="achToastLayer"></div>
+<div id="talentTooltip"></div>
 <div id="bossWarning"><div class="bw-vignette"></div><div class="bw-text">⚠ INCOMING ⚠</div><div class="bw-name" id="bossWarningName">THE DRAGON</div></div>
 
 <script>
@@ -506,6 +584,13 @@ const WEAPONS = {
   stormpiercer:{name:"Stormpiercer",icon:"🌠",type:"projectile",tags:["physical","pierce","speed"],base:{dmg:34,cd:0.5,speed:680,pierce:6,count:1,searchRadius:520,life:1.3},perLevel:{dmg:12,count:0.3},maxLevel:8,fusionOnly:true},
   crimson_fang:{name:"Crimson Fang",icon:"⚔️",type:"melee",tags:["bleed","lifesteal","crit"],base:{dmg:22,cd:0.28,radius:80,pierce:99},perLevel:{dmg:8,radius:3},maxLevel:8,fusionOnly:true},
   entropy_bloom:{name:"Entropy Bloom",icon:"🌌",type:"area",tags:["fire","poison","slow"],base:{dmg:30,cd:1.8,radius:150},perLevel:{dmg:11,radius:7},maxLevel:8,fusionOnly:true},
+  spectral_lance:{name:"Spectral Lance",icon:"🌟",type:"beam",tags:["lightning","elemental","single_target"],base:{dps:52,range:260,tick:0.13},perLevel:{dps:19},maxLevel:8,fusionOnly:true},
+  bone_pack:{name:"Bone Pack",icon:"🦴",type:"summon",tags:["summon","undead","beast"],base:{minionDmg:15,cd:5,maxMinions:3},perLevel:{minionDmg:5.5,maxMinions:0.3},maxLevel:8,fusionOnly:true},
+  voltaic_spikes:{name:"Voltaic Spikes",icon:"💠",type:"trap",tags:["physical","lightning","chain"],base:{dmg:44,cd:2.6,radius:120,jumps:3,jumpRange:220},perLevel:{dmg:16,jumps:0.3},maxLevel:8,fusionOnly:true},
+  maelstrom_chain:{name:"Maelstrom Chain",icon:"⛈️",type:"chain",tags:["lightning","crowd"],base:{dmg:16,cd:0.75,jumps:6,jumpRange:260},perLevel:{dmg:6,jumps:0.5},maxLevel:8,fusionOnly:true},
+  gravity_hammer:{name:"Gravity Hammer",icon:"🌀",type:"melee",tags:["control","stagger","knockback"],base:{dmg:44,cd:1.3,radius:150},perLevel:{dmg:16,radius:5},maxLevel:8,fusionOnly:true},
+  plasma_lance:{name:"Plasma Lance",icon:"☄️",type:"projectile",tags:["physical","fire","burst"],base:{dmg:26,cd:0.5,speed:820,pierce:5,count:1,searchRadius:500,life:1.0},perLevel:{dmg:10,pierce:0.5},maxLevel:8,fusionOnly:true},
+  blight_frost:{name:"Blight Frost",icon:"☣️",type:"area",tags:["frost","poison","slow"],base:{dmg:18,cd:1.3,radius:155,lingerLife:3},perLevel:{dmg:7,radius:6},maxLevel:8,fusionOnly:true},
 };
 // Global weapon rework/nerf pass: the player was reported as too strong overall.
 // Rather than hand-tuning 20 separate weapons' dmg/dps fields (error-prone and
@@ -531,12 +616,14 @@ const WEAPON_COLORS = {
   whip:"#ff8a4d", twin_daggers:"#dfe3ee", javelin:"#c8c8d8", hand_cannon:"#ffb347", gauss_needle:"#7ee0ff",
   arc_lance:"#ffe15c", void_rift:"#b98cff", swarm_hive:"#e0b48a", glacier_totem:"#8fd8ff", storm_chain:"#ffe15c",
   stormpiercer:"#e8c96b", crimson_fang:"#ff7a8a", entropy_bloom:"#c97fdb",
+  spectral_lance:"#c9a6ff", bone_pack:"#d495c7", voltaic_spikes:"#ffb050", maelstrom_chain:"#fff066",
+  gravity_hammer:"#e0a97a", plasma_lance:"#c98fd6", blight_frost:"#8fe0a0",
 };
 // Per-weapon bullet silhouette, reusing the shape-render branches render() already has for boss
 // attack patterns (spiral/diamond/petal/wave/homing/blade — see PART 12) instead of every player
 // projectile being an identical plain circle. Weapons not listed here keep the default circle,
 // which fits their identity (plasma_rifle is a rapid spray of small energy bolts).
-const PROJECTILE_SHAPES = { bow:"wave", railgun:"spiral", shuriken_storm:"blade", javelin:"homing", hand_cannon:"diamond", gauss_needle:"petal", stormpiercer:"homing" };
+const PROJECTILE_SHAPES = { bow:"wave", railgun:"spiral", shuriken_storm:"blade", javelin:"homing", hand_cannon:"diamond", gauss_needle:"petal", stormpiercer:"homing", plasma_lance:"spiral" };
 // Visual tier from weapon level (1-4) — drives bullet size/glow, melee afterimage count, chain arc
 // thickness, area/aura pulse intensity, etc. so leveling up reads as a growing presence on screen,
 // not just a bigger number in the level-up card.
@@ -584,10 +671,24 @@ const EVOLUTIONS = {
 // confirms it from the 🧬 HUD button (only visible while something's available) —
 // applyFusion() then removes both source weapons and grants `result` at a
 // starting level reflecting the sacrifice, netting the player from 2 slots to 1.
+// Expanded (POLISH_PLAN item 4) to cover every weapon type except aura — aura's
+// weaponFire() branch dispatches on a hardcoded `if(wid==="holy_aura")else if(wid
+// ==="thorn_aura")`, not generic base-field reads like every other type, so a new
+// aura fusion result would silently do nothing without real engine changes (out
+// of scope for a data-only content pass). trap/summon/area/chain/melee/beam/
+// projectile are all generic enough that a new wid "just works" the same way the
+// original 3 fusions already proved.
 const FUSIONS = [
   {id:"stormpiercer_fusion", from:["bow","javelin"], minLevel:6, result:"stormpiercer", name:"Stormpiercer", desc:"Bow's speed and Javelin's pierce, forged into one relentless spear of light."},
   {id:"crimson_fang_fusion", from:["blood_blade","twin_daggers"], minLevel:6, result:"crimson_fang", name:"Crimson Fang", desc:"Twin Daggers' speed married to Blood Blade's hunger for blood."},
   {id:"entropy_bloom_fusion", from:["fire_nova","void_rift"], minLevel:6, result:"entropy_bloom", name:"Entropy Bloom", desc:"Fire and void collapse into one another, again and again."},
+  {id:"spectral_lance_fusion", from:["prism_beam","arc_lance"], minLevel:6, result:"spectral_lance", name:"Spectral Lance", desc:"A prismatic current given the focus of a lance."},
+  {id:"bone_pack_fusion", from:["necro_staff","spirit_wolves"], minLevel:6, result:"bone_pack", name:"Bone Pack", desc:"The dead and the feral hunt as one pack."},
+  {id:"voltaic_spikes_fusion", from:["spike_trap","tesla_coil"], minLevel:6, result:"voltaic_spikes", name:"Voltaic Spikes", desc:"Every spike a conductor, every strike a chain."},
+  {id:"maelstrom_chain_fusion", from:["chain_lightning","storm_chain"], minLevel:6, result:"maelstrom_chain", name:"Maelstrom Chain", desc:"Two storms, one unbroken current."},
+  {id:"gravity_hammer_fusion", from:["chain_hook","warhammer"], minLevel:6, result:"gravity_hammer", name:"Gravity Hammer", desc:"Pull them in. Bring it down."},
+  {id:"plasma_lance_fusion", from:["plasma_rifle","railgun"], minLevel:6, result:"plasma_lance", name:"Plasma Lance", desc:"Railgun precision behind a plasma rifle's furious rate of fire."},
+  {id:"blight_frost_fusion", from:["frost_field","poison_cloud"], minLevel:6, result:"blight_frost", name:"Blight Frost", desc:"Cold that festers, rot that numbs."},
 ];
 
 const CARDS = [
@@ -672,6 +773,14 @@ const CARDS = [
 // more specialized pivot (uncommon), build_defining reshapes a whole build (rare).
 const CARD_CAT_RARITY = {offensive:"common",defensive:"common",utility:"common",elemental:"uncommon",build_defining:"rare",legendary:"legendary"};
 for(const c of CARDS) c.rarity = CARD_CAT_RARITY[c.cat] || "common";
+// The three ascendant_* cards are already design-wise "beyond legendary" — uncapped
+// maxStacks:99999, specifically so the level-up pool never runs dry on a long endless run (see
+// Round 3 balance history) — mythic rarity finally gives that intent a visible tier instead of
+// hiding behind their `cat`'s ordinary common/defensive tag. Overridden directly (not via
+// CARD_CAT_RARITY) since these are the only 3 exceptions to the cat->rarity rule.
+for(const id of ["ascendant_power","ascendant_velocity","ascendant_vitality"]){
+  const c=CARDS.find(x=>x.id===id); if(c) c.rarity="mythic";
+}
 
 const PASSIVE_SLOT_TYPES = ["artifact","amulet","ring","relic"];
 const MAX_PASSIVE_SLOTS = 6;
@@ -1083,13 +1192,28 @@ const EVENTS = [
 // hunter/engineer/necromancer each mirror one CHARACTERS id's kit/uniqueBonus so
 // every playable class has a matching branch (was missing for engineer/necromancer).
 const TALENT_BRANCHES = ["warrior","mage","hunter","survivor","engineer","necromancer"];
+// `icon` (POLISH_PLAN item 6) drives the compact talent-node cell — nodes show
+// only the icon + tier pips now, name/desc moved into the hover/tap tooltip
+// (see #talentTooltip / openTalentTooltip in renderTalentTree).
+// Each branch got 2 more lines (POLISH_PLAN item 5, indices 5-6) past the original
+// 5-node diamond so the chain from root to final node is 5 hops deep instead of 3 —
+// see TALENT_NODE_LAYOUT below for the shape. All 12 new lines reuse stats the
+// engine already reads elsewhere (bulwarkDR/thorns/critChance/burnStacks/
+// bonusPierce/critMult/lifesteal/damageReduction/cdrMult/armor/summonInheritDmg) —
+// zero new engine wiring, only applyTalentStat cases.
 const TALENT_STAT_LINES = {
-  warrior:[{key:"maxHp",label:"Vitality",perLevel:12},{key:"armor",label:"Iron Hide",perLevel:0.6},{key:"meleeDmg",label:"Might",perLevel:0.05},{key:"dmgReduction",label:"Steadfast",perLevel:0.02},{key:"startWeaponLvl",label:"Veteran's Edge",perLevel:1}],
-  mage:[{key:"elementalMult",label:"Arcane Focus",perLevel:0.04},{key:"cdr",label:"Flow State",perLevel:0.02},{key:"aoeRadius",label:"Expanded Mind",perLevel:0.03},{key:"arcaneDmg",label:"Ley Attunement",perLevel:0.04},{key:"critDamage",label:"Volatile Casting",perLevel:0.06}],
-  hunter:[{key:"critChance",label:"Deadeye",perLevel:0.015},{key:"moveSpeed",label:"Fleet Foot",perLevel:0.02},{key:"pierce",label:"Penetrating Shot",perLevel:1},{key:"range",label:"Eagle Eye",perLevel:0.03},{key:"eliteDmg",label:"Big Game Hunter",perLevel:0.02}],
-  survivor:[{key:"goldMult",label:"Scavenger",perLevel:0.02},{key:"soulMult",label:"Soulbound",perLevel:0.02},{key:"regen",label:"Grit",perLevel:0.1},{key:"xpMult",label:"Quick Study",perLevel:0.02},{key:"reviveChance",label:"Undying",perLevel:0.04}],
-  engineer:[{key:"turretCdr",label:"Rapid Deployment",perLevel:0.02},{key:"turretRadius",label:"Blast Radius",perLevel:0.03},{key:"turretArmor",label:"Reinforced Chassis",perLevel:0.8},{key:"turretDmg",label:"Overcharged Core",perLevel:0.04},{key:"turretMastery",label:"Master Engineer",perLevel:1}],
-  necromancer:[{key:"boneDmg",label:"Grave Might",perLevel:0.05},{key:"boneCount",label:"Endless Horde",perLevel:0.04},{key:"boneDuration",label:"Undying Legion",perLevel:0.06},{key:"boneInherit",label:"Shared Malice",perLevel:0.03},{key:"boneRaise",label:"Reanimation",perLevel:0.03}],
+  warrior:[{key:"maxHp",label:"Vitality",perLevel:12,icon:"❤️"},{key:"armor",label:"Iron Hide",perLevel:0.6,icon:"🛡️"},{key:"meleeDmg",label:"Might",perLevel:0.05,icon:"⚔️"},{key:"dmgReduction",label:"Steadfast",perLevel:0.02,icon:"🧱"},{key:"startWeaponLvl",label:"Veteran's Edge",perLevel:1,icon:"📈"},
+    {key:"warriorBulwark",label:"Bulwark Instinct",perLevel:0.03,icon:"🔰"},{key:"warriorThorns",label:"Retribution",perLevel:0.05,icon:"🌵"}],
+  mage:[{key:"elementalMult",label:"Arcane Focus",perLevel:0.04,icon:"🌈"},{key:"cdr",label:"Flow State",perLevel:0.02,icon:"⏱️"},{key:"aoeRadius",label:"Expanded Mind",perLevel:0.03,icon:"🌀"},{key:"arcaneDmg",label:"Ley Attunement",perLevel:0.04,icon:"🔮"},{key:"critDamage",label:"Volatile Casting",perLevel:0.06,icon:"💥"},
+    {key:"mageCritChance",label:"Volatile Mind",perLevel:0.01,icon:"🎇"},{key:"mageBurnStacks",label:"Combustion",perLevel:0.4,icon:"🔥"}],
+  hunter:[{key:"critChance",label:"Deadeye",perLevel:0.015,icon:"🎯"},{key:"moveSpeed",label:"Fleet Foot",perLevel:0.02,icon:"🏃"},{key:"pierce",label:"Penetrating Shot",perLevel:1,icon:"🏹"},{key:"range",label:"Eagle Eye",perLevel:0.03,icon:"🔭"},{key:"eliteDmg",label:"Big Game Hunter",perLevel:0.02,icon:"👹"},
+    {key:"hunterPierceDeep",label:"Deep Shots",perLevel:1,icon:"🕳️"},{key:"hunterCritMult",label:"Killer Instinct",perLevel:0.05,icon:"🔪"}],
+  survivor:[{key:"goldMult",label:"Scavenger",perLevel:0.02,icon:"💰"},{key:"soulMult",label:"Soulbound",perLevel:0.02,icon:"🔷"},{key:"regen",label:"Grit",perLevel:0.1,icon:"✚"},{key:"xpMult",label:"Quick Study",perLevel:0.02,icon:"✨"},{key:"reviveChance",label:"Undying",perLevel:0.04,icon:"☥"},
+    {key:"survivorLifesteal",label:"Bloodbound",perLevel:0.01,icon:"🩹"},{key:"survivorDmgReduction",label:"Hardened",perLevel:0.02,icon:"🪖"}],
+  engineer:[{key:"turretCdr",label:"Rapid Deployment",perLevel:0.02,icon:"⚙️"},{key:"turretRadius",label:"Blast Radius",perLevel:0.03,icon:"💣"},{key:"turretArmor",label:"Reinforced Chassis",perLevel:0.8,icon:"🏰"},{key:"turretDmg",label:"Overcharged Core",perLevel:0.04,icon:"🔋"},{key:"turretMastery",label:"Master Engineer",perLevel:1,icon:"🗿"},
+    {key:"engineerCdrDeep",label:"Efficient Systems",perLevel:0.015,icon:"🔧"},{key:"engineerArmorPlate",label:"Plated Hull",perLevel:0.5,icon:"🚧"}],
+  necromancer:[{key:"boneDmg",label:"Grave Might",perLevel:0.05,icon:"💀"},{key:"boneCount",label:"Endless Horde",perLevel:0.04,icon:"🧟"},{key:"boneDuration",label:"Undying Legion",perLevel:0.06,icon:"⏳"},{key:"boneInherit",label:"Shared Malice",perLevel:0.03,icon:"🩸"},{key:"boneRaise",label:"Reanimation",perLevel:0.03,icon:"⚰️"},
+    {key:"necroLifesteal",label:"Vampiric Rites",perLevel:0.015,icon:"🧛"},{key:"necroInheritDeep",label:"Echoing Malice",perLevel:0.02,icon:"👻"}],
 };
 // Talent lines that existed in older builds but had no implemented effect. Their
 // Soul cost is refunded once on load (see migrateTalents) instead of silently lost.
@@ -1109,6 +1233,12 @@ const TALENT_LINE_DESCS = {
   boneDmg:"+5% summon damage per tier.", boneCount:"+4% summon count per tier.",
   boneDuration:"+6% summon duration per tier.", boneInherit:"+3% of your damage multiplier inherited by summons per tier.",
   boneRaise:"+3% chance a killed enemy rises as your minion, per tier.",
+  warriorBulwark:"+3% damage reduction above 50% HP, per tier.", warriorThorns:"+5% thorns (reflect damage to attackers), per tier.",
+  mageCritChance:"+1% crit chance per tier.", mageBurnStacks:"+0.4 max burn stacks per tier (rounded).",
+  hunterPierceDeep:"+1 pierce per tier.", hunterCritMult:"+5% crit damage per tier.",
+  survivorLifesteal:"+1% lifesteal per tier.", survivorDmgReduction:"-2% incoming damage per tier.",
+  engineerCdrDeep:"-1.5% weapon cooldowns per tier.", engineerArmorPlate:"+0.5 flat armor per tier.",
+  necroLifesteal:"+1.5% lifesteal per tier.", necroInheritDeep:"+2% of your damage multiplier inherited by summons per tier.",
 };
 function buildTalentTree(){
   const nodes=[];
@@ -1126,12 +1256,17 @@ function buildTalentTree(){
 // {idx,tier} pairs into the *same branch's* TALENT_STAT_LINES array; a line is
 // locked (can't buy even tier 1) until every required sibling line is at least at
 // that tier. col/row are grid cells the graph UI positions nodes on.
+// POLISH_PLAN item 5 extended the original 5-node diamond (idx0-4) with a 2-node
+// tail (idx5-6) past the old capstone, so the chain from root to final node is now
+// 5 hops deep (was 3) — root->branch->converge->capstone->ext1->ext2.
 const TALENT_NODE_LAYOUT = [
   {col:1,row:2,requires:[]},
   {col:2,row:1,requires:[{idx:0,tier:2}]},
   {col:2,row:3,requires:[{idx:0,tier:2}]},
   {col:3,row:2,requires:[{idx:1,tier:3},{idx:2,tier:3}]},
   {col:4,row:2,requires:[{idx:3,tier:2}]},
+  {col:5,row:2,requires:[{idx:4,tier:2}]},
+  {col:6,row:2,requires:[{idx:5,tier:3}]},
 ];
 function lineRequiresFor(branch,lineIndex){
   return TALENT_NODE_LAYOUT[lineIndex].requires.map(r=>({key:TALENT_STAT_LINES[branch][r.idx].key,tier:r.tier}));
@@ -1173,6 +1308,18 @@ function applyTalentStat(p, statKey, totalPerLevelSum){
     case "boneDuration": p.stats.summonDurationMult=(p.stats.summonDurationMult||1)*(1+v); break;
     case "boneInherit": p.stats.summonInheritDmg=(p.stats.summonInheritDmg||0)+v; break;
     case "boneRaise": p.stats.raiseDeadChance=(p.stats.raiseDeadChance||0)+v; break;
+    case "warriorBulwark": p.stats.bulwarkDR=(p.stats.bulwarkDR||0)+v; break;
+    case "warriorThorns": p.stats.thorns=(p.stats.thorns||0)+v; break;
+    case "mageCritChance": p.stats.critChance+=v; break;
+    case "mageBurnStacks": p.stats.burnStacks=(p.stats.burnStacks||1)+Math.round(v); break;
+    case "hunterPierceDeep": p.stats.bonusPierce=(p.stats.bonusPierce||0)+Math.round(v); break;
+    case "hunterCritMult": p.stats.critMult+=v; break;
+    case "survivorLifesteal": p.stats.lifesteal+=v; break;
+    case "survivorDmgReduction": p.stats.damageReduction=Math.min(0.6,(p.stats.damageReduction||0)+v); break;
+    case "engineerCdrDeep": p.stats.cdrMult=(p.stats.cdrMult||1)*(1-v); break;
+    case "engineerArmorPlate": p.stats.armor+=v; break;
+    case "necroLifesteal": p.stats.lifesteal+=v; break;
+    case "necroInheritDeep": p.stats.summonInheritDmg=(p.stats.summonInheritDmg||0)+v; break;
   }
 }
 
@@ -1195,7 +1342,10 @@ const ACHIEVEMENTS = [
   {id:"hoarder",icon:"🏦",name:"Hoarder",desc:"Accumulate 1000 lifetime Soul.",check:c=>c.lifetime.totalSoul>=1000},
   {id:"persistent",icon:"☠️",name:"Persistent",desc:"Die 10 times.",check:c=>c.lifetime.deaths>=10},
   {id:"veteran",icon:"📜",name:"Veteran",desc:"Complete 25 runs.",check:c=>c.lifetime.runs>=25},
-  {id:"talent_all_maxed",icon:"🎓",name:"Grandmaster",desc:"Max all four talent branches.",check:c=>c.meta.maxedBranches>=4},
+  // >=TALENT_BRANCHES.length (not a hardcoded number) on purpose — this went stale once already
+  // when engineer/necromancer branches were added and the count silently became achievable at
+  // 4/6 branches instead of "all". Description doesn't name a number for the same reason.
+  {id:"talent_all_maxed",icon:"🎓",name:"Grandmaster",desc:"Max every talent branch.",check:c=>c.meta.maxedBranches>=TALENT_BRANCHES.length},
   {id:"evolution_first",icon:"🌀",name:"Transformed",desc:"Evolve your first weapon.",check:c=>c.run.evolutionsThisRun>=1},
   {id:"evolution_all",icon:"🧬",name:"Full Metamorphosis",desc:"Evolve 3 weapons in a single run.",check:c=>c.run.evolutionsThisRun>=3},
   {id:"synergy_first",icon:"🔗",name:"Synergist",desc:"Trigger your first build synergy.",check:c=>c.run.synergiesTriggered>=1},
@@ -1226,6 +1376,12 @@ const ACHIEVEMENTS = [
   {id:"elite_variety",icon:"👹",name:"Elite Cataloguer",desc:"Kill 10 different elite types, lifetime.",check:c=>c.lifetime.uniqueElitesKilled>=10},
   {id:"speed_clear",icon:"⏳",name:"Speedrunner",desc:"Reach the Overlord fight in under 20 minutes.",check:c=>c.run.overlordReachedAtSeconds!=null&&c.run.overlordReachedAtSeconds<1200},
   {id:"talent_branch_maxed",icon:"🌲",name:"Specialist",desc:"Max one full talent branch.",check:c=>c.meta.maxedBranches>=1},
+  // Self-referential unlock (see applyAchievementReward/renderShop): prove you can win without
+  // the training wheels before the game lets you buy them. Uses player.shopPurchases — already
+  // tracked by renderShop() — rather than adding new state to watch.
+  {id:"iron_will",icon:"🩶",name:"Iron Will",desc:"Complete a run without ever buying a Health Potion or Crimson Vial.",
+    check:c=>c.run.completed && !c.run.boughtHealOrLifesteal,
+    reward:{type:"unlock_shop_item", itemIds:["shop_heal","shop_lifesteal"], label:"Health Potion & Crimson Vial"}},
 ];
 
 /* =========================================================================
@@ -1663,14 +1819,14 @@ function weaponFire(wid, lvl, dt){
           const hit=new Set([target]);
           forEachEnemyNear(player.x,player.y,range,e=>{
             if(hit.size>extraBeams || hit.has(e)) return;
-            hit.add(e); dealDamage(e, dps*def.base.tick*0.6*elemental, wid); spawnParticle(e.x,e.y,"#ffd479",2);
+            hit.add(e); dealDamage(e, dps*def.base.tick*0.6*elemental, wid); spawnParticle(e.x,e.y,"#ffd479",1+weaponVisualTier(lvl));
           });
         }
         // cdMult (attack speed) previously only gated melee/projectile/area/trap/chain/summon
         // cooldowns — beams ticked at a flat def.base.tick regardless, so attack-speed
         // investment silently did nothing for Laser Array/Prism Beam/Arc Lance.
         player.weaponTimers[wid+"_tick"] = def.base.tick*cdMult;
-        spawnParticle(target.x,target.y,weaponColor(wid));
+        spawnParticle(target.x,target.y,weaponColor(wid),3+weaponVisualTier(lvl));
       }
       player.weaponTimers[wid+"_sfx"]=(player.weaponTimers[wid+"_sfx"]||0)-dt;
       if(player.weaponTimers[wid+"_sfx"]<=0){ SFX.laserHum(); player.weaponTimers[wid+"_sfx"]=0.45; }
@@ -1801,6 +1957,7 @@ function weaponFire(wid, lvl, dt){
     const dmg = (def.base.dmg+(def.perLevel.dmg||0)*(lvl-1))*dmgMult;
     forEachEnemyNear(player.x,player.y,radius,e=>{
       dealDamage(e,dmg,wid);
+      spawnParticle(e.x,e.y,weaponColor(wid),1+weaponVisualTier(lvl));
       // Seismic Maul: every hit staggers (uses the same staggerT field elite "stagger" uses).
       if(wid==="warhammer" && evo==="seismic_maul") e.staggerT=Math.max(e.staggerT||0,0.5);
       // Crimson Executioner: heals 8% of damage dealt and executes sub-15%-HP enemies outright.
@@ -2782,6 +2939,11 @@ function updatePlayer(dt){
   if(dash.active){
     player.vx=dash.dx*player.stats.moveSpeed*DASH_SPEED_MULT; player.vy=dash.dy*player.stats.moveSpeed*DASH_SPEED_MULT;
     player.x=clamp(player.x+player.vx*dt,player.radius,WORLD.w-player.radius); player.y=clamp(player.y+player.vy*dt,player.radius,WORLD.h-player.radius);
+    // POLISH_PLAN item 2 — a spawned trail (vs. the old flat line-only trail) reads
+    // as a dissipating streak without needing manual point-interpolation: each
+    // particle just launches opposite the dash direction and fades on its own via
+    // spawnParticle's normal life/maxLife decay.
+    spawnParticle(player.x-dash.dx*player.radius, player.y-dash.dy*player.radius, characterColor(player.character), 2);
   } else if(dx||dy){
     const len=Math.hypot(dx,dy);
     player.vx=(dx/len)*player.stats.moveSpeed; player.vy=(dy/len)*player.stats.moveSpeed;
@@ -2903,12 +3065,12 @@ function buildCardPool(){
 // luck (0..1, from Lucky Charm/Fortune's Coin) shifts share away from common
 // toward the other three tiers, proportional to their own base weight, so the
 // total always still sums to 100.
-const RARITY_BASE_WEIGHT = {common:60, uncommon:25, rare:10, legendary:5};
+const RARITY_BASE_WEIGHT = {common:60, uncommon:25, rare:10, legendary:5, mythic:1.2};
 function rarityWeight(rarity, luck){
   luck = clamp(luck||0, 0, 1);
   const base = RARITY_BASE_WEIGHT[rarity] || RARITY_BASE_WEIGHT.common;
   if(rarity==="common") return base*(1-0.6*luck);
-  const pool = RARITY_BASE_WEIGHT.uncommon+RARITY_BASE_WEIGHT.rare+RARITY_BASE_WEIGHT.legendary;
+  const pool = RARITY_BASE_WEIGHT.uncommon+RARITY_BASE_WEIGHT.rare+RARITY_BASE_WEIGHT.legendary+RARITY_BASE_WEIGHT.mythic;
   const given = RARITY_BASE_WEIGHT.common*0.6*luck;
   return base + given*(base/pool);
 }
@@ -2976,13 +3138,17 @@ function showLevelUpCards(){
 // early/mid run, the expensive tier gives a swimming-in-gold late build
 // something worth spending it on instead of it just piling up unused.
 const SHOP_ITEMS = [
-  {id:"shop_heal",name:"Health Potion",icon:"🧪",desc:"Restore 40% of Max HP.",cost:50,growth:1.15,curr:"gold",max:99,rarity:"common",apply:p=>{p.hp=Math.min(p.maxHp,p.hp+p.maxHp*0.4);}},
+  // Locked behind the "Iron Will" achievement (win a run without buying either) — see
+  // CLAUDE.md's Round 6 finding: cheap early healing/lifesteal access was the single biggest
+  // driver of wave-pressure danger collapsing to near-zero after minute 5. Raising the entry
+  // cost to "prove you can win without it first" addresses the same problem a different way.
+  {id:"shop_heal",name:"Health Potion",icon:"🧪",desc:"Restore 40% of Max HP.",cost:50,growth:1.15,curr:"gold",max:99,rarity:"common",unlockAchievement:"iron_will",apply:p=>{p.hp=Math.min(p.maxHp,p.hp+p.maxHp*0.4);}},
   {id:"shop_maxhp",name:"Vitality Elixir",icon:"❤️",desc:"+25 Max HP and heal to full.",cost:120,growth:1.4,curr:"gold",max:5,rarity:"uncommon",apply:p=>{p.maxHp+=25;p.hp=p.maxHp;}},
   {id:"shop_dmg",name:"Sharpening Stone",icon:"⚔️",desc:"+12% Damage multiplier.",cost:150,growth:1.4,curr:"gold",max:5,rarity:"uncommon",apply:p=>{p.stats.dmgMult+=0.12;}},
   {id:"shop_atkspd",name:"Haste Rune",icon:"⚡",desc:"+12% Attack Speed.",cost:150,growth:1.4,curr:"gold",max:5,rarity:"uncommon",apply:p=>{p.stats.atkSpeedMult+=0.12;}},
   {id:"shop_armor",name:"Iron Plating",icon:"🛡️",desc:"+2 Flat Armor.",cost:200,growth:1.4,curr:"gold",max:5,rarity:"uncommon",apply:p=>{p.stats.armor+=2;}},
   {id:"shop_regen",name:"Regen Charm",icon:"✚",desc:"+1.0 HP regen/s.",cost:180,growth:1.4,curr:"gold",max:5,rarity:"uncommon",apply:p=>{p.stats.regen+=1.0;}},
-  {id:"shop_lifesteal",name:"Crimson Vial",icon:"🩸",desc:"+2% Lifesteal.",cost:220,growth:1.4,curr:"gold",max:4,rarity:"uncommon",apply:p=>{p.stats.lifesteal+=0.02;}},
+  {id:"shop_lifesteal",name:"Crimson Vial",icon:"🩸",desc:"+2% Lifesteal.",cost:220,growth:1.4,curr:"gold",max:4,rarity:"uncommon",unlockAchievement:"iron_will",apply:p=>{p.stats.lifesteal+=0.02;}},
   {id:"shop_pickup",name:"Magnet Coil",icon:"🧲",desc:"+20% Pickup radius.",cost:130,growth:1.3,curr:"gold",max:4,rarity:"common",apply:p=>{p.stats.pickupRadius*=1.2;}},
   {id:"shop_revive",name:"Ankh of Rebirth",icon:"☥",desc:"Revive at 50% HP once. Gold resets.",cost:600,curr:"gold",max:1,rarity:"rare",apply:p=>{p.hasRevive=true;}},
   {id:"shop_passive",name:"Mystery Passive",icon:"🔮",desc:"Equip a random passive item.",cost:8,growth:1.25,curr:"crystals",max:99,rarity:"uncommon",apply:p=>{equipPassive(randomPassive());}},
@@ -2994,7 +3160,7 @@ const SHOP_ITEMS = [
   {id:"shop_atkspd_big",name:"Overdrive Core",icon:"🌀",desc:"+20% Attack Speed.",cost:3200,growth:1.5,curr:"gold",max:4,rarity:"rare",apply:p=>{p.stats.atkSpeedMult+=0.2;}},
   {id:"shop_armor_big",name:"Fortress Plating",icon:"🏰",desc:"+6 Flat Armor.",cost:2800,growth:1.5,curr:"gold",max:4,rarity:"rare",apply:p=>{p.stats.armor+=6;}},
   {id:"shop_goldmult",name:"Golden Idol",icon:"🗿",desc:"+15% Gold gained.",cost:4000,growth:1.6,curr:"gold",max:3,rarity:"rare",apply:p=>{p.stats.goldMult*=1.15;}},
-  {id:"shop_ascension",name:"Ascension Shard",icon:"💎",desc:"+30% Damage and +30% Attack Speed. Once per run.",cost:25000,curr:"gold",max:1,rarity:"legendary",apply:p=>{p.stats.dmgMult+=0.3;p.stats.atkSpeedMult+=0.3;}},
+  {id:"shop_ascension",name:"Ascension Shard",icon:"💎",desc:"+30% Damage and +30% Attack Speed. Once per run.",cost:25000,curr:"gold",max:1,rarity:"mythic",apply:p=>{p.stats.dmgMult+=0.3;p.stats.atkSpeedMult+=0.3;}},
 ];
 function shopItemCost(item, purchased){ return Math.ceil(item.cost*Math.pow(item.growth||1, purchased)); }
 function renderShop(){
@@ -3002,11 +3168,18 @@ function renderShop(){
   document.getElementById('shopGoldDisplay').textContent=Math.floor(player.gold);
   document.getElementById('shopCrystalDisplay').textContent=Math.floor(player.crystals);
   SHOP_ITEMS.forEach(item=>{
+    const locked = item.unlockAchievement && !save.achievements.unlocked[item.unlockAchievement];
+    const el=document.createElement('div'); el.className='card shop-card rarity-'+(item.rarity||'common')+(locked?' locked':'');
+    if(locked){
+      const achName = (ACHIEVEMENTS.find(a=>a.id===item.unlockAchievement)||{}).name || item.unlockAchievement;
+      el.innerHTML=`<div class="icon">🔒</div><div class="name">${item.name}</div><div class="desc">Requires achievement: ${achName}</div>
+        <div class="price" style="color:var(--dim)">LOCKED</div><button class="buy-btn" disabled>LOCKED</button>`;
+      wrap.appendChild(el); return;
+    }
     const purchased=player.shopPurchases[item.id]||0; const maxed=purchased>=item.max;
     const cost = shopItemCost(item, purchased);
     const wallet = item.curr==="gold"?player.gold:player.crystals;
     const canAfford = wallet>=cost;
-    const el=document.createElement('div'); el.className='card shop-card rarity-'+(item.rarity||'common');
     const rarityTag = item.rarity && item.rarity!=="common" ? `<div class="rarity-label">${item.rarity}</div>` : "";
     el.innerHTML=`${rarityTag}<div class="icon">${item.icon}</div><div class="name">${item.name}</div><div class="desc">${item.desc}</div>
       <div class="price" style="color:${maxed?'var(--dim)':item.curr==='gold'?'var(--gold)':'var(--crystal)'}">${maxed?"MAXED":cost+" "+(item.curr==="gold"?"GOLD":"CRYSTALS")}</div>
@@ -3248,7 +3421,8 @@ function buildAchievementContext(){
       legendaryCardsTaken:runStats.legendaryCardsTaken, merchantEventsVisited:runStats.merchantEventsVisited, treasureEventsOpened:runStats.treasureEventsOpened,
       arenasCleared:runStats.arenasCleared, miniBossesDefeated:runStats.miniBossesDefeated, riskyChoicesTaken:runStats.riskyChoicesTaken,
       cursedShrinesActivated:runStats.cursedShrinesActivated, passiveSlotsFilled:runStats.passiveSlotsFilled, bossesKilledIds:runStats.bossesKilledIds,
-      stolenByCollector:runStats.stolenByCollector, overlordReachedAtSeconds:runStats.overlordReachedAtSeconds },
+      stolenByCollector:runStats.stolenByCollector, overlordReachedAtSeconds:runStats.overlordReachedAtSeconds,
+      boughtHealOrLifesteal: !!(player.shopPurchases.shop_heal||player.shopPurchases.shop_lifesteal) },
     lifetime: Object.assign({}, save.lifetime, { charactersCompleted:(save.lifetime.charactersCompleted||[]).length, uniqueBossesKilled:(save.lifetime.uniqueBossesKilled||[]).length, uniqueElitesKilled:(save.lifetime.uniqueElitesKilled||[]).length }),
     meta:{ maxedBranches },
   };
@@ -3256,12 +3430,25 @@ function buildAchievementContext(){
 function checkAchievements(){
   if(!player) return;
   const ctx=buildAchievementContext(); let changed=false;
-  for(const a of ACHIEVEMENTS){ if(save.achievements.unlocked[a.id]) continue; if(a.check(ctx)){ save.achievements.unlocked[a.id]=Date.now(); showAchievementToast(a); changed=true; } }
+  for(const a of ACHIEVEMENTS){ if(save.achievements.unlocked[a.id]) continue; if(a.check(ctx)){ save.achievements.unlocked[a.id]=Date.now(); applyAchievementReward(a.reward); showAchievementToast(a); changed=true; } }
   if(changed){ persistSave(); refreshSoulBadges(); }
+}
+// Generic achievement-reward mechanic (previously achievements were pure cosmetic tracking —
+// unlock timestamp + toast, nothing else). unlock_shop_item doesn't mutate anything itself: the
+// actual gate lives on the shop item's own `unlockAchievement` field, checked directly in
+// renderShop() against save.achievements.unlocked — this switch exists so future reward types
+// (e.g. permanent_soul_bonus) have one place to land without touching checkAchievements() again.
+function applyAchievementReward(reward){
+  if(!reward) return;
+  switch(reward.type){
+    case "unlock_shop_item": break;
+    case "permanent_soul_bonus": save.soul+=reward.amount||0; save.lifetime.totalSoul+=reward.amount||0; break;
+  }
 }
 function showAchievementToast(a){
   const layer=document.getElementById('achToastLayer'); const el=document.createElement('div'); el.className='ach-toast';
-  el.innerHTML=`<div class="t-icon">${a.icon}</div><div><div class="t-kicker">ACHIEVEMENT UNLOCKED</div><div class="t-name">${a.name}</div></div>`;
+  const rewardLine = (a.reward && a.reward.type==="unlock_shop_item") ? `<div class="t-reward">🔓 ${a.reward.label||"New shop item"} unlocked</div>` : "";
+  el.innerHTML=`<div class="t-icon">${a.icon}</div><div><div class="t-kicker">ACHIEVEMENT UNLOCKED</div><div class="t-name">${a.name}</div>${rewardLine}</div>`;
   layer.appendChild(el); setTimeout(()=>el.remove(),4000);
   logEvent("Achievement: "+a.name); SFX.achievement(); vibrate([0,30,60,30]);
 }
@@ -3301,6 +3488,26 @@ function saveOnExitIfNeeded(){ if(state==='playing'||state==='paused') doAutosav
 document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden') saveOnExitIfNeeded(); });
 window.addEventListener('pagehide', saveOnExitIfNeeded); window.addEventListener('blur', saveOnExitIfNeeded);
 
+// POLISH_PLAN item 8 — character-scramble glitch for the death title: unlike the
+// CSS-only RGB-split/scanline styles (menu/victory/talent/achievements), this one
+// needs JS since it mutates actual characters, not just paint. Self-terminating:
+// each cycle checks whether its ancestor .screen is still visible instead of
+// needing an explicit stop() call from wherever navigates away.
+function glitchScramble(el){
+  const original = el.textContent;
+  const glyphs = "!<>-_\\/[]{}=+*^#~";
+  function tick(){
+    const screen = el.closest('.screen');
+    if(!screen || screen.classList.contains('hidden')) return;
+    const chars = original.split('');
+    const n = 1+Math.floor(Math.random()*2);
+    for(let i=0;i<n;i++){ const idx=Math.floor(Math.random()*chars.length); if(chars[idx]!==' ') chars[idx]=glyphs[(Math.random()*glyphs.length)|0]; }
+    el.textContent = chars.join('');
+    setTimeout(()=>{ el.textContent=original; },90);
+    setTimeout(tick, 2800+Math.random()*2200);
+  }
+  setTimeout(tick, 900+Math.random()*1200);
+}
 function die(){
   setState('dead'); SFX.stopHeartbeat(); MUSIC.stop(); SFX.death();
   applyRunStatsIncrement(true); save.activeRun=null;
@@ -3318,6 +3525,7 @@ function die(){
     <div class="stat-row"><span class="k">Evolutions</span><span>${runStats.evolutionsThisRun||0}</span></div>`;
   document.getElementById('soulGain').textContent=`+ ${soulGain} SOUL earned`;
   refreshSoulBadges(); show('screen-death');
+  glitchScramble(document.getElementById('deathTitle'));
 }
 function win(){
   setState('victory'); SFX.stopHeartbeat(); SFX.victory(); vibrate([0,60,60,60,60,120]);
@@ -3384,13 +3592,21 @@ function refreshHud(){
   document.getElementById('hpLabel').textContent=Math.max(0,Math.round(player.hp))+" / "+player.maxHp;
   document.getElementById('xpFill').style.width=clamp(player.xp/player.xpNext*100,0,100)+"%";
   document.getElementById('xpLabel').textContent=Math.floor(player.xp)+" / "+player.xpNext+" XP";
-  document.getElementById('goldVal').textContent=Math.floor(player.gold);
+  const goldEl=document.getElementById('goldVal'), goldFloor=Math.floor(player.gold);
+  goldEl.textContent=goldFloor;
+  if(lastGoldVal!==null && goldFloor>lastGoldVal) pulseValue(goldEl);
+  lastGoldVal=goldFloor;
   document.getElementById('crystalVal').textContent=Math.floor(player.crystals);
-  document.getElementById('killVal').textContent=killCount;
+  const killEl=document.getElementById('killVal');
+  killEl.textContent=killCount;
+  if(lastKillVal!==null && killCount>lastKillVal) pulseValue(killEl);
+  lastKillVal=killCount;
   document.getElementById('timerVal').textContent=fmtTime(runTime);
   document.getElementById('phaseVal').textContent=currentPhase().name;
   document.getElementById('fusionBtnHud').classList.toggle('hidden', !player.fusionsAvailable.length);
-  if(player.hp/player.maxHp<0.25) SFX.startHeartbeat(); else SFX.stopHeartbeat();
+  const lowHp = player.hp/player.maxHp<0.25;
+  if(lowHp) SFX.startHeartbeat(); else SFX.stopHeartbeat();
+  document.querySelector('.hp-wrap').classList.toggle('low-hp', lowHp);
   const now=runTime; dpsWindow=dpsWindow.filter(x=>now-x.t<3);
   const dps=dpsWindow.reduce((s,x)=>s+x.dmg,0)/3;
   document.getElementById('dpsVal').textContent=Math.round(dps)+" dps";
@@ -3426,6 +3642,12 @@ function refreshAbilityHud(){
   healCdEl.style.background = healReady ? 'transparent' : `conic-gradient(rgba(8,9,13,0.72) ${healPct}%, transparent ${healPct}%)`;
 }
 let lastWeaponSig=null;
+// POLISH_PLAN item 9 — brief scale-pulse whenever gold/kills actually increase,
+// not every refreshHud() call (that's every frame, would just look like constant
+// vibration) — remove+reflow+add mirrors flashSavedIndicator()'s existing
+// re-trigger pattern so the CSS animation restarts even on back-to-back gains.
+let lastGoldVal=null, lastKillVal=null;
+function pulseValue(el){ el.classList.remove('val-pulse'); void el.offsetWidth; el.classList.add('val-pulse'); }
 function glow(size){ return quality==='low'?0:(quality==='medium'?size*0.6:size); }
 /* ---- Range-driven camera zoom -------------------------------------------
    Camera zoom follows the player's actual current effective attack reach,
@@ -3572,7 +3794,10 @@ function render(){
     if(e.boss || !e.shape){ ctx2d.beginPath(); ctx2d.arc(e.x,e.y,e.radius,0,7); ctx2d.fill(); } else drawEnemyShape(ctx2d,e);
     ctx2d.shadowBlur=0;
     if(e.mutation){ ctx2d.beginPath(); ctx2d.strokeStyle=e.mutationColor; ctx2d.lineWidth=2.5; ctx2d.arc(e.x,e.y,e.radius+2,0,7); ctx2d.stroke(); }
-    if(e.elite||e.boss){ const bw=e.radius*2.4; ctx2d.fillStyle="#1a1c24"; ctx2d.fillRect(e.x-bw/2,e.y-e.radius-14,bw,5); ctx2d.fillStyle=e.boss?"#ff4d5e":"#ffb347"; ctx2d.fillRect(e.x-bw/2,e.y-e.radius-14,bw*clamp(e.hp/e.maxHp,0,1),5); }
+    if(e.elite||e.boss){ const bw=e.radius*2.4; ctx2d.fillStyle="#1a1c24"; ctx2d.fillRect(e.x-bw/2,e.y-e.radius-14,bw,5);
+      ctx2d.fillStyle=e.boss?"#ff4d5e":"#ffb347";
+      if(e.boss){ ctx2d.shadowColor="#ff4d5e"; ctx2d.shadowBlur=glow(10); }
+      ctx2d.fillRect(e.x-bw/2,e.y-e.radius-14,bw*clamp(e.hp/e.maxHp,0,1),5); ctx2d.shadowBlur=0; }
     // Status-effect icons: previously the only visible feedback for burn/poison/slow/
     // shield/stagger/mark was a one-frame white hit-flash. Each active effect now
     // gets a small billboard icon above the enemy so the player can actually read
@@ -3654,8 +3879,16 @@ function render(){
   const pc = characterColor(player.character);
   if(player.abilities.dash.active){
     const dash=player.abilities.dash;
-    ctx2d.save(); ctx2d.globalAlpha=0.35; ctx2d.strokeStyle=pc; ctx2d.lineWidth=player.radius*1.4; ctx2d.lineCap='round';
-    ctx2d.beginPath(); ctx2d.moveTo(player.x-dash.dx*46,player.y-dash.dy*46); ctx2d.lineTo(player.x,player.y); ctx2d.stroke();
+    // POLISH_PLAN item 2 — gradient trail (transparent tail -> character color ->
+    // white-hot core at the head) instead of one flat semi-transparent stroke;
+    // spawnParticle above (updatePlayer) adds the loose spark texture around it.
+    const tailX=player.x-dash.dx*52, tailY=player.y-dash.dy*52;
+    const grad=ctx2d.createLinearGradient(tailX,tailY,player.x,player.y);
+    grad.addColorStop(0,"rgba(0,0,0,0)"); grad.addColorStop(0.55,pc); grad.addColorStop(1,"#ffffff");
+    ctx2d.save(); ctx2d.globalAlpha=0.55; ctx2d.strokeStyle=grad; ctx2d.lineWidth=player.radius*1.4; ctx2d.lineCap='round';
+    ctx2d.beginPath(); ctx2d.moveTo(tailX,tailY); ctx2d.lineTo(player.x,player.y); ctx2d.stroke();
+    ctx2d.globalAlpha=0.8; ctx2d.lineWidth=player.radius*0.6;
+    ctx2d.beginPath(); ctx2d.moveTo(tailX,tailY); ctx2d.lineTo(player.x,player.y); ctx2d.stroke();
     ctx2d.restore();
   }
   ctx2d.beginPath(); ctx2d.fillStyle=player.hitFlash>0?"#ff3b3b":"#fff"; ctx2d.shadowColor=pc; ctx2d.shadowBlur=glow(player.abilities.dash.active?26:16); ctx2d.arc(player.x,player.y,player.radius,0,7); ctx2d.fill(); ctx2d.shadowBlur=0;
@@ -3743,6 +3976,7 @@ function updateBullets(dt){
       forEachEnemyNear(b.x,b.y,b.radius+60,e=>{ if(removed||b.hitset.has(e)) return;
         if(dist2(b.x,b.y,e.x,e.y)<(b.radius+e.radius)*(b.radius+e.radius)){
           dealDamage(e,b.dmg,b.weaponId); b.hitset.add(e);
+          spawnParticle(e.x,e.y,weaponColor(b.weaponId),1+weaponVisualTier(player.weapons[b.weaponId]||1));
           // World Ender: detonates on impact (small extra AoE around the hit target).
           if(b.detonate && !e.dead) forEachEnemyNear(e.x,e.y,70,other=>{ if(other!==e) queueSecondaryDamage(other,b.dmg*0.4,b.weaponId); });
           if(b.pierce<=0){ bullets.splice(i,1); removed=true; } else b.pierce--; } });
@@ -3982,28 +4216,44 @@ document.getElementById('btnNewRun').onclick=()=>{ setState('charselect'); rende
 document.getElementById('charBack').onclick=goMenu;
 document.getElementById('btnContinue').onclick=continueRun;
 
+// Tooltip is the only way to read a locked node's name/desc/requires now (icon-only
+// cells have no room for text) — pinnedNodeId tracks a touch-tap-opened tooltip so a
+// second tap on the *same* node can proceed to buy, while hover (desktop, no touch)
+// just shows/hides on enter/leave without needing a pin at all.
+let talentTooltipPinned=null;
+function openTalentTooltip(el,html){
+  const tt=document.getElementById('talentTooltip'); tt.innerHTML=html; tt.classList.add('show');
+  const r=el.getBoundingClientRect(); const ttW=220;
+  let left=r.left+r.width/2-ttW/2; left=Math.max(6,Math.min(window.innerWidth-ttW-6,left));
+  tt.style.left=left+'px';
+  const above=r.top-10; tt.style.visibility='hidden'; tt.style.top='0px';
+  const th=tt.offsetHeight; tt.style.visibility='visible';
+  tt.style.top=(above-th>0 ? above-th : r.bottom+10)+'px';
+}
+function hideTalentTooltip(){ document.getElementById('talentTooltip').classList.remove('show'); talentTooltipPinned=null; }
 function renderTalentTree(activeBranch){
   const tabsEl=document.getElementById('talentTabs'); tabsEl.innerHTML="";
   TALENT_BRANCHES.forEach(b=>{
     const tab=document.createElement('div'); tab.className='settings-tab'+(b===activeBranch?' active':'');
     tab.textContent=b.charAt(0).toUpperCase()+b.slice(1);
-    tab.onclick=()=>renderTalentTree(b);
+    tab.onclick=()=>{ hideTalentTooltip(); renderTalentTree(b); };
     tabsEl.appendChild(tab);
   });
+  hideTalentTooltip();
   const wrap=document.getElementById('metaWrap'); wrap.innerHTML="";
   const scroll=document.createElement('div'); scroll.className='talent-graph-scroll';
   const graph=document.createElement('div'); graph.className='talent-graph';
-  const COL_W=145, ROW_H=125, NODE_W=132, NODE_CY=55;
-  const cellPos=(col,row)=>({left:(col-1)*COL_W+10, top:(row-1)*ROW_H+15});
+  const COL_W=145, ROW_H=125, NODE_W=58;
+  const cellPos=(col,row)=>({left:(col-1)*COL_W+(COL_W-NODE_W)/2, top:(row-1)*ROW_H+(ROW_H-NODE_W)/2});
   const lines=TALENT_STAT_LINES[activeBranch];
   const svgNS="http://www.w3.org/2000/svg";
   const svg=document.createElementNS(svgNS,"svg"); svg.setAttribute('class','talent-lines');
   lines.forEach((line,idx)=>{
     const layout=TALENT_NODE_LAYOUT[idx], to=cellPos(layout.col,layout.row);
-    const toX=to.left+NODE_W/2, toY=to.top+NODE_CY;
+    const toX=to.left+NODE_W/2, toY=to.top+NODE_W/2;
     layout.requires.forEach(r=>{
       const fromLayout=TALENT_NODE_LAYOUT[r.idx], from=cellPos(fromLayout.col,fromLayout.row);
-      const fromX=from.left+NODE_W/2, fromY=from.top+NODE_CY;
+      const fromX=from.left+NODE_W/2, fromY=from.top+NODE_W/2;
       const el=document.createElementNS(svgNS,"line");
       el.setAttribute('x1',fromX); el.setAttribute('y1',fromY); el.setAttribute('x2',toX); el.setAttribute('y2',toY);
       if(talentLevel(activeBranch,lines[r.idx].key)>=r.tier) el.setAttribute('class','unlocked');
@@ -4011,32 +4261,63 @@ function renderTalentTree(activeBranch){
     });
   });
   graph.appendChild(svg);
-  // Node cells: locked (prereq unmet, greyed, no buy) / unlocked-with-progress
-  // (tier pips fill in, buy button for the next tier) / maxed (gold glow, all 5
-  // pips filled) — the "closed state"/"highlights"/"progress" the redesign asked for.
+  // Compact icon cells: locked (dark, dominant 🔒, prereq unmet) / unlocked-with-
+  // progress (icon + tier pips, buy on click) / maxed (gold glow). Name/desc/cost/
+  // requires all live in the tooltip now, not on the cell itself.
   lines.forEach((line,idx)=>{
     const layout=TALENT_NODE_LAYOUT[idx], pos=cellPos(layout.col,layout.row);
     const lvl=talentLevel(activeBranch,line.key), maxed=lvl>=5, cost=talentCost(activeBranch,line.key);
     const locked=lineLocked(activeBranch,idx);
+    const nodeId=activeBranch+"_"+line.key;
     const el=document.createElement('div'); el.className='talent-node'+(locked?' locked':'')+(maxed?' maxed':'');
     el.style.left=pos.left+'px'; el.style.top=pos.top+'px';
     const pips=Array.from({length:5},(_,i)=>`<div class="pip${i<lvl?' filled':''}"></div>`).join('');
-    const desc = locked
-      ? `Requires: ${lineRequiresFor(activeBranch,idx).map(r=>`${lines.find(l=>l.key===r.key).label} tier ${r.tier}`).join(', ')}`
-      : (TALENT_LINE_DESCS[line.key]||`+${line.perLevel} ${line.key} per tier.`);
-    el.innerHTML=`${locked?'<div class="tn-lock">🔒</div>':''}<div class="tn-name">${line.label}</div><div class="tn-desc">${desc}</div><div class="tn-pips">${pips}</div>`;
-    if(!locked){
-      const btn=document.createElement('button'); btn.className='buy-btn tn-buy';
-      btn.textContent=maxed?"MAXED":`${cost} SOUL`; btn.disabled=maxed||save.soul<cost;
-      btn.onclick=e=>{ e.stopPropagation(); if(maxed||save.soul<cost) return; save.soul-=cost; save.talentLevels[activeBranch+"_"+line.key]=lvl+1; persistSave(); refreshSoulBadges(); renderTalentTree(activeBranch); };
-      el.appendChild(btn);
-    }
+    el.innerHTML=`<div class="tn-icon">${locked?'🔒':line.icon}</div><div class="tn-pips">${pips}</div>`;
+    const tooltipHtml=()=>{
+      const descText = TALENT_LINE_DESCS[line.key]||`+${line.perLevel} ${line.key} per tier.`;
+      const reqText = locked ? `<div class="tt-req">🔒 Requires: ${lineRequiresFor(activeBranch,idx).map(r=>`${lines.find(l=>l.key===r.key).label} tier ${r.tier}`).join(', ')}</div>` : "";
+      const costText = locked ? "" : `<div class="tt-cost">${maxed?"MAXED":`Next tier: ${cost} SOUL`}</div>`;
+      return `<div class="tt-name">${line.label}</div><div class="tt-desc">${descText}</div><div class="tt-tier">TIER ${lvl} / 5</div>${costText}${reqText}`;
+    };
+    el.addEventListener('mouseenter',()=>{ if(!isTouchDevice) openTalentTooltip(el,tooltipHtml()); });
+    el.addEventListener('mouseleave',()=>{ if(!isTouchDevice && !talentTooltipPinned) hideTalentTooltip(); });
+    el.addEventListener('click',e=>{
+      e.stopPropagation();
+      if(isTouchDevice && talentTooltipPinned!==nodeId){ openTalentTooltip(el,tooltipHtml()); talentTooltipPinned=nodeId; return; }
+      if(locked||maxed||save.soul<cost) return;
+      // Snapshot lock state before the purchase so we can tell which *other* node
+      // (if any) this tier just unblocked — that node gets the same pulse plus a
+      // smooth scroll to bring it into view, the "animated shift on open" ask.
+      const lockedBefore = lines.map((l,i)=>lineLocked(activeBranch,i));
+      save.soul-=cost; save.talentLevels[activeBranch+"_"+line.key]=lvl+1; persistSave(); refreshSoulBadges();
+      hideTalentTooltip();
+      const newlyIdx = lines.findIndex((l,i)=>lockedBefore[i] && !lineLocked(activeBranch,i));
+      renderTalentTree(activeBranch);
+      requestAnimationFrame(()=>{
+        const w=document.getElementById('metaWrap');
+        const fresh=w.querySelector(`[data-node-id="${nodeId}"]`); if(fresh) fresh.classList.add('just-unlocked');
+        if(newlyIdx>=0){
+          const newlyId=activeBranch+"_"+lines[newlyIdx].key, freshNew=w.querySelector(`[data-node-id="${newlyId}"]`);
+          if(freshNew){
+            freshNew.classList.add('just-unlocked');
+            const scrollEl=w.querySelector('.talent-graph-scroll');
+            const targetLeft=freshNew.offsetLeft-scrollEl.clientWidth/2+freshNew.offsetWidth/2;
+            scrollEl.scrollTo({left:Math.max(0,targetLeft), behavior:'smooth'});
+          }
+        }
+      });
+    });
+    el.dataset.nodeId=nodeId;
     graph.appendChild(el);
   });
   scroll.appendChild(graph); wrap.appendChild(scroll);
 }
 document.getElementById('btnMeta').onclick=()=>{ setState('meta'); renderTalentTree('warrior'); show('screen-meta'); };
-document.getElementById('metaBack').onclick=goMenu;
+document.getElementById('metaBack').onclick=()=>{ hideTalentTooltip(); goMenu(); };
+// Tap-outside-to-close for a touch-pinned tooltip (mouse users just move the pointer
+// off the node, handled by mouseleave above). One listener for the whole page, gated
+// by talentTooltipPinned being set, rather than re-attaching per render.
+document.addEventListener('click',e=>{ if(talentTooltipPinned && !e.target.closest('.talent-node')) hideTalentTooltip(); });
 
 function renderStatsScreen(){
   const L=save.lifetime;
