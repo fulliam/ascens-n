@@ -24,7 +24,15 @@
   canvas{position:absolute; inset:0; width:100%; height:100%; display:block; touch-action:none;}
   .mono{font-family:'JetBrains Mono',monospace;}
   .display{font-family:'Rajdhani',sans-serif; font-weight:700; letter-spacing:0.5px;}
-  .screen{position:absolute; inset:0; display:flex; align-items:center; justify-content:center; flex-direction:column; z-index:10;}
+  .screen{position:absolute; inset:0; display:flex; align-items:center; justify-content:center; flex-direction:column; z-index:10;
+    opacity:1; transform:scale(1); transition:opacity .22s ease, transform .22s ease;}
+  /* POLISH_PLAN_3 item 1 — show()/hideAll() add these instead of jumping straight
+     to .hidden (display:none can't be transitioned at all) — .hidden itself is
+     added only after the transition finishes (see the JS), so the element stays
+     in-flow and paints during the fade. .screen-in starts below the base state so
+     removing it a frame later is what actually plays the "enter" transition. */
+  .screen.screen-out{opacity:0; transform:scale(0.97); pointer-events:none;}
+  .screen.screen-in{opacity:0; transform:scale(1.02);}
   .hidden{display:none !important;}
   .veil{position:absolute; inset:0; background:radial-gradient(ellipse at 50% 30%, rgba(30,20,50,0.55), rgba(4,5,8,0.92) 70%);}
   .title-wrap{position:relative; z-index:2; text-align:center; margin-bottom:28px;}
@@ -247,7 +255,7 @@
   .talent-lines line{stroke:var(--line); stroke-width:2; transition:stroke .2s, x1 .3s, y1 .3s, x2 .3s, y2 .3s;}
   .talent-lines line.unlocked{stroke:var(--accent);}
   /* Compact icon cell (POLISH_PLAN item 6) — replaces the old full-text card; name/
-     desc/cost/requires all moved into #talentTooltip so the graph itself stays
+     desc/cost/requires all moved into #gameTooltip so the graph itself stays
      dense and scannable. left/top transition so nodes glide into a new layout
      (item 5's longer chains) instead of jumping. */
   .talent-node{position:absolute; width:58px; height:58px; background:var(--panel); border:2px solid var(--line); border-radius:12px;
@@ -270,17 +278,17 @@
   @keyframes talentUnlockPulse{0%{transform:scale(0.7); box-shadow:0 0 0 rgba(185,140,255,0);} 50%{transform:scale(1.22); box-shadow:0 0 26px rgba(185,140,255,0.7);} 100%{transform:scale(1); box-shadow:0 0 0 rgba(185,140,255,0);}}
   /* First custom tooltip component in the game (everything else used the native
      title= attribute) — fixed-positioned near whatever node/element triggered it,
-     shown on hover (desktop) or tap (touch, see openTalentTooltip's isTouchDevice
+     shown on hover (desktop) or tap (touch, see openTooltip's isTouchDevice
      branch) so it "always works" even for a locked node the player can't buy yet. */
-  #talentTooltip{position:fixed; z-index:60; max-width:210px; background:linear-gradient(180deg,#1c1e28,#141821);
+  #gameTooltip{position:fixed; z-index:60; max-width:210px; background:linear-gradient(180deg,#1c1e28,#141821);
     border:1px solid var(--accent); border-radius:6px; padding:10px 12px; pointer-events:none; opacity:0;
     transform:translateY(4px); transition:opacity .12s, transform .12s; box-shadow:0 10px 30px rgba(0,0,0,0.5);}
-  #talentTooltip.show{opacity:1; transform:translateY(0);}
-  #talentTooltip .tt-name{font-family:'Rajdhani',sans-serif; font-weight:700; font-size:13.5px; color:#fff;}
-  #talentTooltip .tt-desc{font-size:11px; color:var(--dim); margin-top:4px; line-height:1.4;}
-  #talentTooltip .tt-tier{font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--accent); margin-top:6px;}
-  #talentTooltip .tt-cost{font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--soul); margin-top:3px;}
-  #talentTooltip .tt-req{font-size:10px; color:#ff8a4d; margin-top:6px; line-height:1.4;}
+  #gameTooltip.show{opacity:1; transform:translateY(0);}
+  #gameTooltip .tt-name{font-family:'Rajdhani',sans-serif; font-weight:700; font-size:13.5px; color:#fff;}
+  #gameTooltip .tt-desc{font-size:11px; color:var(--dim); margin-top:4px; line-height:1.4;}
+  #gameTooltip .tt-tier{font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--accent); margin-top:6px;}
+  #gameTooltip .tt-cost{font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--soul); margin-top:3px;}
+  #gameTooltip .tt-req{font-size:10px; color:#ff8a4d; margin-top:6px; line-height:1.4;}
   .buy-btn{font-family:'JetBrains Mono',monospace; font-size:12.5px; border:1px solid var(--soul); color:var(--soul); background:transparent; padding:7px 12px; border-radius:2px; cursor:pointer; white-space:nowrap;}
   .buy-btn:hover:not(:disabled){background:rgba(92,225,230,0.1);}
   .buy-btn:disabled{opacity:0.3; cursor:not-allowed; border-color:var(--dim); color:var(--dim);}
@@ -571,7 +579,7 @@
 </div>
 
 <div id="achToastLayer"></div>
-<div id="talentTooltip"></div>
+<div id="gameTooltip"></div>
 <div id="bossWarning"><div class="bw-vignette"></div><div class="bw-text">⚠ INCOMING ⚠</div><div class="bw-name" id="bossWarningName">THE DRAGON</div></div>
 
 <script>
@@ -1235,7 +1243,7 @@ const EVENTS = [
 const TALENT_BRANCHES = ["warrior","mage","hunter","survivor","engineer","necromancer"];
 // `icon` (POLISH_PLAN item 6) drives the compact talent-node cell — nodes show
 // only the icon + tier pips now, name/desc moved into the hover/tap tooltip
-// (see #talentTooltip / openTalentTooltip in renderTalentTree).
+// (see #gameTooltip / openTooltip in renderTalentTree).
 // Each branch got 2 more lines (POLISH_PLAN item 5, indices 5-6) past the original
 // 5-node diamond so the chain from root to final node is 5 hops deep instead of 3 —
 // see TALENT_NODE_LAYOUT below for the shape. All 12 new lines reuse stats the
@@ -1819,6 +1827,42 @@ function weaponDef(wid){
   return player.evolvedWeapons && player.evolvedWeapons[wid] ? player.evolvedWeapons[wid] : WEAPONS[wid];
 }
 function weaponEvo(wid){ const d=weaponDef(wid); return (d && d.evoId) ? d.evoId : null; }
+// POLISH_PLAN_3 items 2-3 — WEAPONS has no authored `desc` field at all (unlike
+// CARDS/PASSIVES), and hand-writing ~40 of them (including fusion results) is a
+// lot of content for a tooltip; generated from def.type + the same base/perLevel
+// fields weaponFire() itself reads, at the player's *current* level, instead.
+function weaponTooltipDesc(wid){
+  const def=weaponDef(wid), lvl=player.weapons[wid]||1;
+  const val=(base,per)=> base!=null ? +(base+(per||0)*(lvl-1)).toFixed(1) : null;
+  const dmg=val(def.base.dmg,def.perLevel.dmg);
+  switch(def.type){
+    case "melee": return `Melee — ${dmg} dmg in a ${Math.round(def.base.radius)}px arc every ${def.base.cd}s.`;
+    case "projectile":{
+      const count=Math.round(val(def.base.count,def.perLevel.count)||1);
+      return `Projectile — ${count} shot(s) for ${dmg} dmg every ${def.base.cd}s${def.base.pierce?`, pierces ${def.base.pierce}`:""}.`;
+    }
+    case "beam":{
+      const dps=val(def.base.dps,def.perLevel.dps);
+      return `Beam — ${dps} dps at ${def.base.range}px range, continuous while a target is in range.`;
+    }
+    case "area": return `Area — ${dmg} dmg in a ${Math.round(def.base.radius)}px burst every ${def.base.cd}s.`;
+    case "summon":{
+      const minionDmg=val(def.base.minionDmg,def.perLevel.minionDmg);
+      const maxM=Math.round(val(def.base.maxMinions,def.perLevel.maxMinions)||1);
+      return `Summon — up to ${maxM} minion(s) dealing ${minionDmg} dmg each.`;
+    }
+    case "trap": return `Trap — ${dmg} dmg in a ${Math.round(def.base.radius)}px radius, ${def.base.cd}s between placements.`;
+    case "aura":
+      if(def.base.healPerSec!=null) return `Aura — heals ${val(def.base.healPerSec,def.perLevel.healPerSec)} HP/s in a ${Math.round(def.base.radius)}px radius.`;
+      if(def.base.reflectPct!=null) return `Aura — reflects ${Math.round(val(def.base.reflectPct,def.perLevel.reflectPct)*100)}% of contact damage in a ${Math.round(def.base.radius)}px radius.`;
+      return "Aura — passive area effect.";
+    case "chain":{
+      const jumps=Math.round(val(def.base.jumps,def.perLevel.jumps)||1);
+      return `Chain — ${dmg} dmg, jumps to ${jumps} target(s) every ${def.base.cd}s.`;
+    }
+    default: return `${def.type} weapon.`;
+  }
+}
 // Single source of truth for "is this weapon currently disabled" — weaponFire()'s
 // own early-return (below) and the HUD's weapon-row indicator both need the exact
 // same condition, so this is shared rather than duplicated.
@@ -3745,11 +3789,14 @@ function refreshHud(){
     for(const wid of Object.keys(player.weapons)){
       const def=weaponDef(wid); const el=document.createElement('div'); el.className='wpn-icon'+(def.evolved?' evolved':'')+(isWeaponDisabled(wid)?' disabled':'');
       el.innerHTML=`${def.icon}<span class="wlvl">${player.weapons[wid]}</span>`;
-      if(isWeaponDisabled(wid)) el.title="Disabled"+(player.disabledWeapons[wid]===Infinity?" (permanent)":"");
+      const disabledLine = isWeaponDisabled(wid) ? `<div class="tt-req">🔇 Disabled${player.disabledWeapons[wid]===Infinity?" (permanent)":""}</div>` : "";
+      wireTooltip(el, 'wpn:'+wid, ()=>`<div class="tt-name">${def.icon} ${def.name}${def.evolved?' ⭐':''}</div><div class="tt-desc">${weaponTooltipDesc(wid)}</div><div class="tt-tier">LEVEL ${player.weapons[wid]} / ${def.maxLevel||8}</div>${disabledLine}`);
       row.appendChild(el);
     }
     const prow=document.getElementById('passiveRow'); prow.innerHTML="";
-    for(const pid of player.passives){ const d=PASSIVES.find(x=>x.id===pid); if(!d) continue; const el=document.createElement('div'); el.className='psv-icon'; el.title=d.name; el.textContent=d.icon; prow.appendChild(el); }
+    for(const pid of player.passives){ const d=PASSIVES.find(x=>x.id===pid); if(!d) continue; const el=document.createElement('div'); el.className='psv-icon'; el.textContent=d.icon;
+      wireTooltip(el, 'psv:'+pid, ()=>`<div class="tt-name">${d.icon} ${d.name}</div><div class="tt-desc">${d.desc}</div>`);
+      prow.appendChild(el); }
   }
   refreshAbilityHud();
 }
@@ -3780,6 +3827,46 @@ let lastWeaponSig=null;
 let lastGoldVal=null, lastKillVal=null;
 function pulseValue(el){ el.classList.remove('val-pulse'); void el.offsetWidth; el.classList.add('val-pulse'); }
 function glow(size){ return quality==='low'?0:(quality==='medium'?size*0.6:size); }
+function hexToRgba(hex,a){
+  if(!hex || hex[0]!=='#' || hex.length<7) return hex; // best-effort passthrough for non-hex colors (rare)
+  const r=parseInt(hex.slice(1,3),16), g=parseInt(hex.slice(3,5),16), b=parseInt(hex.slice(5,7),16);
+  return `rgba(${r},${g},${b},${a})`;
+}
+// POLISH_PLAN_3 item 4 — replaces the flat arc()-stroke/fill "boring circle" look
+// shared by area-weapon bursts, aura radii, and the melee swing ring with a
+// layered abstract-pattern look: soft radial glow (instead of flat fill) + a
+// rotating dashed ring (lineDashOffset driven by runTime, no per-instance
+// animation state needed) + a handful of rotating tick marks around the rim.
+// quality-gated (skips the glow fill and tick marks on 'low') since this runs
+// per-instance per-frame for every active nova pulse/aura/swing at once.
+function drawEnergyRing(cx,cy,r,color,alpha,opts){
+  opts=opts||{};
+  if(alpha<=0.001||r<=0) return;
+  const spin=runTime*(opts.spinSpeed??1.2);
+  if(opts.glow!==false && quality!=='low'){
+    const grad=ctx2d.createRadialGradient(cx,cy,0,cx,cy,r);
+    grad.addColorStop(0,hexToRgba(color,alpha*0.22));
+    grad.addColorStop(0.75,hexToRgba(color,alpha*0.08));
+    grad.addColorStop(1,hexToRgba(color,0));
+    ctx2d.beginPath(); ctx2d.fillStyle=grad; ctx2d.arc(cx,cy,r,0,7); ctx2d.fill();
+  }
+  ctx2d.save();
+  ctx2d.globalAlpha=alpha; ctx2d.strokeStyle=color; ctx2d.lineWidth=opts.lineWidth||2.5;
+  ctx2d.setLineDash(opts.dash||[r*0.26,r*0.18]);
+  ctx2d.lineDashOffset=-spin*r*0.6;
+  ctx2d.beginPath(); ctx2d.arc(cx,cy,r,0,7); ctx2d.stroke();
+  ctx2d.setLineDash([]);
+  if(quality!=='low'){
+    const ticks=opts.ticks??6;
+    ctx2d.lineWidth=1.4;
+    for(let i=0;i<ticks;i++){
+      const ang=spin*0.4+(i/ticks)*Math.PI*2;
+      const ox=Math.cos(ang), oy=Math.sin(ang);
+      ctx2d.beginPath(); ctx2d.moveTo(cx+ox*r,cy+oy*r); ctx2d.lineTo(cx+ox*(r-8),cy+oy*(r-8)); ctx2d.stroke();
+    }
+  }
+  ctx2d.restore();
+}
 /* ---- Range-driven camera zoom -------------------------------------------
    Camera zoom follows the player's actual current effective attack reach,
    not the raw rangeMult stat. rangeMult (Farsight card / Farseer's Lens /
@@ -3880,16 +3967,13 @@ function render(){
   }
   for(const n of novaPulses){
     const alpha=clamp(n.life/n.maxLife,0,1); const grow=1+(1-alpha)*0.25;
-    ctx2d.beginPath(); ctx2d.strokeStyle=n.color; ctx2d.globalAlpha=alpha*0.8; ctx2d.lineWidth=4;
-    ctx2d.arc(n.x,n.y,n.radius*grow,0,7); ctx2d.stroke(); ctx2d.globalAlpha=1;
+    drawEnergyRing(n.x,n.y,n.radius*grow,n.color,alpha*0.85,{lineWidth:3.5,ticks:5,spinSpeed:2.4});
   }
   if(player.swordFx){
     const fx=player.swordFx, alpha=fx.t/0.22;
-    ctx2d.beginPath(); ctx2d.strokeStyle=fx.color||"#b98cff"; ctx2d.globalAlpha=alpha*0.7; ctx2d.lineWidth=fx.width||6;
-    ctx2d.arc(player.x,player.y,fx.r,0,Math.PI*2); ctx2d.stroke();
+    drawEnergyRing(player.x,player.y,fx.r,fx.color||"#b98cff",alpha*0.75,{lineWidth:fx.width||6,ticks:8,spinSpeed:3.4,glow:false});
     // Evolved melee weapons leave a brighter white afterimage ring just inside the main swing.
-    if(fx.evolved){ ctx2d.strokeStyle="#ffffff"; ctx2d.globalAlpha=alpha*0.45; ctx2d.lineWidth=Math.max(2,(fx.width||6)*0.4); ctx2d.beginPath(); ctx2d.arc(player.x,player.y,fx.r*0.85,0,Math.PI*2); ctx2d.stroke(); }
-    ctx2d.globalAlpha=1;
+    if(fx.evolved){ ctx2d.save(); ctx2d.strokeStyle="#ffffff"; ctx2d.globalAlpha=alpha*0.45; ctx2d.lineWidth=Math.max(2,(fx.width||6)*0.4); ctx2d.beginPath(); ctx2d.arc(player.x,player.y,fx.r*0.85,0,Math.PI*2); ctx2d.stroke(); ctx2d.restore(); }
   }
   if(player.beamTargets){
     for(const wid of Object.keys(player.beamTargets)){
@@ -3904,11 +3988,9 @@ function render(){
   if(player.auraRadius){
     for(const k of Object.keys(player.auraRadius)){
       const a = player.auraRadius[k];
-      ctx2d.beginPath(); ctx2d.strokeStyle=weaponColor(k); ctx2d.globalAlpha=0.28; ctx2d.lineWidth=2+a.tier*0.5;
-      ctx2d.arc(player.x,player.y,a.radius,0,7); ctx2d.stroke();
+      drawEnergyRing(player.x,player.y,a.radius,weaponColor(k),0.3,{lineWidth:2+a.tier*0.5,ticks:4+a.tier,spinSpeed:0.6,glow:quality==='high'});
       // Higher-level auras pulse a second, tighter inner ring instead of just growing radius.
-      if(a.tier>=3){ ctx2d.globalAlpha=0.16; ctx2d.beginPath(); ctx2d.arc(player.x,player.y,a.radius*0.82,0,7); ctx2d.stroke(); }
-      ctx2d.globalAlpha=1;
+      if(a.tier>=3) drawEnergyRing(player.x,player.y,a.radius*0.82,weaponColor(k),0.18,{lineWidth:1.5,ticks:0,spinSpeed:-0.8,glow:false});
     }
   }
   for(const m of minions){
@@ -4303,8 +4385,24 @@ document.getElementById('settingsBack').onclick=()=>{ if(settingsReturnTo==='pau
 /* =========================================================================
    PART 17 — SCREEN MANAGEMENT / CHARACTER SELECT / TALENT TREE / MENU WIRING
    ========================================================================= */
-function hideAll(){ document.querySelectorAll('.screen').forEach(s=>s.classList.add('hidden')); }
-function show(id){ hideAll(); document.getElementById(id).classList.remove('hidden'); }
+// POLISH_PLAN_3 item 1 — animated screen transitions. state (the game's own state
+// machine) stays the source of truth for logic, not the .hidden class, so this
+// delay is purely cosmetic and doesn't need anything downstream to wait on it.
+const SCREEN_TRANSITION_MS = 220;
+function fadeOutScreen(el){
+  if(el.classList.contains('hidden')) return;
+  el.classList.add('screen-out');
+  setTimeout(()=>{ el.classList.remove('screen-out'); el.classList.add('hidden'); el.style.zIndex=''; }, SCREEN_TRANSITION_MS);
+}
+function hideAll(){ document.querySelectorAll('.screen').forEach(s=>fadeOutScreen(s)); }
+function show(id){
+  const next=document.getElementById(id);
+  document.querySelectorAll('.screen').forEach(s=>{ if(s!==next) fadeOutScreen(s); });
+  next.classList.remove('hidden','screen-out');
+  next.style.zIndex='11'; // guarantees the incoming screen paints above whatever's still fading out, regardless of DOM order
+  next.classList.add('screen-in');
+  requestAnimationFrame(()=>requestAnimationFrame(()=>next.classList.remove('screen-in')));
+}
 function setState(s){ state=s; if(!["playing","levelup","paused","shop","ingame-stats","event","fusion"].includes(s)) document.getElementById('hud').classList.add('hidden'); }
 function goMenu(){ setState('menu'); SFX.stopHeartbeat(); MUSIC.stop(); refreshSoulBadges(); updateContinueButton(); show('screen-menu'); }
 function updateContinueButton(){
@@ -4369,9 +4467,9 @@ document.getElementById('btnContinue').onclick=continueRun;
 // cells have no room for text) — pinnedNodeId tracks a touch-tap-opened tooltip so a
 // second tap on the *same* node can proceed to buy, while hover (desktop, no touch)
 // just shows/hides on enter/leave without needing a pin at all.
-let talentTooltipPinned=null;
-function openTalentTooltip(el,html){
-  const tt=document.getElementById('talentTooltip'); tt.innerHTML=html; tt.classList.add('show');
+let tooltipPinned=null;
+function openTooltip(el,html){
+  const tt=document.getElementById('gameTooltip'); tt.innerHTML=html; tt.classList.add('show');
   const r=el.getBoundingClientRect(); const ttW=220;
   let left=r.left+r.width/2-ttW/2; left=Math.max(6,Math.min(window.innerWidth-ttW-6,left));
   tt.style.left=left+'px';
@@ -4379,16 +4477,29 @@ function openTalentTooltip(el,html){
   const th=tt.offsetHeight; tt.style.visibility='visible';
   tt.style.top=(above-th>0 ? above-th : r.bottom+10)+'px';
 }
-function hideTalentTooltip(){ document.getElementById('talentTooltip').classList.remove('show'); talentTooltipPinned=null; }
+function hideTooltip(){ document.getElementById('gameTooltip').classList.remove('show'); tooltipPinned=null; }
+// POLISH_PLAN_3 items 2-3 — shared hover(desktop)/click-to-toggle(works for touch
+// too) wiring for icons that only ever show info, no second action layered on
+// top (weapon-row/passive-row) — talent nodes wire this by hand instead since a
+// second tap there needs to fall through to a purchase, not just toggle.
+function wireTooltip(el, uid, htmlFn){
+  el.addEventListener('mouseenter',()=>{ if(!isTouchDevice) openTooltip(el,htmlFn()); });
+  el.addEventListener('mouseleave',()=>{ if(!isTouchDevice && !tooltipPinned) hideTooltip(); });
+  el.addEventListener('click',e=>{
+    e.stopPropagation();
+    if(tooltipPinned===uid){ hideTooltip(); return; }
+    openTooltip(el,htmlFn()); tooltipPinned=uid;
+  });
+}
 function renderTalentTree(activeBranch){
   const tabsEl=document.getElementById('talentTabs'); tabsEl.innerHTML="";
   TALENT_BRANCHES.forEach(b=>{
     const tab=document.createElement('div'); tab.className='settings-tab'+(b===activeBranch?' active':'');
     tab.textContent=b.charAt(0).toUpperCase()+b.slice(1);
-    tab.onclick=()=>{ hideTalentTooltip(); renderTalentTree(b); };
+    tab.onclick=()=>{ hideTooltip(); renderTalentTree(b); };
     tabsEl.appendChild(tab);
   });
-  hideTalentTooltip();
+  hideTooltip();
   const wrap=document.getElementById('metaWrap'); wrap.innerHTML="";
   const scroll=document.createElement('div'); scroll.className='talent-graph-scroll';
   const graph=document.createElement('div'); graph.className='talent-graph';
@@ -4435,18 +4546,18 @@ function renderTalentTree(activeBranch){
       const costText = locked ? "" : `<div class="tt-cost">${maxed?"MAXED":`Next tier: ${cost} SOUL`}</div>`;
       return `<div class="tt-name">${line.label}</div><div class="tt-desc">${descText}</div><div class="tt-tier">TIER ${lvl} / 5</div>${costText}${reqText}`;
     };
-    el.addEventListener('mouseenter',()=>{ if(!isTouchDevice) openTalentTooltip(el,tooltipHtml()); });
-    el.addEventListener('mouseleave',()=>{ if(!isTouchDevice && !talentTooltipPinned) hideTalentTooltip(); });
+    el.addEventListener('mouseenter',()=>{ if(!isTouchDevice) openTooltip(el,tooltipHtml()); });
+    el.addEventListener('mouseleave',()=>{ if(!isTouchDevice && !tooltipPinned) hideTooltip(); });
     el.addEventListener('click',e=>{
       e.stopPropagation();
-      if(isTouchDevice && talentTooltipPinned!==nodeId){ openTalentTooltip(el,tooltipHtml()); talentTooltipPinned=nodeId; return; }
+      if(isTouchDevice && tooltipPinned!==nodeId){ openTooltip(el,tooltipHtml()); tooltipPinned=nodeId; return; }
       if(locked||maxed||save.soul<cost) return;
       // Snapshot lock state before the purchase so we can tell which *other* node
       // (if any) this tier just unblocked — that node gets the same pulse plus a
       // smooth scroll to bring it into view, the "animated shift on open" ask.
       const lockedBefore = lines.map((l,i)=>lineLocked(activeBranch,i));
       save.soul-=cost; save.talentLevels[activeBranch+"_"+line.key]=lvl+1; persistSave(); refreshSoulBadges();
-      hideTalentTooltip();
+      hideTooltip();
       const newlyIdx = lines.findIndex((l,i)=>lockedBefore[i] && !lineLocked(activeBranch,i));
       renderTalentTree(activeBranch);
       requestAnimationFrame(()=>{
@@ -4473,11 +4584,11 @@ function renderTalentTree(activeBranch){
   scroll.appendChild(graph); wrap.appendChild(scroll);
 }
 document.getElementById('btnMeta').onclick=()=>{ setState('meta'); renderTalentTree('warrior'); show('screen-meta'); };
-document.getElementById('metaBack').onclick=()=>{ hideTalentTooltip(); goMenu(); };
+document.getElementById('metaBack').onclick=()=>{ hideTooltip(); goMenu(); };
 // Tap-outside-to-close for a touch-pinned tooltip (mouse users just move the pointer
 // off the node, handled by mouseleave above). One listener for the whole page, gated
-// by talentTooltipPinned being set, rather than re-attaching per render.
-document.addEventListener('click',e=>{ if(talentTooltipPinned && !e.target.closest('.talent-node')) hideTalentTooltip(); });
+// by tooltipPinned being set, rather than re-attaching per render.
+document.addEventListener('click',e=>{ if(tooltipPinned && !e.target.closest('.talent-node, .wpn-icon, .psv-icon')) hideTooltip(); });
 
 function renderStatsScreen(){
   const L=save.lifetime;
