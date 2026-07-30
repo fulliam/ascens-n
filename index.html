@@ -34,6 +34,10 @@
   .screen.screen-out{opacity:0; transform:scale(0.97); pointer-events:none;}
   .screen.screen-in{opacity:0; transform:scale(1.02);}
   .hidden{display:none !important;}
+  /* Generic keyboard-navigation focus ring — see MENU_NAV_SELECTOR (PART 16/17)
+     for what can receive it. Outline (not box-shadow) so it never fights an
+     element's own box-shadow (char-card-selected glow, talent-node.maxed, etc). */
+  .kbd-focus{outline:3px solid var(--accent); outline-offset:3px;}
   .veil{position:absolute; inset:0; background:radial-gradient(ellipse at 50% 30%, rgba(30,20,50,0.55), rgba(4,5,8,0.92) 70%);}
   .title-wrap{position:relative; z-index:2; text-align:center; margin-bottom:28px;}
   .kicker{font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:4px; color:var(--accent); opacity:0.8; margin-bottom:10px;}
@@ -915,6 +919,10 @@ const WEAPON_COLORS = {
 // projectile being an identical plain circle. Weapons not listed here keep the default circle,
 // which fits their identity (plasma_rifle is a rapid spray of small energy bolts).
 const PROJECTILE_SHAPES = { bow:"wave", railgun:"spiral", shuriken_storm:"blade", javelin:"homing", hand_cannon:"diamond", gauss_needle:"petal", stormpiercer:"homing", plasma_lance:"spiral" };
+// Same idea as PROJECTILE_SHAPES but for round area/aura skills — see drawEnergyRing()'s
+// opts.shape branches (PART 12) for what each name actually draws. Weapons not listed here
+// keep the "dashed" default (still a real, distinct look, just the original one).
+const RING_SHAPES = { fire_nova:"segmented", frost_field:"hex", poison_cloud:"serrated", holy_aura:"solid", thorn_aura:"spokes", void_rift:"counter", entropy_bloom:"serrated", blight_frost:"hex" };
 // Visual tier from weapon level (1-4) — drives bullet size/glow, melee afterimage count, chain arc
 // thickness, area/aura pulse intensity, etc. so leveling up reads as a growing presence on screen,
 // not just a bigger number in the level-up card.
@@ -2348,10 +2356,10 @@ function weaponFire(wid, lvl, dt){
     if(wid==="poison_cloud" && evo==="plague_zone") player.stats.poisonSpread = true;
     // Absolute Zero: enemies under 30% HP caught in the field are fully frozen (near-total slow).
     if(wid==="frost_field" && evo==="absolute_zero") forEachEnemyNear(player.x,player.y,radius,e=>{ if(e.hp/e.maxHp<0.3){ e.slowed=true; e.slowT=Math.max(e.slowT||0,2.5); e.frozenSolid=true; } });
-    novaPulses.push({x:player.x,y:player.y,radius,life:0.4,maxLife:0.4,color:weaponColor(wid)});
+    novaPulses.push({x:player.x,y:player.y,radius,life:0.4,maxLife:0.4,color:weaponColor(wid),weaponId:wid});
     // Second, slightly-delayed inner ring at higher levels — a leveled-up nova visibly pulses
     // twice instead of just growing a bigger single ring.
-    if(weaponVisualTier(lvl)>=3) novaPulses.push({x:player.x,y:player.y,radius:radius*0.6,life:0.55,maxLife:0.55,color:weaponColor(wid)});
+    if(weaponVisualTier(lvl)>=3) novaPulses.push({x:player.x,y:player.y,radius:radius*0.6,life:0.55,maxLife:0.55,color:weaponColor(wid),weaponId:wid});
     if(wid==="fire_nova") SFX.novaBurst(); else if(wid==="poison_cloud") SFX.chainZap(); else SFX.novaBurst();
     return;
   }
@@ -4454,10 +4462,19 @@ function hexToRgba(hex,a){
 // animation state needed) + a handful of rotating tick marks around the rim.
 // quality-gated (skips the glow fill and tick marks on 'low') since this runs
 // per-instance per-frame for every active nova pulse/aura/swing at once.
+// Distinct "line formation" per round skill (opts.shape), not just per-instance size/color —
+// area/aura weapons all used the exact same dashed-ring-plus-ticks silhouette before, only
+// recolored/rescaled, so two different abilities at a glance looked like the same effect.
+// RING_SHAPES (below, near the weapon data) maps weaponId -> shape name; each shape here is a
+// self-contained stroke pattern instead of a shared dash config, so the "dashed" case (kept as
+// the default/fallback for callers that never set opts.shape, e.g. the melee swing ring) is
+// the only one that still gets the original tick-mark accent — the other shapes carry their
+// own built-in radial detail instead of needing it bolted on separately.
 function drawEnergyRing(cx,cy,r,color,alpha,opts){
   opts=opts||{};
   if(alpha<=0.001||r<=0) return;
   const spin=runTime*(opts.spinSpeed??1.2);
+  const shape=opts.shape||"dashed";
   if(opts.glow!==false && quality!=='low'){
     const grad=ctx2d.createRadialGradient(cx,cy,0,cx,cy,r);
     grad.addColorStop(0,hexToRgba(color,alpha*0.22));
@@ -4467,11 +4484,55 @@ function drawEnergyRing(cx,cy,r,color,alpha,opts){
   }
   ctx2d.save();
   ctx2d.globalAlpha=alpha; ctx2d.strokeStyle=color; ctx2d.lineWidth=opts.lineWidth||2.5;
-  ctx2d.setLineDash(opts.dash||[r*0.26,r*0.18]);
-  ctx2d.lineDashOffset=-spin*r*0.6;
-  ctx2d.beginPath(); ctx2d.arc(cx,cy,r,0,7); ctx2d.stroke();
-  ctx2d.setLineDash([]);
-  if(quality!=='low'){
+  if(shape==="solid"){
+    // Clean unbroken ring — no dash, no ticks. Reads as "orderly/supportive" (Holy Aura).
+    ctx2d.beginPath(); ctx2d.arc(cx,cy,r,0,7); ctx2d.stroke();
+  } else if(shape==="segmented"){
+    // A handful of chunky rotating arcs with real gaps between them — reads as "bursting"
+    // rather than the fine-grained dashed ring (Fire Nova).
+    const segs=opts.segCount||6, gap=0.22, segLen=(Math.PI*2/segs)*(1-gap);
+    for(let i=0;i<segs;i++){ const a0=spin+(i/segs)*Math.PI*2; ctx2d.beginPath(); ctx2d.arc(cx,cy,r,a0,a0+segLen); ctx2d.stroke(); }
+  } else if(shape==="serrated"){
+    // Jagged spiked outline (radius alternates in/out with angle) — bubbling/toxic edge
+    // (Poison Cloud, Entropy Bloom).
+    const spikes=opts.spikes||14, amp=r*0.12;
+    ctx2d.beginPath();
+    for(let i=0;i<=spikes*2;i++){
+      const ang=spin*0.3+(i/(spikes*2))*Math.PI*2, rr=r+((i%2===0)?amp:-amp);
+      const px=cx+Math.cos(ang)*rr, py=cy+Math.sin(ang)*rr;
+      if(i===0) ctx2d.moveTo(px,py); else ctx2d.lineTo(px,py);
+    }
+    ctx2d.closePath(); ctx2d.stroke();
+  } else if(shape==="hex"){
+    // Faceted polygon instead of a true circle — crystalline/geometric (Frost Field, Blight Frost).
+    const sides=opts.sides||6;
+    ctx2d.beginPath();
+    for(let i=0;i<=sides;i++){ const ang=spin*0.5+(i/sides)*Math.PI*2, px=cx+Math.cos(ang)*r, py=cy+Math.sin(ang)*r; if(i===0) ctx2d.moveTo(px,py); else ctx2d.lineTo(px,py); }
+    ctx2d.closePath(); ctx2d.stroke();
+  } else if(shape==="spokes"){
+    // Thin inner ring with literal spikes jutting outward from the rim (Thorn Aura).
+    ctx2d.beginPath(); ctx2d.arc(cx,cy,r*0.94,0,7); ctx2d.stroke();
+    const spokeCount=opts.ticks??8; ctx2d.lineWidth=Math.max(1,(opts.lineWidth||2.5)*0.7);
+    for(let i=0;i<spokeCount;i++){
+      const ang=spin*0.4+(i/spokeCount)*Math.PI*2, ox=Math.cos(ang), oy=Math.sin(ang);
+      ctx2d.beginPath(); ctx2d.moveTo(cx+ox*r*0.94,cy+oy*r*0.94); ctx2d.lineTo(cx+ox*r*1.18,cy+oy*r*1.18); ctx2d.stroke();
+    }
+  } else if(shape==="counter"){
+    // Two dashed rings spinning in opposite directions at different radii — unstable/warping
+    // feel distinct from a single rotating ring (Void Rift).
+    ctx2d.setLineDash(opts.dash||[r*0.3,r*0.22]); ctx2d.lineDashOffset=-spin*r*0.6;
+    ctx2d.beginPath(); ctx2d.arc(cx,cy,r,0,7); ctx2d.stroke();
+    ctx2d.lineDashOffset=spin*r*0.9; ctx2d.lineWidth=Math.max(1,(opts.lineWidth||2.5)*0.6);
+    ctx2d.beginPath(); ctx2d.arc(cx,cy,r*0.8,0,7); ctx2d.stroke();
+    ctx2d.setLineDash([]);
+  } else {
+    // "dashed" — original look, kept as the default for callers that don't specify a shape.
+    ctx2d.setLineDash(opts.dash||[r*0.26,r*0.18]);
+    ctx2d.lineDashOffset=-spin*r*0.6;
+    ctx2d.beginPath(); ctx2d.arc(cx,cy,r,0,7); ctx2d.stroke();
+    ctx2d.setLineDash([]);
+  }
+  if(shape==="dashed" && quality!=='low'){
     const ticks=opts.ticks??6;
     ctx2d.lineWidth=1.4;
     for(let i=0;i<ticks;i++){
@@ -4582,7 +4643,7 @@ function render(){
   }
   for(const n of novaPulses){
     const alpha=clamp(n.life/n.maxLife,0,1); const grow=1+(1-alpha)*0.25;
-    drawEnergyRing(n.x,n.y,n.radius*grow,n.color,alpha*0.85,{lineWidth:3.5,ticks:5,spinSpeed:2.4});
+    drawEnergyRing(n.x,n.y,n.radius*grow,n.color,alpha*0.85,{lineWidth:3.5,ticks:5,spinSpeed:2.4,shape:RING_SHAPES[n.weaponId]});
   }
   if(player.swordFx){
     const fx=player.swordFx, alpha=fx.t/0.22;
@@ -4603,9 +4664,9 @@ function render(){
   if(player.auraRadius){
     for(const k of Object.keys(player.auraRadius)){
       const a = player.auraRadius[k];
-      drawEnergyRing(player.x,player.y,a.radius,weaponColor(k),0.3,{lineWidth:2+a.tier*0.5,ticks:4+a.tier,spinSpeed:0.6,glow:quality==='high'});
+      drawEnergyRing(player.x,player.y,a.radius,weaponColor(k),0.3,{lineWidth:2+a.tier*0.5,ticks:4+a.tier,spinSpeed:0.6,glow:quality==='high',shape:RING_SHAPES[k]});
       // Higher-level auras pulse a second, tighter inner ring instead of just growing radius.
-      if(a.tier>=3) drawEnergyRing(player.x,player.y,a.radius*0.82,weaponColor(k),0.18,{lineWidth:1.5,ticks:0,spinSpeed:-0.8,glow:false});
+      if(a.tier>=3) drawEnergyRing(player.x,player.y,a.radius*0.82,weaponColor(k),0.18,{lineWidth:1.5,ticks:0,spinSpeed:-0.8,glow:false,shape:RING_SHAPES[k]});
     }
   }
   for(const m of minions){
@@ -5577,8 +5638,35 @@ function togglePause(){ if(state==='playing'){ setState('paused'); SFX.stopHeart
 // same regardless of active layout, so movement mirrors it into the same
 // keys['w'/'a'/'s'/'d'] flags updatePlayer() already checks.
 const CODE_TO_WASD = {KeyW:'w',KeyA:'a',KeyS:'s',KeyD:'d'};
+// Generic roving-focus keyboard navigation for every non-gameplay screen (main menu,
+// char-select, shop, fusion, pause, death, victory, talent tree, stats, achievements,
+// armory, event, settings). Deliberately re-scans the DOM on every keypress instead of
+// caching a focusable-element list — these screens re-render their contents dynamically
+// (shop stock, talent branch switch, achievement unlocks), and a cached list would go
+// stale the same way the achievement-context cache did earlier this session. Level-up
+// already has its own bespoke arrow-key handler (focusLevelUpCard) above and is
+// deliberately not part of this — different card-grid layout, different intent (must
+// pick exactly one), not worth unifying.
+const MENU_NAV_SELECTOR = '.screen:not(.hidden) button:not(:disabled), .screen:not(.hidden) .toggle-switch, '
+  +'.screen:not(.hidden) .seg-btn, .screen:not(.hidden) .settings-tab, .screen:not(.hidden) .back-link, '
+  +'.screen:not(.hidden) .card:not(.locked), .screen:not(.hidden) .talent-node:not(.locked), .screen:not(.hidden) input[type=range]';
+const MENU_NAV_STATES = new Set(['menu','charselect','shop','fusion','ingame-stats','paused','dead','victory','meta','stats','achievements','armory','event','settings']);
+let menuKbdFocusEl=null;
+function menuNavFocusables(){ return Array.from(document.querySelectorAll(MENU_NAV_SELECTOR)).filter(el=>el.offsetParent!==null); }
+function menuNavSetFocus(el){
+  if(menuKbdFocusEl) menuKbdFocusEl.classList.remove('kbd-focus');
+  menuKbdFocusEl=el;
+  if(el){ el.classList.add('kbd-focus'); if(el.tabIndex<0) el.tabIndex=-1; el.focus({preventScroll:true}); el.scrollIntoView({block:'nearest',inline:'nearest'}); }
+}
+function menuNavMove(dir){
+  const list=menuNavFocusables(); if(!list.length) return;
+  const cur=menuKbdFocusEl?list.indexOf(menuKbdFocusEl):-1;
+  menuNavSetFocus(list[cur<0?0:(cur+dir+list.length)%list.length]);
+}
+function menuNavActivate(){ if(menuKbdFocusEl && menuKbdFocusEl.tagName!=='INPUT') menuKbdFocusEl.click(); }
 window.addEventListener('keydown',e=>{ keys[e.key.toLowerCase()]=true; const wasd=CODE_TO_WASD[e.code]; if(wasd) keys[wasd]=true;
   if(e.key==='Escape' && ["playing","paused","shop","ingame-stats"].includes(state)){ if(state==='shop'||state==='ingame-stats'){ hideAll(); setState('playing'); MUSIC.start(); } else togglePause(); }
+  if(e.code==='KeyP' && (state==='playing'||state==='paused')){ e.preventDefault(); togglePause(); }
   if(e.code==='Space' && state==='playing'){ e.preventDefault(); tryDash(); }
   if(e.key==='Shift' && state==='playing'){ tryFastHeal(); }
   if(state==='levelup'){
@@ -5588,6 +5676,13 @@ window.addEventListener('keydown',e=>{ keys[e.key.toLowerCase()]=true; const was
     if(wasdCode==='a'||k==='arrowleft'||wasdCode==='w'||k==='arrowup'){ e.preventDefault(); focusLevelUpCard(levelUpKbdIndex-1); }
     else if(wasdCode==='d'||k==='arrowright'||wasdCode==='s'||k==='arrowdown'){ e.preventDefault(); focusLevelUpCard(levelUpKbdIndex+1); }
     else if(e.code==='Space'||e.key==='Enter'){ e.preventDefault(); const cards=document.getElementById('cardsWrap').children; if(cards[levelUpKbdIndex]) cards[levelUpKbdIndex].click(); }
+  } else if(MENU_NAV_STATES.has(state)){
+    const k=e.key, onRange=menuKbdFocusEl && menuKbdFocusEl.tagName==='INPUT';
+    if(k==='ArrowUp'){ e.preventDefault(); menuNavMove(-1); }
+    else if(k==='ArrowDown'){ e.preventDefault(); menuNavMove(1); }
+    else if(k==='ArrowLeft'){ if(onRange) return; e.preventDefault(); menuNavMove(-1); }
+    else if(k==='ArrowRight'){ if(onRange) return; e.preventDefault(); menuNavMove(1); }
+    else if(k==='Enter'||e.code==='Space'){ e.preventDefault(); menuNavActivate(); }
   } });
 window.addEventListener('keyup',e=>{ keys[e.key.toLowerCase()]=false; const wasd=CODE_TO_WASD[e.code]; if(wasd) keys[wasd]=false; });
 
