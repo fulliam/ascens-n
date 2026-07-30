@@ -4125,6 +4125,11 @@ function eventCtx(){
     convertGoldToSoul:(p,rate)=>{ const amt=Math.floor(p.gold*rate*0.1); p.gold=0; save.soul+=amt; save.lifetime.totalSoul+=amt; persistSave(); refreshSoulBadges(); logEvent(`Converted gold into ${amt} Soul.`); },
     applyHpPenalty:(p,pct)=>{ p.maxHp=Math.max(10,Math.floor(p.maxHp*(1-pct))); p.hp=Math.min(p.hp,p.maxHp); },
     grantRandomWeaponIfSlotOpen:(p)=>{ if(Object.keys(p.weapons).length<maxWeaponSlots(p)){ const avail=Object.keys(WEAPONS).filter(w=>!p.weapons[w]&&!WEAPONS[w].fusionOnly); if(avail.length){ const w=pick(avail); p.weapons[w]=1; logEvent(`${WEAPONS[w].name} acquired from cache!`); } } },
+    // Shrine of Silence calls this with a 2nd {grantPassiveSlots} arg that's
+    // intentionally ignored here (see settleEventEffects, which grants those
+    // slots as its own special-case) — kept duration-only to match the boss-ctx
+    // version of this same method (PART 8, boss attack ctx) exactly.
+    disableRandomWeapon:(duration)=>{ const wids=Object.keys(player.weapons); if(!wids.length) return; const wid=pick(wids); player.disabledWeapons[wid]= duration===Infinity?Infinity:(runTime+duration); logEvent(`${WEAPONS[wid].name} has been disabled!`); },
     spawnGuardedTreasure:(p,eliteId,goldAmt)=>{ const b=spawnEnemy(eliteId,{x:p.x+rand(-200,200),y:p.y+rand(-200,200)}); if(b) b._treasureGold=goldAmt; logEvent("A guardian appears — defeat it for treasure!"); },
     startArenaWave:(p,opts)=>{
       runStats.arenasCleared=(runStats.arenasCleared||0)+1;
