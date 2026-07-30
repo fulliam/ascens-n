@@ -351,8 +351,13 @@
   .char-select-wrap{width:min(94vw,900px); margin:0 auto; padding:20px 4px 26px;}
   .char-select-wrap.fit{display:flex; justify-content:center; align-items:stretch; gap:16px;}
   .char-select-wrap.carousel{display:flex; gap:16px; overflow-x:auto; overflow-y:visible; scroll-snap-type:x mandatory;
-    scrollbar-width:none; -ms-overflow-style:none; padding-left:calc(50% - 90px); padding-right:calc(50% - 90px);}
+    scrollbar-width:none; -ms-overflow-style:none; padding-left:calc(50% - 90px); padding-right:calc(50% - 90px); cursor:grab;}
   .char-select-wrap.carousel::-webkit-scrollbar{display:none;}
+  /* POLISH_PLAN_16 — mouse click-and-drag scroll (touch already had native swipe
+     via overflow-x:auto; desktop mouse users had no way to pan the carousel at
+     all before this). scroll-snap-type is suspended while actively dragging so
+     the drag doesn't fight the browser's own snap-back mid-gesture. */
+  .char-select-wrap.carousel.dragging{cursor:grabbing; scroll-snap-type:none; user-select:none;}
   .char-card{flex-shrink:0; scroll-snap-align:center; opacity:0; background-repeat:no-repeat; background-size:220% 100%;
     animation-name:charCardIn, cardShimmer; animation-duration:.45s, 6s; animation-timing-function:ease-out, ease-in-out;
     animation-iteration-count:1, infinite; animation-fill-mode:forwards, none; animation-delay:var(--char-card-delay,0s), 0s;}
@@ -3547,20 +3552,37 @@ function weightedPick(pool,n){
   }
   return out;
 }
+// POLISH_PLAN_16 — level-up cards used to rely purely on `onclick` (mouse-click
+// synthesis), same class of bug the ability buttons had before POLISH_PLAN_6:
+// unreliable for a second finger tapping this card while another finger is
+// still mid-drag on the joystick (native touch-target capture keeps that first
+// finger bound to #joystickCapture regardless of this new screen appearing on
+// top of it, but the SECOND finger tapping a card is a fresh touch and should
+// work fine — except click-synthesis for it wasn't reliable). `wireActivate`
+// binds one action to both click (desktop) and a direct touchstart (bypasses
+// synthesis for touch) — guarded by `fired` since, unlike the idempotent
+// tryDash()/tryFastHeal(), picking a card mutates state (pendingLevelUps,
+// player.weapons/cardsTaken) and must not fire twice for one tap.
+function wireActivate(el, action){
+  let fired=false;
+  const activate=()=>{ if(fired) return; fired=true; action(); };
+  el.onclick=activate;
+  el.addEventListener('touchstart',e=>{ e.preventDefault(); e.stopPropagation(); activate(); },{passive:false});
+}
 function renderCardEl(entry){
   const el=document.createElement('div'); el.className='card';
   if(entry.kind==="unlock"){ const d=WEAPONS[entry.wid];
     el.innerHTML=`<div class="card-head"><div class="icon">${d.icon}</div><div class="card-head-text"><div class="name">${d.name}</div><div class="tag">NEW WEAPON</div></div></div><div class="desc">Unlocks a new weapon: ${d.type} type.</div>`;
-    el.onclick=()=>{ SFX.uiClick(); pulseCardPick(el); player.weapons[entry.wid]=1; logEvent(d.name+" acquired."); afterCardPicked(); }; }
+    wireActivate(el, ()=>{ SFX.uiClick(); pulseCardPick(el); player.weapons[entry.wid]=1; logEvent(d.name+" acquired."); afterCardPicked(); }); }
   else if(entry.kind==="levelup"){ const d=WEAPONS[entry.wid]; const lvl=player.weapons[entry.wid];
     el.innerHTML=`<div class="card-head"><div class="icon">${d.icon}</div><div class="card-head-text"><div class="name">${d.name} +1</div><div class="tag">WEAPON LVL</div></div></div><div class="desc">Level ${lvl} → ${lvl+1}.</div>`;
-    el.onclick=()=>{ SFX.uiClick(); pulseCardPick(el); player.weapons[entry.wid]++; logEvent(d.name+" leveled up."); performEvolution(entry.wid); afterCardPicked(); }; }
+    wireActivate(el, ()=>{ SFX.uiClick(); pulseCardPick(el); player.weapons[entry.wid]++; logEvent(d.name+" leveled up."); performEvolution(entry.wid); afterCardPicked(); }); }
   else { const c=entry.card;
     el.className='card rarity-'+(c.rarity||'common');
     const stackNote = c.stackable ? ` <span style="color:var(--dim)">(${player.cardsTaken.filter(id=>id===c.id).length}/${c.maxStacks||99} taken)</span>` : "";
     const rarityTag = c.rarity && c.rarity!=="common" ? `<div class="rarity-label">${c.rarity}</div>` : "";
     el.innerHTML=`${rarityTag}<div class="card-head"><div class="icon">${cardIcon(c.cat)}</div><div class="card-head-text"><div class="name">${c.name}</div><div class="tag cat-${c.cat}">${c.cat.toUpperCase().replace('_',' ')}</div></div></div><div class="desc">${c.desc}${stackNote}</div>`;
-    el.onclick=()=>{ SFX.uiClick(); pulseCardPick(el); c.apply(player); player.cardsTaken.push(c.id); if(c.cat==="legendary") runStats.legendaryCardsTaken=(runStats.legendaryCardsTaken||0)+1; logEvent(c.name+" acquired."); afterCardPicked(); }; }
+    wireActivate(el, ()=>{ SFX.uiClick(); pulseCardPick(el); c.apply(player); player.cardsTaken.push(c.id); if(c.cat==="legendary") runStats.legendaryCardsTaken=(runStats.legendaryCardsTaken||0)+1; logEvent(c.name+" acquired."); afterCardPicked(); }); }
   return el;
 }
 function cardIcon(cat){ return {offensive:"⚔",defensive:"🛡",utility:"🧭",elemental:"🌪",build_defining:"🧩",legendary:"⭐"}[cat]||"✦"; }
@@ -4845,7 +4867,24 @@ function applySettings(){
   function updateFromPoint(cx,cy){ const dx=cx-originX,dy=cy-originY,len=Math.hypot(dx,dy),travel=Math.min(len,RADIUS);
     const nx=len>0?dx/len:0, ny=len>0?dy/len:0; knob.style.transform=`translate(${nx*travel}px, ${ny*travel}px)`;
     const mag=clamp(len/RADIUS,0,1); if(mag<DEADZONE){ touchVec.x=0; touchVec.y=0; } else { touchVec.x=nx*mag; touchVec.y=ny*mag; } }
-  function reset(){ activeId=null; touchVec.x=0; touchVec.y=0; knob.style.transform='translate(0px,0px)'; zone.style.display='none'; }
+  // POLISH_PLAN_16 — releasing the joystick used to be instant: the moment a
+  // touchend/touchcancel arrived for activeId, touchVec zeroed and the knob
+  // snapped back to center right then. Reported bug: rapidly tapping an
+  // ability button with a second finger could drop the joystick entirely —
+  // never pinned an exact single cause (multi-touch touchcancel quirks are
+  // notoriously device/browser-specific and untestable without real hardware
+  // this session), so instead of chasing one theory, made release itself more
+  // resilient: a brief grace window where the *same* in-progress drag can be
+  // seamlessly reclaimed by a new touch instead of hard-resetting immediately.
+  // If nothing reclaims it within the window, it releases exactly as before.
+  let releaseTimer=null;
+  const RELEASE_GRACE_MS=150;
+  function hardReset(){ activeId=null; touchVec.x=0; touchVec.y=0; knob.style.transform='translate(0px,0px)'; zone.style.display='none'; }
+  function reset(){
+    activeId=null; // stop treating any further touchmove as the joystick's while grace pends
+    if(releaseTimer) clearTimeout(releaseTimer);
+    releaseTimer=setTimeout(()=>{ releaseTimer=null; hardReset(); }, RELEASE_GRACE_MS);
+  }
   // Dash swipe: a second finger, independent of whichever touch drives the
   // joystick, so a quick flick works "even while running" instead of fighting the
   // joystick's own continuous drag. Tracked per touch identifier so multiple
@@ -4869,12 +4908,18 @@ function applySettings(){
   // expected for a second concurrent finger while the joystick is already held.
   function isOnInteractiveHud(x,y){ const el=document.elementFromPoint(x,y); return !!(el&&el.closest('.ability-hud, .hud-action-panel')); }
   capture.addEventListener('touchstart',e=>{
+    let claimed=false;
     for(const t of e.changedTouches){
       if(isOnInteractiveHud(t.clientX,t.clientY)) continue;
-      if(activeId===null){ activeId=t.identifier; showZoneAt(t.clientX,t.clientY); updateFromPoint(t.clientX,t.clientY); }
+      claimed=true;
+      if(activeId===null){
+        activeId=t.identifier;
+        if(releaseTimer){ clearTimeout(releaseTimer); releaseTimer=null; updateFromPoint(t.clientX,t.clientY); } // reclaim: keep the existing origin/knob, don't re-anchor
+        else { showZoneAt(t.clientX,t.clientY); updateFromPoint(t.clientX,t.clientY); }
+      }
       else if(!dashTouches.has(t.identifier)){ dashTouches.set(t.identifier,{x:t.clientX,y:t.clientY,t:performance.now()}); }
     }
-    e.preventDefault();
+    if(claimed) e.preventDefault(); // only suppress default for touches this system actually claimed
   },{passive:false});
   capture.addEventListener('touchmove',e=>{
     for(const t of e.changedTouches){ if(t.identifier===activeId) updateFromPoint(t.clientX,t.clientY); }
@@ -5118,6 +5163,38 @@ function setupCharCarouselTilt(wrap){
   wrap.addEventListener('scroll',()=>{ if(!ticking){ ticking=true; requestAnimationFrame(apply); } },{passive:true});
   requestAnimationFrame(apply);
 }
+// POLISH_PLAN_16 — mouse click-and-drag scroll for the carousel. Wired ONCE on
+// the persistent #charWrap node (not inside renderCharSelect/
+// setupCharCarouselTilt, which both re-run on every screen open and would
+// otherwise stack duplicate listeners on the same never-recreated element).
+// Touch already scrolls the carousel natively via overflow-x:auto — this is
+// purely the desktop-mouse gap.
+(function setupCharSelectDrag(){
+  const wrap=document.getElementById('charWrap');
+  if(!wrap) return;
+  let dragging=false, moved=false, startX=0, startScrollLeft=0, suppressClick=false;
+  wrap.addEventListener('mousedown',e=>{
+    if(!wrap.classList.contains('carousel')) return; // nothing to drag in "fit" mode
+    dragging=true; moved=false; startX=e.clientX; startScrollLeft=wrap.scrollLeft;
+    wrap.classList.add('dragging');
+    e.preventDefault(); // stops native text/image drag-selection mid-pan
+  });
+  window.addEventListener('mousemove',e=>{
+    if(!dragging) return;
+    const dx=e.clientX-startX;
+    if(Math.abs(dx)>4) moved=true;
+    wrap.scrollLeft=startScrollLeft-dx;
+  });
+  window.addEventListener('mouseup',()=>{
+    if(!dragging) return;
+    dragging=false; wrap.classList.remove('dragging');
+    if(moved) suppressClick=true; // a real drag shouldn't also "pick" whatever card the cursor released over
+  });
+  // Capture phase, on the wrap (not each card) — runs before the click reaches
+  // whichever card's own onclick, so one flag here suppresses it regardless of
+  // which card the drag happened to end on top of.
+  wrap.addEventListener('click',e=>{ if(suppressClick){ suppressClick=false; e.stopPropagation(); e.preventDefault(); } },true);
+})();
 document.getElementById('btnNewRun').onclick=()=>{ setState('charselect'); renderCharSelect(); show('screen-charselect'); };
 let charSelectResizeTimer=null;
 window.addEventListener('resize',()=>{
