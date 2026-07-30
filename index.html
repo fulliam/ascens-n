@@ -121,6 +121,22 @@
   .timer{font-family:'JetBrains Mono',monospace; font-size:24px; letter-spacing:2px; color:var(--text); text-align:center;}
   .timer .phase{display:block; font-size:10px; letter-spacing:3px; color:var(--accent); text-align:center; margin-top:2px; transition:color .3s, text-shadow .3s;}
   .timer .phase.phase-reveal{color:var(--gold); text-shadow:0 0 10px rgba(255,179,71,0.7); letter-spacing:4px;}
+  /* Rare periodic glitch burst on the run timer + phase label (see
+     scheduleHudTextGlitch/triggerHudTextGlitch) — distinct from phase-reveal
+     above (which fires only on an actual phase change) and from the 3 big
+     screen-title glitch styles (glitchRgb/glitchScan/glitchFreeze, all infinite
+     loops on static titles) — these 4 are one-shot bursts on live-updating text,
+     picked at random and never twice in a row, on an irregular multi-second gap
+     so it reads as an occasional signal hiccup, not a tic. */
+  .timer span{display:inline-block;}
+  @keyframes hudGlitchRgb{0%,100%{text-shadow:none;} 25%{text-shadow:-2px 0 var(--accent2), 2px 0 var(--crystal);} 50%{text-shadow:2px 0 var(--accent2), -2px 0 var(--crystal);} 75%{text-shadow:-1px 0 var(--accent2), 1px 0 var(--crystal);}}
+  @keyframes hudGlitchJitter{0%,100%{transform:translate(0,0);} 20%{transform:translate(-2px,1px);} 40%{transform:translate(2px,-1px);} 60%{transform:translate(-1px,-1px);} 80%{transform:translate(1px,1px);}}
+  @keyframes hudGlitchScan{0%,100%{clip-path:inset(0 0 0 0); opacity:1;} 30%{clip-path:inset(15% 0 55% 0); opacity:0.65;} 55%{clip-path:inset(65% 0 5% 0); opacity:0.8;} 80%{clip-path:inset(0 0 0 0); opacity:1;}}
+  @keyframes hudGlitchFlicker{0%,100%{filter:none; opacity:1;} 25%{filter:brightness(1.9) hue-rotate(20deg); opacity:0.55;} 50%{filter:none; opacity:1;} 75%{filter:brightness(1.4) hue-rotate(-15deg); opacity:0.8;}}
+  .hud-glitch-rgb{animation:hudGlitchRgb .5s ease-in-out;}
+  .hud-glitch-jitter{animation:hudGlitchJitter .45s ease-in-out;}
+  .hud-glitch-scan{animation:hudGlitchScan .55s ease-in-out;}
+  .hud-glitch-flicker{animation:hudGlitchFlicker .5s ease-in-out;}
   .hud-bottom{position:absolute; bottom:0; left:0; right:0; padding:14px calc(20px + var(--safe-right)) calc(14px + var(--safe-bottom)) calc(20px + var(--safe-left)); display:flex; flex-direction:column; gap:8px; align-items:center;}
   .ability-hud{position:absolute; right:calc(20px + var(--safe-right)); bottom:calc(96px + var(--safe-bottom)); z-index:7; display:flex; flex-direction:column; gap:26px; pointer-events:auto;}
   .ability-btn{position:relative; width:52px; height:52px; border-radius:50%; background:var(--panel); border:2px solid var(--line); display:flex; align-items:center; justify-content:center; font-size:22px; cursor:pointer; user-select:none; transition:border-color .15s;}
@@ -317,9 +333,37 @@
   .shop-card .buy-btn:hover:not(:disabled){ background:rgba(255,179,71,0.15); }
   .shop-card .buy-btn:disabled{ opacity:0.3; cursor:not-allowed; border-color:var(--dim); color:var(--dim); }
   #screen-shop .cards-wrap, #screen-events-shop .cards-wrap { display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; width:min(680px,94vw); max-height:62vh; overflow-y:auto; padding:4px 6px; }
-  .stats-grid{display:grid; grid-template-columns:1fr; gap:9px 40px; width:440px; margin:22px 0; z-index:2; max-height:56vh; overflow-y:auto; padding:0 20px;}
+  /* POLISH_PLAN_10 — fixed height (not just max-height) so switching between the
+     CHARACTER screen's tabs (Stats/Cards/Passives/Events, see renderIngameStats)
+     doesn't visually jump: each tab's content height varies wildly (Stats is a
+     constant ~24 short rows; Cards can be anywhere from empty to dozens of rows
+     in a long endless run; Events is often just 1-2 lines) — .screen's own
+     align-items:center means a shorter/taller box re-centers the whole column,
+     which read as the screen jumping on every tab click. Same fixed-height +
+     vh-floor-for-short-viewports pattern .settings-wrap/.meta-wrap already use.
+     overflow-y:auto still handles whichever tab's content actually overflows. */
+  .stats-grid{display:grid; grid-template-columns:1fr; align-content:start; gap:9px 40px; width:440px; height:480px; max-height:70vh; max-height:70dvh; margin:22px 0; z-index:2; overflow-y:auto; padding:0 20px;}
   .stat-row{display:flex; justify-content:space-between; font-family:'JetBrains Mono',monospace; font-size:13px; border-bottom:1px solid var(--line); padding-bottom:6px;}
   .stat-row .k{color:var(--dim);}
+  /* POLISH_PLAN_8 — Cards/Passives/Events tabs of the CHARACTER screen. Denser
+     than .stat-row (icon + name + description, sometimes a stack badge or a
+     countdown) since these list actual acquired things, not a single number —
+     still lives inside the same .stats-grid scroll container, just a different
+     row shape. */
+  .inv-row{display:flex; align-items:flex-start; gap:10px; padding:7px 0; border-bottom:1px solid var(--line);}
+  .inv-row .inv-icon{font-size:17px; width:24px; flex-shrink:0; text-align:center; line-height:1.3;}
+  .inv-row .inv-body{flex:1; min-width:0;}
+  .inv-row .inv-name{font-family:'Rajdhani',sans-serif; font-weight:700; font-size:13px; display:flex; align-items:center; gap:6px; flex-wrap:wrap;}
+  .inv-row .inv-desc{font-size:11px; color:var(--dim); line-height:1.4; margin-top:1px;}
+  .inv-row .inv-count{font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--dim); background:var(--panel2); border:1px solid var(--line); border-radius:8px; padding:0 6px;}
+  .inv-row .inv-timer{font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--accent); flex-shrink:0; white-space:nowrap; padding-top:1px;}
+  .inv-row.rarity-uncommon .inv-name{color:var(--xp);}
+  .inv-row.rarity-rare .inv-name{color:var(--crystal);}
+  .inv-row.rarity-legendary .inv-name{color:var(--gold);}
+  .inv-row.rarity-mythic .inv-name{color:var(--artifact);}
+  .inv-section-title{font-family:'JetBrains Mono',monospace; font-size:10.5px; letter-spacing:2px; color:var(--dim); text-transform:uppercase; margin-top:14px; padding-bottom:4px; border-bottom:1px solid var(--line);}
+  .inv-section-title:first-child{margin-top:0;}
+  .inv-empty{font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--dim); text-align:center; padding:34px 0;}
   .soul-gain{font-family:'JetBrains Mono',monospace; color:var(--soul); font-size:15px; margin-bottom:16px; z-index:2;}
   /* Fixed height for the same reason as .settings-wrap below: .screen still
      vertically centers this column, so a fixed height keeps tab switches from
@@ -337,13 +381,16 @@
      under .meta-wrap's max-width:94vw / new height:600px) — this wrapper is kept
      as a light safety net, not the primary scroll surface anymore (that was the
      old wide horizontal layout's job). */
-  .talent-graph-scroll{overflow-x:visible; overflow-y:visible;}
+  /* POLISH_PLAN_9 item 1 — scale-to-fit compensation box (see renderTalentTree's
+     graphScale) needs to animate too, or the shrink snaps instead of gliding
+     like the graph's own width/height transition already does. */
+  .talent-graph-scroll{overflow-x:visible; overflow-y:visible; transition:width .25s, height .25s;}
   /* POLISH_PLAN_7 — talent tree tinted per class. renderTalentTree() sets
      --branch-color/--branch-glow/--branch-glow-strong as inline custom
      properties on #screen-meta (ancestor of both the tab bar and the graph), so
      every rule below that reads them updates automatically on tab switch — no
      re-render of static CSS needed, just the one JS assignment per switch. */
-  .talent-graph{position:relative; width:300px; height:540px; margin:6px auto 0; transition:width .25s, height .25s, background .25s;
+  .talent-graph{position:relative; width:300px; height:540px; margin:6px auto 0; transition:width .25s, height .25s, background .25s, transform .25s;
     background:radial-gradient(ellipse at 50% 25%, var(--branch-glow,transparent), transparent 65%);}
   .talent-lines{position:absolute; inset:0; width:100%; height:100%; pointer-events:none; overflow:visible;}
   .talent-lines line{stroke:var(--line); stroke-width:2; transition:stroke .2s, x1 .3s, y1 .3s, x2 .3s, y2 .3s;}
@@ -514,7 +561,7 @@
     </div>
     <div class="ability-hud" id="abilityHud">
       <div class="ability-btn" id="dashBtn" title="Dash (Space / swipe)"><span class="ab-icon">💨</span><div class="ab-cd" id="dashCd"></div><div class="ab-label">DASH</div></div>
-      <div class="ability-btn" id="healBtn" title="Fast Heal (Shift / tap)"><span class="ab-icon">❤️</span><div class="ab-cd" id="healCd"></div><div class="ab-label">HEAL</div></div>
+      <div class="ability-btn" id="healBtn" title="Fast Heal (Shift / tap / double-tap)"><span class="ab-icon">❤️</span><div class="ab-cd" id="healCd"></div><div class="ab-label">HEAL</div></div>
     </div>
   </div>
 
@@ -570,7 +617,8 @@
 
   <div class="screen hidden" id="screen-ingame-stats">
     <div class="veil"></div>
-    <div class="title-wrap" style="margin-bottom:22px;"><div class="kicker">current build</div><div class="title" style="font-size:36px;">CHARACTER STATS</div></div>
+    <div class="title-wrap" style="margin-bottom:14px;"><div class="kicker">current build</div><div class="title" style="font-size:36px;">CHARACTER</div></div>
+    <div class="settings-tabs" style="width:min(660px,94vw);" id="charInfoTabs"></div>
     <div class="stats-grid" id="ingameStatsGrid"></div>
     <div class="back-link" id="statsBack" style="margin-top:20px;">← RESUME RUN</div>
   </div>
@@ -1303,7 +1351,7 @@ const EVENTS = [
   {id:"reroll_gremlin",cat:"merchant",name:"Reroll Gremlin",desc:"Pay gold to reroll your next level-up choices.",resolve:(p,i,ctx)=>ctx.grantRerollCharges(p,3)},
   {id:"traveling_smith",cat:"merchant",name:"Traveling Smith",desc:"Pay gold to instantly level up one weapon.",resolve:(p,i,ctx)=>ctx.offerWeaponLevelForGold(p,180)},
   {id:"soul_broker",cat:"merchant",name:"Soul Broker",desc:"Convert gold into Soul at a poor rate.",resolve:(p,i,ctx)=>ctx.convertGoldToSoul(p,0.4)},
-  {id:"treasure_portal",cat:"treasure",name:"Treasure Portal",desc:"Choice: legendary card, or +100% enemy spawn rate for 60s.",choice:true,resolve:(p,i,ctx)=> i===0 ? ctx.grantLegendaryCard(p) : ctx.applyTemporaryModifier("spawnRate",2,60)},
+  {id:"treasure_portal",cat:"treasure",name:"Treasure Portal",desc:"Choice: legendary card, or +100% enemy spawn rate for 60s.",choice:true,resolve:(p,i,ctx)=> i===0 ? ctx.grantLegendaryCard(p) : ctx.applyTemporaryModifier("spawnRate",2,60,null,"Treasure Portal")},
   {id:"buried_chest",cat:"treasure",name:"Buried Chest",desc:"Free gold and a chance of a passive item.",resolve:(p,i,ctx)=>{ctx.grantGold(p,80); if(Math.random()<0.3) ctx.grantRandomPassive(p);}},
   {id:"ancient_vault",cat:"treasure",name:"Ancient Vault",desc:"Choice: safe moderate reward, or a risky vault guarded by an elite.",choice:true,resolve:(p,i,ctx)=> i===0 ? ctx.grantGold(p,150) : ctx.spawnGuardedTreasure(p,"ogre",400)},
   {id:"soul_cache",cat:"treasure",name:"Soul Cache",desc:"Grants a burst of Soul immediately, banked even if you die.",resolve:(p,i,ctx)=>ctx.grantSoulImmediate(p,20)},
@@ -1322,10 +1370,10 @@ const EVENTS = [
   {id:"unstable_rift",cat:"risk_reward",name:"Unstable Rift",desc:"Choice: enter for a random powerful buff or debuff.",choice:true,resolve:(p,i,ctx)=> i===0 ? ctx.rollRiftOutcome(p) : null},
   {id:"cursed_weapon",cat:"risk_reward",name:"Cursed Weapon",desc:"Choice: a weapon far above your level, but it drains HP while equipped.",choice:true,resolve:(p,i,ctx)=> i===0 ? ctx.grantCursedWeapon(p) : null},
   {id:"sacrificial_altar",cat:"risk_reward",name:"Sacrificial Altar",desc:"Choice: sacrifice a random passive for two cards.",choice:true,resolve:(p,i,ctx)=> i===0 ? ctx.sacrificePassiveForCards(p,2) : null},
-  {id:"bloodmoon_wager",cat:"risk_reward",name:"Bloodmoon Wager",desc:"Choice: double spawns for 90s for double gold/XP (both revert after 90s).",choice:true,resolve:(p,i,ctx)=> i===0 ? ctx.applyTemporaryModifier("spawnRate",2,90,{goldMult:2,xpMult:2}) : null},
+  {id:"bloodmoon_wager",cat:"risk_reward",name:"Bloodmoon Wager",desc:"Choice: double spawns for 90s for double gold/XP (both revert after 90s).",choice:true,resolve:(p,i,ctx)=> i===0 ? ctx.applyTemporaryModifier("spawnRate",2,90,{goldMult:2,xpMult:2},"Bloodmoon Wager") : null},
   {id:"shrine_of_hunger",cat:"cursed_shrine",name:"Shrine of Hunger",desc:"Lose regen permanently for a big damage boost.",resolve:(p,i,ctx)=>{p.stats.regen=0;p.stats.dmgMult*=1.3;}},
   {id:"shrine_of_silence",cat:"cursed_shrine",name:"Shrine of Silence",desc:"Disable one random weapon, +2 passive slots.",resolve:(p,i,ctx)=>ctx.disableRandomWeapon(Infinity,{grantPassiveSlots:2})},
-  {id:"shrine_of_ruin",cat:"cursed_shrine",name:"Shrine of Ruin",desc:"Enemies spawn 20% faster, gold gain +40%.",resolve:(p,i,ctx)=>{ctx.applyTemporaryModifier("spawnRate",1.2,Infinity);p.stats.goldMult*=1.4;}},
+  {id:"shrine_of_ruin",cat:"cursed_shrine",name:"Shrine of Ruin",desc:"Enemies spawn 20% faster, gold gain +40%.",resolve:(p,i,ctx)=>{ctx.applyTemporaryModifier("spawnRate",1.2,Infinity,null,"Shrine of Ruin");p.stats.goldMult*=1.4;}},
   {id:"shrine_of_fading",cat:"cursed_shrine",name:"Shrine of Fading",desc:"-15% max HP, all elemental multipliers +20%.",resolve:(p,i,ctx)=>{ctx.applyHpPenalty(p,0.15);["fireMult","frostMult","lightningMult","poisonMult"].forEach(k=>p.stats[k]=(p.stats[k]||1)*1.2);}},
   {id:"shrine_of_the_forgotten",cat:"cursed_shrine",name:"Shrine of the Forgotten",desc:"Lose all gold, gain a guaranteed legendary card.",resolve:(p,i,ctx)=>{p.gold=0;ctx.grantLegendaryCard(p);}},
   {id:"desperate_trader",cat:"merchant",name:"Desperate Trader",desc:"Convert gold into Soul at a generous rate.",resolve:(p,i,ctx)=>ctx.convertGoldToSoul(p,0.8)},
@@ -1339,7 +1387,7 @@ const EVENTS = [
   {id:"gamblers_coin",cat:"risk_reward",name:"Gambler's Coin",desc:"Choice: flip a coin — double your gold, or lose it all.",choice:true,resolve:(p,i,ctx)=>{ if(i!==0) return; if(Math.random()<0.5) p.gold*=2; else p.gold=0; }},
   {id:"forbidden_tome",cat:"risk_reward",name:"Forbidden Tome",desc:"Choice: -10% max HP for a permanent extra passive slot.",choice:true,resolve:(p,i,ctx)=>{ if(i!==0) return; ctx.applyHpPenalty(p,0.1); p.stats.extraPassiveSlots=(p.stats.extraPassiveSlots||0)+1; }},
   {id:"shrine_of_greed",cat:"cursed_shrine",name:"Shrine of Greed",desc:"Lose half your current gold, but gold gain is doubled.",resolve:(p,i,ctx)=>{p.gold=Math.floor(p.gold*0.5);p.stats.goldMult*=2;}},
-  {id:"shrine_of_the_swarm",cat:"cursed_shrine",name:"Shrine of the Swarm",desc:"Enemies spawn faster for the rest of the run, but you gain bonus projectiles.",resolve:(p,i,ctx)=>{ctx.applyTemporaryModifier("spawnRate",1.15,Infinity);p.stats.bonusProjectiles=(p.stats.bonusProjectiles||0)+2;}},
+  {id:"shrine_of_the_swarm",cat:"cursed_shrine",name:"Shrine of the Swarm",desc:"Enemies spawn faster for the rest of the run, but you gain bonus projectiles.",resolve:(p,i,ctx)=>{ctx.applyTemporaryModifier("spawnRate",1.15,Infinity,null,"Shrine of the Swarm");p.stats.bonusProjectiles=(p.stats.bonusProjectiles||0)+2;}},
 ];
 
 // "survivor" is intentionally not tied to any CHARACTERS entry — it's the generic/
@@ -1437,17 +1485,20 @@ const TALENT_NODE_LAYOUTS = {
     {col:1.05,row:3.45,requires:[{idx:4,tier:3}]},
     {col:1.44,row:1.75,requires:[{idx:5,tier:3}]},
   ],
-  // Straight shaft + a splitting/converging arrowhead pointing right — "стрела".
-  // Kept to maxCol 5 (same as warrior/necromancer/survivor) so no branch is
-  // uniquely wider than the others on a narrow viewport.
+  // Diagonal shaft (root at bottom-left, tip at top-right) + a splitting/
+  // converging arrowhead perpendicular to that diagonal — "стрела", now angled
+  // rather than the earlier horizontal draft. Bounding box is roughly square
+  // (~5.6x5.6) instead of wide+short, but renderTalentTree's per-branch scale-
+  // to-fit (see cellPos/graph sizing) means the larger footprint no longer
+  // risks overflowing a narrow viewport the way a fixed-size graph would have.
   hunter:[
-    {col:1,row:3,requires:[]},
-    {col:1.8,row:3,requires:[{idx:0,tier:2}]},
-    {col:2.6,row:3,requires:[{idx:1,tier:2}]},
-    {col:3.4,row:3,requires:[{idx:2,tier:2}]},
-    {col:4.2,row:2.2,requires:[{idx:3,tier:2}]},
-    {col:4.2,row:3.8,requires:[{idx:3,tier:2}]},
-    {col:5,row:3,requires:[{idx:4,tier:3},{idx:5,tier:3}]},
+    {col:1,row:5.6,requires:[]},
+    {col:2,row:4.6,requires:[{idx:0,tier:2}]},
+    {col:3,row:3.6,requires:[{idx:1,tier:2}]},
+    {col:4,row:2.6,requires:[{idx:2,tier:2}]},
+    {col:5.5,row:2.4,requires:[{idx:3,tier:2}]},
+    {col:4.2,row:1.1,requires:[{idx:3,tier:2}]},
+    {col:5.6,row:1,requires:[{idx:4,tier:3},{idx:5,tier:3}]},
   ],
   // Right-angle-only staircase trace — reads as a circuit board, contrasts with
   // the organic curves of the other branches.
@@ -1962,7 +2013,7 @@ function startRun(){
   player = newPlayer(selectedCharacter);
   enemies=[]; bullets=[]; orbs=[]; particles=[]; floaters=[]; zones=[]; minions=[]; pendingShots=[];
   chainArcs=[]; novaPulses=[]; camera.zoom=null; camera.lagX=0; camera.lagY=0;
-  runTime=0; killCount=0; dpsWindow=[]; lastPhaseName=null;
+  runTime=0; killCount=0; dpsWindow=[]; lastPhaseName=null; nextHudGlitchAt=null;
   lastSpawn=0; eliteTimer=0; keys={};
   spawnedBossIds=new Set(); warnedBossIds=new Set();
   appliedKills=0; appliedGold=0; autosaveTimer=AUTOSAVE_INTERVAL;
@@ -3552,9 +3603,34 @@ function renderFusion(){
 }
 function openFusion(){ if(state!=='playing'&&state!=='paused') return; setState('fusion'); SFX.stopHeartbeat(); MUSIC.stop(); renderFusion(); show('screen-fusion'); }
 
-function renderIngameStats(){
-  const grid=document.getElementById('ingameStatsGrid'); const s=player.stats;
-  grid.innerHTML=`
+// POLISH_PLAN_8 — the "CHARACTER STATS" screen (only numeric stats) grew tabs so
+// the player can also browse *what* they picked, not just derived totals: Cards
+// (grouped player.cardsTaken + shop purchases), Passives (+ active synergies —
+// "ACTIVE BUILDS" — since those are effectively combo bonuses on top of
+// passives/cards), and Events (tempModifiers + disabledWeapons, both already
+// have a countdown; the screen only opens from state playing/paused, both of
+// which freeze loop() entirely, so a static snapshot at render time never goes
+// stale while the tab is open — no live-updating timer needed here).
+const CHAR_INFO_TABS=["stats","cards","passives","events"];
+let charInfoTab="stats";
+function renderIngameStats(tab){
+  if(tab) charInfoTab=tab;
+  const tabsEl=document.getElementById('charInfoTabs'); tabsEl.innerHTML="";
+  CHAR_INFO_TABS.forEach(t=>{
+    const el=document.createElement('div'); el.className='settings-tab'+(t===charInfoTab?' active':'');
+    el.textContent=t.charAt(0).toUpperCase()+t.slice(1);
+    el.onclick=()=>renderIngameStats(t);
+    tabsEl.appendChild(el);
+  });
+  const grid=document.getElementById('ingameStatsGrid');
+  if(charInfoTab==="cards") grid.innerHTML=charInfoCardsHtml();
+  else if(charInfoTab==="passives") grid.innerHTML=charInfoPassivesHtml();
+  else if(charInfoTab==="events") grid.innerHTML=charInfoEventsHtml();
+  else grid.innerHTML=charInfoStatsHtml();
+}
+function charInfoStatsHtml(){
+  const s=player.stats;
+  return `
     <div class="stat-row"><span class="k">Level</span><span>${player.level}</span></div>
     <div class="stat-row"><span class="k">Health</span><span>${Math.round(player.hp)} / ${player.maxHp}</span></div>
     <div class="stat-row"><span class="k">Shield</span><span>${Math.round(player.shield)}</span></div>
@@ -3582,7 +3658,74 @@ function renderIngameStats(){
     <div class="stat-row"><span class="k">Revive</span><span style="color:${player.hasRevive?'var(--xp)':'var(--dim)'}">${player.hasRevive?"READY ☥":"None"}</span></div>
   `;
 }
-function openIngameStats(){ if(state!=='playing'&&state!=='paused') return; setState('ingame-stats'); SFX.stopHeartbeat(); MUSIC.stop(); renderIngameStats(); show('screen-ingame-stats'); }
+// Cards tab: player.cardsTaken is a flat array with one entry per pick (a
+// stackable card appears once per stack), grouped here by id so a 40-minute
+// run's worth of Ascendant Power stacks reads as one row with a ×N badge, not
+// dozens of identical lines. Shop purchases are a separate object
+// (id -> count) but functionally the same "permanent buff acquired this run"
+// idea, so they get their own labeled section rather than a whole extra tab.
+function charInfoCardsHtml(){
+  const counts={};
+  for(const id of player.cardsTaken) counts[id]=(counts[id]||0)+1;
+  const cardIds=Object.keys(counts);
+  const shopIds=Object.keys(player.shopPurchases).filter(id=>player.shopPurchases[id]>0);
+  if(!cardIds.length && !shopIds.length) return `<div class="inv-empty">No cards or shop upgrades taken yet.</div>`;
+  let html="";
+  if(cardIds.length){
+    html+=`<div class="inv-section-title">Cards Taken (${cardIds.length})</div>`;
+    html+=cardIds.map(id=>{
+      const c=CARDS.find(x=>x.id===id); if(!c) return "";
+      const n=counts[id];
+      return `<div class="inv-row rarity-${c.rarity||'common'}"><div class="inv-icon">${cardIcon(c.cat)}</div><div class="inv-body"><div class="inv-name">${c.name}${n>1?`<span class="inv-count">×${n}</span>`:""}</div><div class="inv-desc">${c.desc}</div></div></div>`;
+    }).join("");
+  }
+  if(shopIds.length){
+    html+=`<div class="inv-section-title">Shop Upgrades</div>`;
+    html+=shopIds.map(id=>{
+      const it=SHOP_ITEMS.find(x=>x.id===id); if(!it) return "";
+      const n=player.shopPurchases[id];
+      return `<div class="inv-row rarity-${it.rarity||'common'}"><div class="inv-icon">${it.icon}</div><div class="inv-body"><div class="inv-name">${it.name}${n>1?`<span class="inv-count">×${n}</span>`:""}</div><div class="inv-desc">${it.desc}</div></div></div>`;
+    }).join("");
+  }
+  return html;
+}
+function charInfoPassivesHtml(){
+  let html="";
+  const activeSyns=player.synergiesActive.map(id=>SYNERGIES.find(s=>s.id===id)).filter(Boolean);
+  if(activeSyns.length){
+    html+=`<div class="inv-section-title">Active Builds</div>`;
+    html+=activeSyns.map(s=>`<div class="inv-row"><div class="inv-icon">🧬</div><div class="inv-body"><div class="inv-name">${s.name}</div><div class="inv-desc">${s.desc}</div></div></div>`).join("");
+  }
+  const slotMax=MAX_PASSIVE_SLOTS+(player.stats.extraPassiveSlots||0);
+  html+=`<div class="inv-section-title">Passives (${player.passives.length} / ${slotMax})</div>`;
+  html+= player.passives.length ? player.passives.map(id=>{
+    const d=PASSIVES.find(x=>x.id===id); if(!d) return "";
+    return `<div class="inv-row"><div class="inv-icon">${d.icon}</div><div class="inv-body"><div class="inv-name">${d.name}</div><div class="inv-desc">${d.desc}</div></div></div>`;
+  }).join("") : `<div class="inv-empty">No passives equipped yet.</div>`;
+  return html;
+}
+function charInfoEventsHtml(){
+  const disabledIds=Object.keys(player.disabledWeapons).filter(wid=>isWeaponDisabled(wid));
+  if(!tempModifiers.length && !disabledIds.length) return `<div class="inv-empty">No active timed effects right now.</div>`;
+  let html="";
+  if(tempModifiers.length){
+    html+=`<div class="inv-section-title">Active Effects</div>`;
+    html+=tempModifiers.map(m=>{
+      const timeStr=m.life===Infinity?"Permanent":fmtTime(Math.max(0,m.life));
+      return `<div class="inv-row"><div class="inv-icon">⏳</div><div class="inv-body"><div class="inv-name">${m.label}</div><div class="inv-desc">${m.key} ×${m.mult}</div></div><div class="inv-timer">${timeStr}</div></div>`;
+    }).join("");
+  }
+  if(disabledIds.length){
+    html+=`<div class="inv-section-title">Disabled Weapons</div>`;
+    html+=disabledIds.map(wid=>{
+      const t=player.disabledWeapons[wid];
+      const timeStr=t===Infinity?"Permanent":fmtTime(Math.max(0,t-runTime));
+      return `<div class="inv-row"><div class="inv-icon">🔇</div><div class="inv-body"><div class="inv-name">${WEAPONS[wid].name}</div><div class="inv-desc">Disabled</div></div><div class="inv-timer">${timeStr}</div></div>`;
+    }).join("");
+  }
+  return html;
+}
+function openIngameStats(){ if(state!=='playing'&&state!=='paused') return; setState('ingame-stats'); SFX.stopHeartbeat(); MUSIC.stop(); renderIngameStats('stats'); show('screen-ingame-stats'); }
 
 /* ---- Events ---- */
 function eventCtx(){
@@ -3623,11 +3766,17 @@ function eventCtx(){
     rollRiftOutcome:(p)=>{ if(Math.random()<0.5){ p.stats.dmgMult*=1.3; logEvent("The rift empowers you!"); } else { p.maxHp=Math.max(10,Math.floor(p.maxHp*0.85)); p.hp=Math.min(p.hp,p.maxHp); logEvent("The rift weakens you!"); } },
     grantCursedWeapon:(p)=>{ const avail=Object.keys(WEAPONS).filter(w=>!p.weapons[w]&&!WEAPONS[w].fusionOnly); if(avail.length){ const w=pick(avail); p.weapons[w]=Math.min(WEAPONS[w].maxLevel,4); p._cursedWeapon=w; logEvent(`Cursed ${WEAPONS[w].name} acquired — it drains your HP.`); } },
     sacrificePassiveForCards:(p,n)=>{ if(p.passives.length){ p.passives.splice((Math.random()*p.passives.length)|0,1); } for(let i=0;i<n;i++){ const pool=buildCardPool().filter(e=>e.kind==="card"); if(!pool.length) break; const entry=pick(pool); entry.card.apply(p); p.cardsTaken.push(entry.card.id); } logEvent("Sacrifice complete — power gained."); },
-    applyTemporaryModifier:(key,mult,life,extra)=>{
+    // POLISH_PLAN_8 — `label` is the event's own display name, passed as a plain
+    // string literal at each call site (resolve() is an arrow function with no
+    // bound `this`/access to its own `def`, so re-deriving it here isn't an
+    // option) purely so the in-run inventory's EVENTS tab has something to show
+    // besides the internal `key` ("spawnRate") — doesn't affect the modifier's
+    // own mechanics at all.
+    applyTemporaryModifier:(key,mult,life,extra,label)=>{
       // `extra` multipliers (e.g. goldMult/xpMult from Bloodmoon Wager) are stored on
       // the modifier and reverted by updateTempModifiers() once `life` elapses —
       // applying them directly and permanently would turn a temporary buff permanent.
-      const mod = {key,mult,life,extra:extra||null,_appliedExtra:false};
+      const mod = {key,mult,life,extra:extra||null,_appliedExtra:false,label:label||key};
       tempModifiers.push(mod);
       if(extra){ Object.entries(extra).forEach(([k,v])=>{ if(player.stats[k]!=null) player.stats[k]*=v; }); mod._appliedExtra=true; }
     },
@@ -3979,6 +4128,7 @@ function refreshHud(){
   document.getElementById('timerVal').textContent=fmtTime(runTime);
   const curPhaseName=currentPhase().name;
   if(curPhaseName!==lastPhaseName){ lastPhaseName=curPhaseName; revealPhaseText(document.getElementById('phaseVal'),curPhaseName); }
+  maybeTriggerHudTextGlitch();
   document.getElementById('fusionBtnHud').classList.toggle('hidden', !player.fusionsAvailable.length);
   const lowHp = player.hp/player.maxHp<0.25;
   if(lowHp) SFX.startHeartbeat(); else SFX.stopHeartbeat();
@@ -4072,6 +4222,26 @@ function revealPhaseText(el,finalText){
     el.textContent=out;
     if(frame>=totalFrames){ clearInterval(phaseRevealTimer); phaseRevealTimer=null; el.textContent=finalText; setTimeout(()=>el.classList.remove('phase-reveal'),450); }
   },35);
+}
+// Rare, irregular glitch burst on the timer + phase label (distinct ask from
+// revealPhaseText above, which only fires on an actual phase change) — picks a
+// random gap (20-45s) before the next burst, and a pattern different from the
+// one just used, so repeated bursts never look identical back to back.
+const HUD_GLITCH_PATTERNS=["hud-glitch-rgb","hud-glitch-jitter","hud-glitch-scan","hud-glitch-flicker"];
+let nextHudGlitchAt=null, lastHudGlitchPattern=null;
+function maybeTriggerHudTextGlitch(){
+  if(nextHudGlitchAt===null) nextHudGlitchAt=runTime+rand(20,45);
+  if(runTime<nextHudGlitchAt) return;
+  nextHudGlitchAt=runTime+rand(20,45);
+  const choices=HUD_GLITCH_PATTERNS.filter(p=>p!==lastHudGlitchPattern);
+  const pattern=pick(choices.length?choices:HUD_GLITCH_PATTERNS);
+  lastHudGlitchPattern=pattern;
+  [document.getElementById('timerVal'),document.getElementById('phaseVal')].forEach(el=>{
+    if(!el) return;
+    HUD_GLITCH_PATTERNS.forEach(p=>el.classList.remove(p));
+    void el.offsetWidth;
+    el.classList.add(pattern);
+  });
 }
 function glow(size){ return quality==='low'?0:(quality==='medium'?size*0.6:size); }
 function hexToRgba(hex,a){
@@ -4575,6 +4745,14 @@ function applySettings(){
   // simultaneous non-joystick touches (unlikely, but cheap to handle) don't clobber
   // each other.
   const dashTouches=new Map(); const SWIPE_MIN_DIST=36, SWIPE_MAX_TIME=380;
+  // POLISH_PLAN_10 — double-tap-to-heal, same non-joystick-finger tracking as the
+  // dash swipe below, just a different gesture shape: two quick taps (short
+  // duration, small movement — the opposite profile of a swipe) close together
+  // in both time and position. lastTapAt/-X/-Y is deliberately global (not keyed
+  // by touch identifier) since it's pairing two *separate* touch events over
+  // time, not following one continuous touch the way swipe-tracking does.
+  const TAP_MAX_TIME=250, DOUBLE_TAP_MAX_DIST=40, DOUBLE_TAP_MAX_GAP=350;
+  let lastTapAt=-9999, lastTapX=0, lastTapY=0;
   // POLISH_PLAN_6 item 1 — a finger landing visually on the ability buttons
   // (dash/heal) or the HUD action panel (pause/shop/etc) should never be claimed
   // as a joystick anchor or dash-swipe candidate, even though this capture layer
@@ -4601,7 +4779,17 @@ function applySettings(){
       else if(dashTouches.has(t.identifier)){
         const start=dashTouches.get(t.identifier); dashTouches.delete(t.identifier);
         const dx=t.clientX-start.x, dy=t.clientY-start.y, dist=Math.hypot(dx,dy), elapsed=performance.now()-start.t;
-        if(dist>=SWIPE_MIN_DIST && elapsed<=SWIPE_MAX_TIME) tryDash(dx,dy);
+        if(dist>=SWIPE_MIN_DIST && elapsed<=SWIPE_MAX_TIME){
+          tryDash(dx,dy);
+        } else if(dist<DOUBLE_TAP_MAX_DIST && elapsed<=TAP_MAX_TIME){
+          const now=performance.now();
+          if(now-lastTapAt<=DOUBLE_TAP_MAX_GAP && Math.hypot(t.clientX-lastTapX,t.clientY-lastTapY)<=DOUBLE_TAP_MAX_DIST){
+            tryFastHeal();
+            lastTapAt=-9999; // consumed — a 3rd quick tap starts a fresh pair, doesn't chain into another heal
+          } else {
+            lastTapAt=now; lastTapX=t.clientX; lastTapY=t.clientY;
+          }
+        }
       }
     }
   }
@@ -4693,7 +4881,7 @@ function continueRun(){
   // still reset (not saved, see doAutosave's comment).
   enemies=[]; bullets=[]; orbs=unpackInfinity(snap.orbs||[]); particles=[]; floaters=[];
   zones=unpackInfinity(snap.zones||[]); minions=unpackInfinity(snap.minions||[]); pendingShots=[]; chainArcs=[]; novaPulses=[];
-  runTime=snap.runTime||0; killCount=snap.killCount||0; dpsWindow=[]; lastSpawn=0; eliteTimer=0; keys={}; lastPhaseName=null;
+  runTime=snap.runTime||0; killCount=snap.killCount||0; dpsWindow=[]; lastSpawn=0; eliteTimer=0; keys={}; lastPhaseName=null; nextHudGlitchAt=null;
   spawnedBossIds=new Set(snap.bossesSpawned||[]);
   // Previously seeded from bossesSpawned (a copy-paste of the line above) as a
   // "warned implies later spawned" approximation — worked except for the window
@@ -4765,6 +4953,13 @@ window.addEventListener('resize',()=>{
   if(state!=='charselect') return;
   clearTimeout(charSelectResizeTimer); charSelectResizeTimer=setTimeout(renderCharSelect,150);
 });
+// POLISH_PLAN_9 item 1 — re-run the talent graph's scale-to-fit calc on resize/
+// rotation while the screen is open, same debounced pattern as class-select above.
+let talentResizeTimer=null;
+window.addEventListener('resize',()=>{
+  if(state!=='meta') return;
+  clearTimeout(talentResizeTimer); talentResizeTimer=setTimeout(()=>renderTalentTree(currentTalentBranch),150);
+});
 document.getElementById('charBack').onclick=goMenu;
 document.getElementById('btnContinue').onclick=continueRun;
 
@@ -4796,7 +4991,9 @@ function wireTooltip(el, uid, htmlFn){
     openTooltip(el,htmlFn()); tooltipPinned=uid;
   });
 }
+let currentTalentBranch='warrior';
 function renderTalentTree(activeBranch){
+  currentTalentBranch=activeBranch;
   // POLISH_PLAN_7 — set once per branch switch on #screen-meta (ancestor of both
   // the tab bar and the graph below), every --branch-color/-glow/-glow-strong
   // reference in the CSS updates from this single assignment.
@@ -4829,8 +5026,27 @@ function renderTalentTree(activeBranch){
   // box for all six — `.talent-graph` already had a width/height transition from
   // an earlier pass, so switching branches animates the resize instead of jumping.
   const maxCol=Math.max(...layout.map(l=>l.col)), maxRow=Math.max(...layout.map(l=>l.row));
-  graph.style.width=(maxCol*STEP_X+20)+'px';
-  graph.style.height=(maxRow*STEP_Y+20)+'px';
+  const graphW=maxCol*STEP_X+20, graphH=maxRow*STEP_Y+20;
+  graph.style.width=graphW+'px';
+  graph.style.height=graphH+'px';
+  // Some shapes (hunter's diagonal arrow, survivor's 9-node web) are wider than
+  // .meta-wrap's own budget on a narrow phone (94vw can be well under 400px) —
+  // rather than letting them clip/overflow, scale the whole graph down to fit
+  // and shrink the scroll wrapper's reserved box to match the scaled size (a
+  // transform alone doesn't change how much space the untransformed layout box
+  // would otherwise reserve, which would leave dead space below a shrunk graph).
+  const availW=Math.min(640, window.innerWidth*0.94)-16;
+  const graphScale=Math.min(1, availW/graphW);
+  if(graphScale<1){
+    graph.style.transform=`scale(${graphScale})`;
+    graph.style.transformOrigin='top left';
+    scroll.style.width=(graphW*graphScale)+'px';
+    scroll.style.height=(graphH*graphScale)+'px';
+  } else {
+    graph.style.transform='';
+    scroll.style.width='';
+    scroll.style.height='';
+  }
   const svgNS="http://www.w3.org/2000/svg";
   const svg=document.createElementNS(svgNS,"svg"); svg.setAttribute('class','talent-lines');
   lines.forEach((line,idx)=>{
