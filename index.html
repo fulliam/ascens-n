@@ -4696,6 +4696,12 @@ const SFX=(()=>{ let muted=false, volume=1, heartbeatTimer=null;
     // this is specifically for *spending* it on a purchase) — two bright bell
     // tones back to back, each sliding up slightly, second one higher-pitched.
     shopBuy(){ tone({freq:1400,slideTo:1700,dur:0.09,type:'triangle',gain:0.12}); tone({freq:1750,slideTo:2100,dur:0.11,type:'triangle',gain:0.11,delay:0.09}); },
+    // Talent tier purchase (Soul, meta-progression) — deliberately not the same
+    // as shopBuy()'s percussive cha-ching (that's gold, in-run) or levelup()'s
+    // 3-note fanfare (that's in-run weapon/card picks): a single rising sine
+    // with a soft triangle harmonic on top plus a brief high-passed sparkle,
+    // going for "crystalline"/soul-toned rather than "coin".
+    talentUpgrade(){ tone({freq:660,slideTo:880,dur:0.12,type:'sine',gain:0.12}); tone({freq:990,dur:0.14,type:'triangle',gain:0.08,delay:0.06}); noise({dur:0.15,gain:0.05,delay:0.02,filterFreq:4500}); },
   };
 })();
 const MUSIC=(()=>{ let musicGain=null,volume=0.35,playing=false,schedulerId=null,nextNoteTime=0,step16=0,intense=false;
@@ -5096,6 +5102,7 @@ function renderTalentTree(activeBranch){
       // smooth scroll to bring it into view, the "animated shift on open" ask.
       const lockedBefore = lines.map((l,i)=>lineLocked(activeBranch,i));
       save.soul-=cost; save.talentLevels[activeBranch+"_"+line.key]=lvl+1; persistSave(); refreshSoulBadges();
+      SFX.talentUpgrade();
       hideTooltip();
       const newlyIdx = lines.findIndex((l,i)=>lockedBefore[i] && !lineLocked(activeBranch,i));
       renderTalentTree(activeBranch);
