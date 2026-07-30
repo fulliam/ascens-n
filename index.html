@@ -942,7 +942,7 @@
 // Semver-ish display version (shown in the main menu, see #versionTag) — bump
 // by hand per notable batch of work. Independent from SAVE_VERSION below:
 // this one is purely informational, the other one gates save migrations.
-const GAME_VERSION = "0.29.3";
+const GAME_VERSION = "0.30.0";
 
 /* =========================================================================
    PART 1 — BUILD LAYER DATA (weapons, evolutions, cards, passives, synergies, characters)
@@ -2837,7 +2837,8 @@ function dealDamage(enemy, dmg, weaponId){
     spawnFloater(enemy.x,enemy.y-10,Math.round(dmg), crit?"#ffe15c":(isEliteOrBoss?"#ffb347":"#fff"));
     if(player.stats.lifesteal>0){
       if(runTime-player.lifestealWindowStart>=1){ player.lifestealWindowStart=runTime; player.lifestealHealedThisSec=0; }
-      const budget = Math.max(0, LIFESTEAL_HPS_CAP-player.lifestealHealedThisSec);
+      const capThisSec = runTime<LIFESTEAL_HPS_PCT_CAP_START_T ? LIFESTEAL_HPS_CAP : Math.min(LIFESTEAL_HPS_CAP, player.maxHp*LIFESTEAL_HPS_PCT_CAP);
+      const budget = Math.max(0, capThisSec-player.lifestealHealedThisSec);
       const healed = Math.min(player.maxHp-player.hp, dmg*player.stats.lifesteal, budget);
       player.hp=Math.min(player.maxHp,player.hp+healed);
       player.lifestealHealedThisSec += healed;
@@ -2875,9 +2876,9 @@ function killEnemy(enemy){
   if(enemy.elite){ eliteKillsRun++; save.lifetime.uniqueElitesKilled = Array.from(new Set([...(save.lifetime.uniqueElitesKilled||[]),enemy.id])); }
   if(enemy.boss){ bossKilledRun=true; runStats.bossesKilledIds.push(enemy.bossDefId); save.lifetime.uniqueBossesKilled = Array.from(new Set([...(save.lifetime.uniqueBossesKilled||[]),enemy.bossDefId])); }
   const goldMult = player.stats.goldMult||1;
-  orbs.push({type:"xp",x:enemy.x,y:enemy.y,value:enemy.xp,radius:6});
-  if(Math.random()<0.75) orbs.push({type:"gold",x:enemy.x+rand(-8,8),y:enemy.y+rand(-8,8),value:enemy.gold,radius:5});
-  if(enemy.elite && Math.random()<0.35){ orbs.push({type:"crystal",x:enemy.x+rand(-8,8),y:enemy.y-rand(4,10),value:Math.ceil(enemy.gold*0.4),radius:5}); }
+  spawnOrb({type:"xp",x:enemy.x,y:enemy.y,value:enemy.xp,radius:6});
+  if(Math.random()<0.75) spawnOrb({type:"gold",x:enemy.x+rand(-8,8),y:enemy.y+rand(-8,8),value:enemy.gold,radius:5});
+  if(enemy.elite && Math.random()<0.35){ spawnOrb({type:"crystal",x:enemy.x+rand(-8,8),y:enemy.y-rand(4,10),value:Math.ceil(enemy.gold*0.4),radius:5}); }
   if(enemy.elite && Math.random()<0.15){ orbs.push({type:"passive",x:enemy.x,y:enemy.y-16,radius:7}); }
   if(enemy.boss){ orbs.push({type:"passive",x:enemy.x,y:enemy.y-16,radius:8}); player.crystals += 40; }
   if(enemy._treasureGold){ player.gold += enemy._treasureGold; logEvent(`The guardian falls — ${enemy._treasureGold} gold spills out!`); }
@@ -3511,17 +3512,24 @@ function spawnMinion(props){
   minions.push(m);
   return m;
 }
+// Search radii scale with weaponRange() (the same rangeMult the player's own
+// weapons already read) instead of a flat number — late-game, ranged player
+// weapons auto-target and kill anything within their own (rangeMult-scaled)
+// reach well before a minion's fixed 400px search could ever see it, so the
+// static radius left minions permanently target-less and clustered idle
+// around the player once the player's own effective kill zone outgrew it
+// (a static radius simply can't keep up with a stat that scales up to 4x).
 function updateMinions(dt){
   for(let i=minions.length-1;i>=0;i--){
     const m=minions[i];
     if(m.life!==Infinity){ m.life-=dt; if(m.life<=0){ m.dead=true; continue; } }
     if(m.speed>0){
-      const target = nearestEnemy(m.x,m.y,400);
+      const target = nearestEnemy(m.x,m.y,weaponRange(400));
       if(target){ const dx=target.x-m.x,dy=target.y-m.y,d=Math.hypot(dx,dy)||1; m.x+=(dx/d)*m.speed*dt; m.y+=(dy/d)*m.speed*dt;
         m.atkCd-=dt; if(d<24 && m.atkCd<=0){ dealDamage(target,m.dmg,null); m.atkCd=0.7; } }
       else { m.x=clamp(m.x+(player.x-m.x)*0.02,m.radius,WORLD.w-m.radius); m.y=clamp(m.y+(player.y-m.y)*0.02,m.radius,WORLD.h-m.radius); }
     } else {
-      const target=nearestEnemy(m.x,m.y,260); m.atkCd-=dt;
+      const target=nearestEnemy(m.x,m.y,weaponRange(260)); m.atkCd-=dt;
       if(target && m.atkCd<=0){ const ang=Math.atan2(target.y-m.y,target.x-m.x); spawnBullet({owner:"player",x:m.x,y:m.y,vx:Math.cos(ang)*400,vy:Math.sin(ang)*400,dmg:m.dmg,radius:4,life:1.5,color:"#8fffcf",pierce:0}); m.atkCd=0.6; }
     }
   }
@@ -3625,6 +3633,28 @@ const HEAL_ABILITY_PCT = 0.12;    // fraction of maxHp restored per use
 // staying flat — real, continuing risk for the whole run, not just the opening
 // minutes, which was the explicit ask ("усложнения жизни игроку").
 const LIFESTEAL_HPS_CAP = 80;
+// Direct playtest feedback (not just verify-balance's threat-abstraction, which has
+// no spatial resolution and can't see a player dashing/kiting around most contact):
+// a flat 80/sec ceiling is still enormous against a *typical* (non-HP-stacked)
+// maxHp pool — 80/sec into a 100-400 HP player is a near-instant full heal, so even
+// 1-2% lifesteal reads as effective invincibility once combat settles down. First
+// attempt applied a percentage-of-maxHp secondary cap for the *whole* run — verify-
+// balance showed that crushes the opening gauntlet instead (winRate 33%->4.5%,
+// avgSurvival cut in half even for tanky Warrior/Hunter): early game's maxHp is
+// tiny too, so a %-based cap is tightest exactly where the game is already
+// deliberately hardest and healing already wasn't the problem there (see Round 6:
+// 85%+ of deaths already happen before minute 3, purely from wave-pressure).
+// Gated to only kick in at t=600 (10 min, past the gauntlet + Dragon fight) so
+// early survivability is untouched. Swept 0.08-0.25 pct x 300/600/900/1200 start
+// via verify-balance.js: 0.20/t=600 landed closest to the pre-existing ~35-37%
+// baseline winRate (25.8% @ 1000 runs, evenly spread 24-28% across characters —
+// tighter combos crushed specific characters like Mage to single digits) while
+// finally making aliveFraction *keep declining* through the whole run instead of
+// flattening once the flat cap alone kicks in (35.0%/34.3%/28.5%/28.4%/22.8% at
+// t=300/600/1200/1800/2400) and spreading boss deaths across most of the roster
+// again instead of just Dragon+wave-pressure.
+const LIFESTEAL_HPS_PCT_CAP = 0.20;
+const LIFESTEAL_HPS_PCT_CAP_START_T = 600;
 const STAT_CAPS = {
   dmgMult:[0,32], atkSpeedMult:[0.1,6], cdrMult:[0.18,3], critChance:[0,0.8], critMult:[1,4.5],
   damageReduction:[0,0.55], arcaneDmgMult:[0.2,4], reviveChance:[0,0.4], chillCap:[0.1,0.6], burnStacks:[1,4],
@@ -3768,6 +3798,26 @@ function applyKnockback(fromX, fromY, dist){
   player.x=clamp(player.x+pushX, player.radius, WORLD.w-player.radius);
   player.y=clamp(player.y+pushY, player.radius, WORLD.h-player.radius);
   camera.lagX=(camera.lagX||0)-pushX; camera.lagY=(camera.lagY||0)-pushY;
+}
+// Hard cap on concurrent pickup orbs. Killing enemies at late-game rates
+// (hundreds/sec on a strong build) otherwise floods the screen with orbs
+// popping in and instantly vanishing on pickup — a real perf cost, and per
+// direct player feedback, an actual photosensitivity concern (bright
+// yellow-on-black gold orbs, the single highest-contrast color pair,
+// strobing at high frequency). Past the cap, new value merges into the
+// nearest same-type orb instead of spawning another shape, so nothing is
+// ever lost — kills just stop multiplying the on-screen orb count.
+const MAX_ORBS = 220;
+function spawnOrb(orb){
+  if(orbs.length<MAX_ORBS){ orbs.push(orb); return; }
+  let nearest=null, nearestD=Infinity;
+  for(const o of orbs){
+    if(o.type!==orb.type) continue;
+    const d=Math.hypot(o.x-orb.x,o.y-orb.y);
+    if(d<nearestD){ nearestD=d; nearest=o; }
+  }
+  if(nearest){ nearest.value+=orb.value; nearest.radius=Math.min(nearest.radius+0.15,14); }
+  else orbs.push(orb);
 }
 function updateOrbs(dt){
   for(let i=orbs.length-1;i>=0;i--){
@@ -4865,7 +4915,23 @@ function render(){
   const grid=80, startX=Math.floor(camera.x/grid)*grid, endX=camera.x+viewW+grid, startY=Math.floor(camera.y/grid)*grid, endY=camera.y+viewH+grid;
   ctx2d.beginPath(); for(let x=startX;x<endX;x+=grid){ctx2d.moveTo(x,startY);ctx2d.lineTo(x,endY);} for(let y=startY;y<endY;y+=grid){ctx2d.moveTo(startX,y);ctx2d.lineTo(endX,y);} ctx2d.stroke();
   ctx2d.strokeStyle="rgba(185,140,255,0.25)"; ctx2d.lineWidth=4; ctx2d.strokeRect(0,0,WORLD.w,WORLD.h);
+  // Viewport culling: WORLD is 4600x4600 but the visible viewport is a small fraction of
+  // that, and population-floor/burst spawning (updateSpawns) deliberately keeps a growing
+  // number of enemies alive off-screen as a run goes on. Every entity used to get a full
+  // draw call (including a shadowBlur pass, one of the most expensive Canvas2D ops) even
+  // when nowhere near the camera — cost that was invisible early (few enemies total) but
+  // scaled directly into the reported 20-25min heating as the on-screen+off-screen count
+  // climbed. Pad covers the largest boss radius (52) plus status icons/health bar (~40)
+  // plus a dash telegraph's reach (~130) so nothing visibly pops in/out at the edge. This
+  // only skips drawing — update/AI/damage/spawn timing all still run at full rate off-screen.
+  const CULL_PAD = 260;
+  const viewL = camera.x-CULL_PAD, viewR = camera.x+viewW+CULL_PAD, viewT = camera.y-CULL_PAD, viewB = camera.y+viewH+CULL_PAD;
+  // `extra` widens the pad further for entities whose own radius can exceed CULL_PAD (AoE
+  // zones scale up to 4x via aoeRadiusMult, e.g. cluster_charge base 150 -> 600) — without it
+  // a zone's edge could still be visible while its center falls just outside the flat pad.
+  function inView(x,y,extra){ extra=extra||0; return x>viewL-extra && x<viewR+extra && y>viewT-extra && y<viewB+extra; }
   for(const z of zones){
+    if(!inView(z.x,z.y,z.radius)) continue;
     if(z.tag==="quake"){
       // Quaker mutation's ground fissure: while armT>0 it's a pure warning (growing dashed
       // ring + jagged crack lines, zero damage) — once armed it flashes a solid orange burst
@@ -4891,7 +4957,11 @@ function render(){
     else { ctx2d.fillStyle= z.tag==="boss"?"rgba(255,77,94,0.15)": z.slowOnly?"rgba(140,80,40,0.15)":"rgba(140,255,120,0.14)"; }
     ctx2d.arc(z.x,z.y,z.radius,0,7); ctx2d.fill(); ctx2d.globalAlpha=1;
   }
-  for(const o of orbs){ ctx2d.beginPath(); ctx2d.fillStyle = o.type==="xp"?"#7cff6b": o.type==="gold"?"#ffb347": o.type==="crystal"?"#7ee0ff":"#ff9ecb"; ctx2d.shadowColor=ctx2d.fillStyle; ctx2d.shadowBlur=glow(8); ctx2d.arc(o.x,o.y,o.radius,0,7); ctx2d.fill(); }
+  // Softer glow than most other glowing entities on purpose — orbs are the single
+  // highest-frequency glowing shape on screen late-game, and gold's near-max-
+  // contrast yellow-on-black is a real flash/photosensitivity concern at volume
+  // (see spawnOrb's MAX_ORBS cap, which cuts the count; this cuts the intensity).
+  for(const o of orbs){ if(!inView(o.x,o.y)) continue; ctx2d.beginPath(); ctx2d.fillStyle = o.type==="xp"?"#7cff6b": o.type==="gold"?"#ffb347": o.type==="crystal"?"#7ee0ff":"#ff9ecb"; ctx2d.shadowColor=ctx2d.fillStyle; ctx2d.shadowBlur=glow(3.5); ctx2d.arc(o.x,o.y,o.radius,0,7); ctx2d.fill(); }
   ctx2d.shadowBlur=0;
   // Chain-lightning arcs and area-burst pulses (see updateJuice fix above) — actually drawn now.
   for(const c of chainArcs){
@@ -4930,6 +5000,7 @@ function render(){
     }
   }
   for(const m of minions){
+    if(!inView(m.x,m.y)) continue;
     // Colored per-summon-weapon (Necro Staff/Spirit Wolves/Turret Deployer/Swarm Hive used to all
     // render as the same flat green dot). POLISH_PLAN_2 item 8: the weapon's own icon (already
     // stored on the minion) is now the minion's actual body, sized to its radius, instead of a
@@ -4947,6 +5018,7 @@ function render(){
   }
   ctx2d.shadowBlur=0;
   for(const e of enemies){
+    if(!inView(e.x,e.y)) continue;
     ctx2d.fillStyle=e.hitFlash>0?"#ffffff":e.color; ctx2d.shadowColor=e.glow; ctx2d.shadowBlur=glow(e.boss?26:(e.elite?18:10));
     if(e.boss || !e.shape){ ctx2d.beginPath(); ctx2d.arc(e.x,e.y,e.radius,0,7); ctx2d.fill(); } else drawEnemyShape(ctx2d,e);
     ctx2d.shadowBlur=0;
@@ -4986,6 +5058,7 @@ function render(){
     }
   }
   for(const b of bullets){
+    if(!inView(b.x,b.y)) continue;
     ctx2d.fillStyle=b.color; ctx2d.strokeStyle=b.color; ctx2d.shadowColor=b.color; ctx2d.shadowBlur=glow(8);
     if(b.shape==="spiral"){
       // Elongated comet with a fading tail pointing back along its travel direction —
