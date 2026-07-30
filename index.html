@@ -258,7 +258,7 @@
   .wpn-icon .wpn-cd{position:absolute; inset:0; border-radius:4px; background:transparent; pointer-events:none;}
   .passive-row{display:flex; gap:6px;}
   .psv-icon{width:26px; height:26px; border:1px solid var(--soul); background:var(--panel); border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:12px;}
-  .event-log{position:absolute; top:66px; left:20px; width:230px; display:flex; flex-direction:column; gap:3px; font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--dim);}
+  .event-log{position:absolute; bottom:calc(96px + var(--safe-bottom)); left:calc(20px + var(--safe-left)); width:230px; display:flex; flex-direction:column; gap:3px; font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--dim);}
   .event-log div{opacity:0; animation:login .25s forwards, logout .4s 2.6s forwards;}
   @keyframes login{to{opacity:1;}}
   @keyframes logout{to{opacity:0;}}
@@ -503,14 +503,52 @@
   /* POLISH_PLAN_9 item 1 — scale-to-fit compensation box (see renderTalentTree's
      graphScale) needs to animate too, or the shrink snaps instead of gliding
      like the graph's own width/height transition already does. */
-  .talent-graph-scroll{overflow-x:visible; overflow-y:visible; transition:width .25s, height .25s;}
+  /* display:flex + justify-content:center (not .talent-graph's own margin:auto)
+     centers the graph even when scaled down — margin:auto can't center a child
+     that's WIDER than its parent, and that's exactly what happens once scaled:
+     .talent-graph keeps its full unscaled layout box (transform doesn't change
+     layout size, only paint) while .talent-graph-scroll is deliberately shrunk to
+     the scaled visual size (renderTalentTree, PART 17) so a scaled-down graph
+     doesn't leave dead reserved space in #metaWrap. margin:auto centering a
+     445px-wide box inside a narrower shrunk parent was resolving to flush-left,
+     not centered — flexbox centers correctly regardless of which one is bigger.
+     margin:0 auto on THIS element is a second, separate fix: .talent-graph-scroll
+     is itself a block-level box that gets explicitly narrowed by the same JS (to
+     the scaled width) — without its own auto margins, a narrowed block box isn't
+     centered within #metaWrap either, it's flush-left by default. Both levels
+     needed centering, not just the inner one. */
+  .talent-graph-scroll{display:flex; justify-content:center; align-items:flex-start; overflow-x:visible; overflow-y:visible; margin:0 auto; transition:width .25s, height .25s;}
   /* POLISH_PLAN_7 — talent tree tinted per class. renderTalentTree() sets
      --branch-color/--branch-glow/--branch-glow-strong as inline custom
      properties on #screen-meta (ancestor of both the tab bar and the graph), so
      every rule below that reads them updates automatically on tab switch — no
      re-render of static CSS needed, just the one JS assignment per switch. */
-  .talent-graph{position:relative; width:300px; height:540px; margin:6px auto 0; transition:width .25s, height .25s, background .25s, transform .25s;
-    background:radial-gradient(ellipse at 50% 25%, var(--branch-glow,transparent), transparent 65%);}
+  .talent-graph{position:relative; width:300px; height:540px; margin:6px 0 0; flex-shrink:0; transition:width .25s, height .25s, background .25s, transform .25s;
+    background:radial-gradient(ellipse at 50% 50%, var(--branch-glow,transparent), transparent 65%);}
+  /* Fully-maxed branch (every stat line at tier 5, see renderTalentTree) — the glow
+     breathes between the normal and --branch-glow-strong intensities instead of
+     sitting static, plus a handful of .talent-particle motes drift up and fade,
+     both in the branch's own color. A first version animated .talent-graph's own
+     `background` gradient color-stops directly, which read as a jarring flicker
+     rather than a smooth pulse — browsers don't reliably interpolate between two
+     different radial-gradient() color values keyframe-to-keyframe (and it was also
+     fighting .talent-graph's own `transition:background .25s`, the exact kind of
+     animation/transition collision already found and fixed once this session for
+     the character-select stripe wipe). A separate ::after overlay carrying the
+     *strong* gradient, faded via opacity instead, sidesteps both problems —
+     opacity is always smoothly interpolated. */
+  .talent-graph.maxed::after{content:''; position:absolute; inset:0; border-radius:inherit; pointer-events:none;
+    background:radial-gradient(ellipse at 50% 50%, var(--branch-glow-strong,transparent), transparent 72%);
+    opacity:0; animation:talentTreeMaxedGlow 3s ease-in-out infinite;}
+  @keyframes talentTreeMaxedGlow{0%,100%{opacity:0;} 50%{opacity:1;}}
+  .talent-particle{position:absolute; width:4px; height:4px; border-radius:50%; background:var(--branch-color,var(--accent));
+    box-shadow:0 0 7px var(--branch-color,var(--accent)); opacity:0; pointer-events:none;
+    animation-name:talentParticleFloat; animation-timing-function:ease-in-out; animation-iteration-count:infinite;}
+  @keyframes talentParticleFloat{
+    0%{opacity:0; transform:translateY(0) scale(0.6);}
+    15%{opacity:0.9;} 85%{opacity:0.6;}
+    100%{opacity:0; transform:translateY(-56px) scale(1);}
+  }
   .talent-lines{position:absolute; inset:0; width:100%; height:100%; pointer-events:none; overflow:visible;}
   .talent-lines line{stroke:var(--line); stroke-width:2; transition:stroke .2s, x1 .3s, y1 .3s, x2 .3s, y2 .3s;}
   .talent-lines line.unlocked{stroke:var(--branch-color,var(--accent));}
@@ -561,14 +599,35 @@
   ::-webkit-scrollbar{width:6px;} ::-webkit-scrollbar-thumb{background:var(--line); border-radius:3px;}
   .ach-chip{font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--dim); border:1px solid var(--line); border-radius:8px; padding:1px 7px; margin-left:8px;}
   .ach-wrap{width:780px; max-width:90vw; max-height:58vh; overflow-y:auto; z-index:2; display:grid; grid-template-columns:1fr 1fr; gap:9px; padding:4px 6px 4px 0;}
-  .ach-card{display:flex; gap:12px; align-items:flex-start; background:var(--panel); border:1px solid var(--line); border-radius:5px; padding:11px 13px; transition:border-color .15s;}
+  .ach-card{display:flex; gap:12px; align-items:center; background:var(--panel); border:1px solid var(--line); border-radius:5px; padding:11px 13px; transition:border-color .15s;}
   .ach-card.unlocked{border-color:rgba(255,179,71,0.5); box-shadow:0 0 18px rgba(255,179,71,0.06) inset;}
   .ach-card.locked{opacity:0.5;}
   .ach-icon{font-size:22px; width:30px; text-align:center; flex-shrink:0;}
   .ach-icon.locked-icon{filter:grayscale(1);}
+  .ach-text{flex:1; min-width:0;}
   .ach-name{font-family:'Rajdhani',sans-serif; font-weight:700; font-size:14px; margin-bottom:2px;}
   .ach-card.unlocked .ach-name{color:var(--gold);}
   .ach-desc{font-size:11px; color:var(--dim); line-height:1.35;}
+  /* Reward slot (unlock_card achievements only — see renderAchievementsScreen): its
+     own flex item at the card's right edge, vertically centered against the whole
+     row (.ach-card's own align-items:center) instead of stacked under the
+     description. locked = a lock+item chip with a hover/tap tooltip (card name+desc)
+     so the reward is visible and explained before it's earned, not a total mystery.
+     Unlocked-but-not-collected = a blinking Collect button, the explicit "claim
+     this" step the mechanic is built around. Collected = a static checkmark chip.
+     All three share one fixed height (28px, box-sizing:border-box) so swapping
+     between states never shifts the card's layout, and the locked chip / collected
+     chip / Collect button all read as the same-weight UI element. */
+  .ach-reward-slot{flex-shrink:0;}
+  .ach-reward-chip, .ach-collect-btn{height:28px; box-sizing:border-box; display:inline-flex; align-items:center; gap:5px;}
+  .ach-reward-chip{font-family:'JetBrains Mono',monospace; font-size:10px;
+    color:var(--dim); border:1px solid var(--line); border-radius:8px; padding:0 10px; cursor:help;}
+  .ach-reward-chip.collected{color:var(--xp); border-color:var(--xp); cursor:default;}
+  .ach-collect-btn{appearance:none; border:1px solid var(--gold); background:rgba(255,179,71,0.12); color:var(--gold);
+    font-family:'Rajdhani',sans-serif; font-weight:700; font-size:11.5px; letter-spacing:0.5px; padding:0 12px;
+    border-radius:4px; cursor:pointer; text-transform:uppercase; animation:achCollectBlink 1.4s ease-in-out infinite;}
+  .ach-collect-btn:hover{background:rgba(255,179,71,0.24);}
+  @keyframes achCollectBlink{0%,100%{box-shadow:0 0 6px rgba(255,179,71,0.25);} 50%{box-shadow:0 0 16px rgba(255,179,71,0.9);}}
   #achToastLayer{position:absolute; top:calc(22px + var(--safe-top)); left:50%; transform:translateX(-50%); z-index:40; display:flex; flex-direction:column; gap:8px; align-items:center; pointer-events:none;}
   .ach-toast{display:flex; align-items:center; gap:12px; background:linear-gradient(180deg,#1c1710,#141821); border:1px solid var(--gold); border-radius:5px; padding:10px 18px; box-shadow:0 10px 30px rgba(0,0,0,0.5), 0 0 24px rgba(255,179,71,0.15);
     animation:toastIn .35s cubic-bezier(.2,.9,.3,1) forwards, toastOut .4s ease-in 3.6s forwards;}
@@ -823,7 +882,10 @@
   <div class="screen hidden" id="screen-event">
     <div class="veil"></div>
     <div class="title-wrap" style="margin-bottom:6px;"><div class="kicker" id="eventKicker">random event</div><div class="title" style="font-size:34px;" id="eventTitle">EVENT</div></div>
-    <div class="event-desc-box" id="eventDesc"></div>
+    <div class="event-desc-box">
+      <div class="event-speaker"><span class="event-speaker-icon" id="eventSpeakerIcon"></span><span class="event-speaker-name" id="eventSpeakerName"></span></div>
+      <div id="eventDesc"></div>
+    </div>
     <div class="cards-wrap" id="eventChoices"></div>
   </div>
 
@@ -1065,7 +1127,12 @@ const CARDS = [
   {id:"greed",cat:"utility",name:"Greed",tags:["gold"],stackable:true,maxStacks:3,desc:"+25% gold gained.",apply:p=>p.stats.goldMult*=1.25},
   {id:"fortune",cat:"utility",name:"Fortune",tags:["xp"],stackable:true,maxStacks:3,desc:"+20% XP gained.",apply:p=>p.stats.xpMult*=1.2},
   {id:"time_warp",cat:"utility",name:"Time Warp",tags:["control"],stackable:true,maxStacks:3,desc:"Enemies move 8% slower globally.",apply:p=>p.stats.globalSlow=(p.stats.globalSlow||0)+0.08},
-  {id:"collector",cat:"utility",name:"Collector",tags:["pickup"],desc:"XP orbs pulled from anywhere on screen.",apply:p=>p.stats.xpAutoPull=true},
+  // Gated behind the "Insatiable" achievement's Collect button (ACHIEVEMENTS below,
+  // reward:{type:"unlock_card"}) instead of being in the default pool from run 1 —
+  // pulling XP from anywhere on screen is strong enough to be worth a real
+  // milestone, not just a lucky level-up roll. requiresCollect is checked in
+  // buildCardPool().
+  {id:"collector",cat:"utility",name:"Collector",tags:["pickup"],requiresCollect:true,desc:"XP orbs pulled from anywhere on screen.",apply:p=>p.stats.xpAutoPull=true},
   {id:"swift_boots",cat:"utility",name:"Swift Boots",tags:["speed"],stackable:true,maxStacks:4,desc:"+9% movement speed.",apply:p=>p.stats.moveSpeed*=1.09},
   {id:"lucky_charm",cat:"utility",name:"Lucky Charm",tags:["luck"],stackable:true,maxStacks:3,desc:"+15% chance for rare card options.",apply:p=>p.stats.luck=(p.stats.luck||0)+0.15},
   {id:"quick_hands",cat:"utility",name:"Quick Hands",tags:["cooldown"],stackable:true,maxStacks:4,desc:"-8% all weapon cooldowns.",apply:p=>p.stats.cdrMult=(p.stats.cdrMult||1)*0.92},
@@ -1503,14 +1570,14 @@ const FINAL_BOSS_ID = "overlord";
 
 const EVENT_CATEGORIES = ["merchant","treasure","elite_arena","mini_boss","risk_reward","cursed_shrine"];
 const EVENTS = [
-  {id:"wandering_merchant",cat:"merchant",name:"Wandering Merchant",desc:"Offers 3 random cards for gold.",resolve:(p,i,ctx)=>{ /* handled by renderMerchantCardOffers() in triggerRandomEvent — no-op fallback */ }},
+  {id:"wandering_merchant",cat:"merchant",name:"Wandering Merchant",speaker:{name:"The Wandering Merchant",icon:"🧳"},desc:"Offers 3 random cards for gold.",resolve:(p,i,ctx)=>{ /* handled by renderMerchantCardOffers() in triggerRandomEvent — no-op fallback */ }},
   {id:"black_market_dealer",cat:"merchant",name:"Black Market Dealer",desc:"Sells a guaranteed passive item at a premium price.",resolve:(p,i,ctx)=>ctx.offerPassiveForGold(p,ctx.randomPassive(),250)},
   {id:"reroll_gremlin",cat:"merchant",name:"Reroll Gremlin",desc:"Pay gold to reroll your next level-up choices.",resolve:(p,i,ctx)=>ctx.grantRerollCharges(p,3)},
   {id:"traveling_smith",cat:"merchant",name:"Traveling Smith",desc:"Pay gold to instantly level up one weapon.",resolve:(p,i,ctx)=>ctx.offerWeaponLevelForGold(p,180)},
   {id:"soul_broker",cat:"merchant",name:"Soul Broker",desc:"Convert gold into Soul at a poor rate.",resolve:(p,i,ctx)=>ctx.convertGoldToSoul(p,0.4)},
-  {id:"treasure_portal",cat:"treasure",name:"Treasure Portal",desc:"Choice: legendary card, or +100% enemy spawn rate for 60s.",choice:true,resolve:(p,i,ctx)=> i===0 ? ctx.grantLegendaryCard(p) : ctx.applyTemporaryModifier("spawnRate",2,60,null,"Treasure Portal")},
+  {id:"treasure_portal",cat:"treasure",name:"Treasure Portal",speaker:{name:"A Shimmering Portal",icon:"🌀"},acceptLabel:"Step Through",acceptIcon:"🌀",declineLabel:"Turn Away",desc:"Choice: legendary card, or +100% enemy spawn rate for 60s.",choice:true,resolve:(p,i,ctx)=> i===0 ? ctx.grantLegendaryCard(p) : ctx.applyTemporaryModifier("spawnRate",2,60,null,"Treasure Portal")},
   {id:"buried_chest",cat:"treasure",name:"Buried Chest",desc:"Free gold and a chance of a passive item.",resolve:(p,i,ctx)=>{ctx.grantGold(p,80); if(Math.random()<0.3) ctx.grantRandomPassive(p);}},
-  {id:"ancient_vault",cat:"treasure",name:"Ancient Vault",desc:"Choice: safe moderate reward, or a risky vault guarded by an elite.",choice:true,resolve:(p,i,ctx)=> i===0 ? ctx.grantGold(p,150) : ctx.spawnGuardedTreasure(p,"ogre",400)},
+  {id:"ancient_vault",cat:"treasure",name:"Ancient Vault",speaker:{name:"An Ancient Vault",icon:"🗝️"},acceptLabel:"Open the Vault",acceptIcon:"🗝️",declineLabel:"Leave It Sealed",desc:"Choice: safe moderate reward, or a risky vault guarded by an elite.",choice:true,resolve:(p,i,ctx)=> i===0 ? ctx.grantGold(p,150) : ctx.spawnGuardedTreasure(p,"ogre",400)},
   {id:"soul_cache",cat:"treasure",name:"Soul Cache",desc:"Grants a burst of Soul immediately, banked even if you die.",resolve:(p,i,ctx)=>ctx.grantSoulImmediate(p,20)},
   {id:"weapon_cache",cat:"treasure",name:"Weapon Cache",desc:"Guaranteed new weapon if you have an open slot.",resolve:(p,i,ctx)=>ctx.grantRandomWeaponIfSlotOpen(p)},
   {id:"sealed_arena",cat:"elite_arena",name:"Sealed Arena",desc:"Clear the wave to earn a reward.",resolve:(p,i,ctx)=>ctx.startArenaWave(p,{count:12,rewardGold:200})},
@@ -1523,11 +1590,11 @@ const EVENTS = [
   {id:"the_hollow_knight",cat:"mini_boss",name:"The Hollow Knight",desc:"Tanky mini-boss, drops a guaranteed passive.",resolve:(p,i,ctx)=>ctx.spawnMiniBoss(p,"iron_colossus",{rewardPassive:true})},
   {id:"twin_terrors",cat:"mini_boss",name:"Twin Terrors",desc:"Two linked elites appear together.",resolve:(p,i,ctx)=>{ctx.spawnMiniBoss(p,"shade_elite");ctx.spawnMiniBoss(p,"glass_wraith");}},
   {id:"the_starved_one",cat:"mini_boss",name:"The Starved One",desc:"Grows stronger the longer the fight lasts.",resolve:(p,i,ctx)=>ctx.spawnMiniBoss(p,"bloated_horror",{rewardGold:220})},
-  {id:"devils_bargain",cat:"risk_reward",name:"Devil's Bargain",desc:"Choice: -20% max HP for a legendary card, or walk away.",choice:true,resolve:(p,i,ctx)=> i===0 ? (ctx.applyHpPenalty(p,0.2),ctx.grantLegendaryCard(p)) : null},
-  {id:"unstable_rift",cat:"risk_reward",name:"Unstable Rift",desc:"Choice: enter for a random powerful buff or debuff.",choice:true,resolve:(p,i,ctx)=> i===0 ? ctx.rollRiftOutcome(p) : null},
-  {id:"cursed_weapon",cat:"risk_reward",name:"Cursed Weapon",desc:"Choice: a weapon far above your level, but it drains HP while equipped.",choice:true,resolve:(p,i,ctx)=> i===0 ? ctx.grantCursedWeapon(p) : null},
-  {id:"sacrificial_altar",cat:"risk_reward",name:"Sacrificial Altar",desc:"Choice: sacrifice a random passive for two cards.",choice:true,resolve:(p,i,ctx)=> i===0 ? ctx.sacrificePassiveForCards(p,2) : null},
-  {id:"bloodmoon_wager",cat:"risk_reward",name:"Bloodmoon Wager",desc:"Choice: double spawns for 90s for double gold/XP (both revert after 90s).",choice:true,resolve:(p,i,ctx)=> i===0 ? ctx.applyTemporaryModifier("spawnRate",2,90,{goldMult:2,xpMult:2},"Bloodmoon Wager") : null},
+  {id:"devils_bargain",cat:"risk_reward",name:"Devil's Bargain",speaker:{name:"A Velvet-Voiced Devil",icon:"😈"},acceptLabel:"Sign the Pact",acceptIcon:"✍️",declineLabel:"Refuse",desc:"Choice: -20% max HP for a legendary card, or walk away.",choice:true,resolve:(p,i,ctx)=> i===0 ? (ctx.applyHpPenalty(p,0.2),ctx.grantLegendaryCard(p)) : null},
+  {id:"unstable_rift",cat:"risk_reward",name:"Unstable Rift",speaker:{name:"The Unstable Rift",icon:"🌌"},acceptLabel:"Step Into the Rift",acceptIcon:"🌌",declineLabel:"Seal It",desc:"Choice: enter for a random powerful buff or debuff.",choice:true,resolve:(p,i,ctx)=> i===0 ? ctx.rollRiftOutcome(p) : null},
+  {id:"cursed_weapon",cat:"risk_reward",name:"Cursed Weapon",speaker:{name:"A Whispering Blade",icon:"🗡️"},acceptLabel:"Take the Blade",acceptIcon:"🗡️",declineLabel:"Leave It",desc:"Choice: a weapon far above your level, but it drains HP while equipped.",choice:true,resolve:(p,i,ctx)=> i===0 ? ctx.grantCursedWeapon(p) : null},
+  {id:"sacrificial_altar",cat:"risk_reward",name:"Sacrificial Altar",speaker:{name:"A Silent Altar",icon:"🩸"},acceptLabel:"Make the Sacrifice",acceptIcon:"🩸",declineLabel:"Refuse",desc:"Choice: sacrifice a random passive for two cards.",choice:true,resolve:(p,i,ctx)=> i===0 ? ctx.sacrificePassiveForCards(p,2) : null},
+  {id:"bloodmoon_wager",cat:"risk_reward",name:"Bloodmoon Wager",speaker:{name:"The Bloodmoon Herald",icon:"🌕"},acceptLabel:"Accept the Wager",acceptIcon:"🌕",declineLabel:"Decline",desc:"Choice: double spawns for 90s for double gold/XP (both revert after 90s).",choice:true,resolve:(p,i,ctx)=> i===0 ? ctx.applyTemporaryModifier("spawnRate",2,90,{goldMult:2,xpMult:2},"Bloodmoon Wager") : null},
   {id:"shrine_of_hunger",cat:"cursed_shrine",name:"Shrine of Hunger",desc:"Lose regen permanently for a big damage boost.",resolve:(p,i,ctx)=>{p.stats.regen=0;p.stats.dmgMult*=1.3;}},
   {id:"shrine_of_silence",cat:"cursed_shrine",name:"Shrine of Silence",desc:"Disable one random weapon, +2 passive slots.",resolve:(p,i,ctx)=>ctx.disableRandomWeapon(Infinity,{grantPassiveSlots:2})},
   {id:"shrine_of_ruin",cat:"cursed_shrine",name:"Shrine of Ruin",desc:"Enemies spawn 20% faster, gold gain +40%.",resolve:(p,i,ctx)=>{ctx.applyTemporaryModifier("spawnRate",1.2,Infinity,null,"Shrine of Ruin");p.stats.goldMult*=1.4;}},
@@ -1541,8 +1608,8 @@ const EVENTS = [
   {id:"endless_horde",cat:"elite_arena",name:"Endless Horde",desc:"A massive wave rushes in at once.",resolve:(p,i,ctx)=>ctx.startArenaWave(p,{count:25,rewardGold:220})},
   {id:"the_iron_warden",cat:"mini_boss",name:"The Iron Warden",desc:"A heavily-armored mini-boss appears.",resolve:(p,i,ctx)=>ctx.spawnMiniBoss(p,"thornback",{rewardGold:200})},
   {id:"phantom_pair",cat:"mini_boss",name:"Phantom Pair",desc:"Two spectral hunters appear together.",resolve:(p,i,ctx)=>{ctx.spawnMiniBoss(p,"phantom_duelist");ctx.spawnMiniBoss(p,"night_hag");}},
-  {id:"gamblers_coin",cat:"risk_reward",name:"Gambler's Coin",desc:"Choice: flip a coin — double your gold, or lose it all.",choice:true,resolve:(p,i,ctx)=>{ if(i!==0) return; if(Math.random()<0.5) p.gold*=2; else p.gold=0; }},
-  {id:"forbidden_tome",cat:"risk_reward",name:"Forbidden Tome",desc:"Choice: -10% max HP for a permanent extra passive slot.",choice:true,resolve:(p,i,ctx)=>{ if(i!==0) return; ctx.applyHpPenalty(p,0.1); p.stats.extraPassiveSlots=(p.stats.extraPassiveSlots||0)+1; }},
+  {id:"gamblers_coin",cat:"risk_reward",name:"Gambler's Coin",speaker:{name:"A Grinning Gambler",icon:"🎲"},acceptLabel:"Flip the Coin",acceptIcon:"🎲",declineLabel:"Walk Away",desc:"Choice: flip a coin — double your gold, or lose it all.",choice:true,resolve:(p,i,ctx)=>{ if(i!==0) return; if(Math.random()<0.5) p.gold*=2; else p.gold=0; }},
+  {id:"forbidden_tome",cat:"risk_reward",name:"Forbidden Tome",speaker:{name:"A Forbidden Tome",icon:"📖"},acceptLabel:"Read the Tome",acceptIcon:"📖",declineLabel:"Close It",desc:"Choice: -10% max HP for a permanent extra passive slot.",choice:true,resolve:(p,i,ctx)=>{ if(i!==0) return; ctx.applyHpPenalty(p,0.1); p.stats.extraPassiveSlots=(p.stats.extraPassiveSlots||0)+1; }},
   {id:"shrine_of_greed",cat:"cursed_shrine",name:"Shrine of Greed",desc:"Lose half your current gold, but gold gain is doubled.",resolve:(p,i,ctx)=>{p.gold=Math.floor(p.gold*0.5);p.stats.goldMult*=2;}},
   {id:"shrine_of_the_swarm",cat:"cursed_shrine",name:"Shrine of the Swarm",desc:"Enemies spawn faster for the rest of the run, but you gain bonus projectiles.",resolve:(p,i,ctx)=>{ctx.applyTemporaryModifier("spawnRate",1.15,Infinity,null,"Shrine of the Swarm");p.stats.bonusProjectiles=(p.stats.bonusProjectiles||0)+2;}},
 ];
@@ -1775,6 +1842,13 @@ const ACHIEVEMENTS = [
   {id:"survivor_30",icon:"🏔️",name:"The Test",desc:"Survive 30 minutes in a single run.",check:c=>c.run.time>=1800},
   {id:"level_10",icon:"⭐",name:"Ascending",desc:"Reach level 10 in a single run.",check:c=>c.run.level>=10},
   {id:"level_25",icon:"🌟",name:"Transcendent",desc:"Reach level 25 in a single run.",check:c=>c.run.level>=25},
+  // unlock_card reward (see applyAchievementReward/renderAchievementsScreen/
+  // buildCardPool) — unlike unlock_shop_item, this doesn't auto-apply the moment
+  // the achievement completes: the Achievements screen shows a blinking Collect
+  // button once unlocked, and only clicking it sets save.collectedRewards so the
+  // card can actually appear in a level-up pool.
+  {id:"level_40",icon:"🧲",name:"Insatiable",desc:"Reach level 40 in a single run.",check:c=>c.run.level>=40,
+    reward:{type:"unlock_card", cardId:"collector", label:"Collector"}},
   {id:"arsenal",icon:"🎒",name:"Full Arsenal",desc:"Unlock 6 weapons in one run.",check:c=>c.run.weaponsCount>=6},
   {id:"weapon_mastery",icon:"🔧",name:"Mastercraft",desc:"Level any single weapon to level 8.",check:c=>c.run.maxWeaponLvl>=8},
   {id:"elite_hunter",icon:"👹",name:"Elite Hunter",desc:"Kill 5 elites in a single run.",check:c=>c.run.eliteKills>=5},
@@ -2022,6 +2096,10 @@ const DEFAULT_SAVE = { soul:0, artifacts:0, talentLevels:{}, armoryUnlocks:{},
   lifetime:{ runs:0, kills:0, deaths:0, bestTime:0, bestLevel:0, totalGold:0, totalSoul:0, eliteKills:0, bossKills:0,
     charactersCompleted:[], uniqueBossesKilled:[], uniqueElitesKilled:[] },
   activeRun:null, achievements:{ unlocked:{} },
+  // Achievement rewards (see ACHIEVEMENTS' `reward:{type:"unlock_card",...}` entries)
+  // that require an explicit "Collect" click on the Achievements screen, not just
+  // finishing the achievement — see renderAchievementsScreen() and buildCardPool().
+  collectedRewards:{},
   settings:{ muted:false, sfxVolume:1, musicVolume:0.35, controlMode:'auto', haptics:true, quality:'high', enemyDensity:'high', screenShake:true, debugOverlay:false } };
 let save = JSON.parse(JSON.stringify(DEFAULT_SAVE));
 
@@ -2059,6 +2137,7 @@ async function loadSave(){
       save.achievements.unlocked = Object.assign({}, save.achievements.unlocked, (loaded.achievements&&loaded.achievements.unlocked)||{});
       save.talentLevels = Object.assign({}, loaded.talentLevels||{});
       save.armoryUnlocks = Object.assign({}, loaded.armoryUnlocks||{});
+      save.collectedRewards = Object.assign({}, loaded.collectedRewards||{});
     }
   }catch(e){}
   migrateTalents();
@@ -3699,6 +3778,7 @@ function buildCardPool(){
   // Non-stackable cards are excluded once taken; stackable cards are excluded once
   // they hit their own maxStacks.
   for(const c of CARDS){
+    if(c.requiresCollect && !save.collectedRewards[c.id]) continue;
     const takenCount = player.cardsTaken.filter(id=>id===c.id).length;
     if(c.stackable){ if(takenCount < (c.maxStacks||99)) pool.push({kind:"card",card:c}); }
     else if(takenCount===0){ pool.push({kind:"card",card:c}); }
@@ -4124,6 +4204,20 @@ function renderMerchantCardOffers(){
 // border) and the no-choice toast border, so an event's "flavor" reads the same
 // way regardless of which presentation it gets.
 const EVENT_CAT_COLOR = { merchant:"var(--gold)", treasure:"var(--crystal)", elite_arena:"#ff8a4d", mini_boss:"var(--hp)", risk_reward:"var(--accent2)", cursed_shrine:"var(--accent)" };
+// Per-category fallback "speaker" for the event screen's nameplate (see
+// eventSpeakerFor()) — every event reads as someone/something presenting it
+// instead of an anonymous system message, without needing a bespoke persona
+// hand-authored for all ~38 EVENTS entries up front. Individual events can
+// still override with their own `speaker` field (done below for the ones
+// actually shown on the full screen — choice:true events + the merchant) —
+// this map is just the floor everything else falls back to, and the hook
+// future story/lore content can build on without any engine changes.
+const EVENT_CAT_SPEAKER = {
+  merchant:{name:"A Traveling Merchant",icon:"🧳"}, treasure:{name:"???",icon:"🗝️"},
+  elite_arena:{name:"The Arena Keeper",icon:"🏛️"}, mini_boss:{name:"???",icon:"👁️"},
+  risk_reward:{name:"A Stranger",icon:"🃏"}, cursed_shrine:{name:"The Shrine",icon:"🕯️"},
+};
+function eventSpeakerFor(def){ return def.speaker || EVENT_CAT_SPEAKER[def.cat] || {name:"???",icon:"❔"}; }
 // Bookkeeping that must happen once an event's resolve() has run, regardless of
 // whether it was presented as a full-screen choice or an instant toast —
 // Shrine of Silence's "+2 passive slots" is a hardcoded special-case here (not in
@@ -4163,15 +4257,25 @@ function triggerRandomEvent(forceId){
   document.getElementById('screen-event').style.setProperty('--event-color', color);
   const kickerEl=document.getElementById('eventKicker'); kickerEl.textContent=def.cat.replace('_',' '); kickerEl.style.color=color;
   revealPhaseText(document.getElementById('eventTitle'), def.name); // same decode-scramble already used for wave-name reveals
+  // Speaker nameplate — gives every event a "someone/something is presenting this"
+  // identity instead of an anonymous system box, and a hook future story/lore
+  // content can build on (see EVENT_CAT_SPEAKER/eventSpeakerFor above).
+  const speaker=eventSpeakerFor(def);
+  document.getElementById('eventSpeakerIcon').textContent=speaker.icon;
+  document.getElementById('eventSpeakerName').textContent=speaker.name;
   const descEl=document.getElementById('eventDesc'); descEl.textContent=def.desc;
   const wrap=document.getElementById('eventChoices'); wrap.innerHTML="";
   if(def.id==="wandering_merchant"){ renderMerchantCardOffers(); show('screen-event'); return; }
   const c = eventCtx();
+  // acceptLabel/acceptIcon/declineLabel let individual events replace the generic
+  // Accept/Decline framing with wording that actually matches their flavor (see
+  // EVENTS above) — falls back to the old generic pair for any choice event that
+  // doesn't specify its own, so nothing regresses for ones not yet hand-authored.
   const accept=document.createElement('div'); accept.className='card'; accept.style.setProperty('--event-card-delay','0s');
-  accept.innerHTML=`<div class="icon">✅</div><div class="name">Accept</div><div class="desc">Take the risk / reward.</div>`;
+  accept.innerHTML=`<div class="icon">${def.acceptIcon||"✅"}</div><div class="name">${def.acceptLabel||"Accept"}</div><div class="desc">Take the risk / reward.</div>`;
   accept.onclick=()=>{ SFX.uiClick(); runStats.riskyChoicesTaken=(runStats.riskyChoicesTaken||0)+1; def.resolve(player,0,c); closeEvent(); };
   const decline=document.createElement('div'); decline.className='card'; decline.style.setProperty('--event-card-delay','0.08s');
-  decline.innerHTML=`<div class="icon">🚪</div><div class="name">Decline</div><div class="desc">Walk away safely.</div>`;
+  decline.innerHTML=`<div class="icon">🚪</div><div class="name">${def.declineLabel||"Decline"}</div><div class="desc">Walk away safely.</div>`;
   decline.onclick=()=>{ SFX.uiClick(); def.resolve(player,1,c); closeEvent(); };
   wrap.appendChild(accept); wrap.appendChild(decline);
   show('screen-event');
@@ -4253,11 +4357,19 @@ function applyAchievementReward(reward){
   switch(reward.type){
     case "unlock_shop_item": break;
     case "permanent_soul_bonus": save.soul+=reward.amount||0; save.lifetime.totalSoul+=reward.amount||0; break;
+    // unlock_card doesn't mutate anything here either — deliberately NOT auto-applied
+    // on completion like unlock_shop_item is. The actual gate is CARDS' own
+    // `requiresCollect` field, checked against save.collectedRewards in
+    // buildCardPool() — that flag only gets set by clicking Collect on the
+    // Achievements screen (renderAchievementsScreen), a real extra step past just
+    // finishing the achievement.
+    case "unlock_card": break;
   }
 }
 function showAchievementToast(a){
   const layer=document.getElementById('achToastLayer'); const el=document.createElement('div'); el.className='ach-toast';
-  const rewardLine = (a.reward && a.reward.type==="unlock_shop_item") ? `<div class="t-reward">🔓 ${a.reward.label||"New shop item"} unlocked</div>` : "";
+  const rewardLine = (a.reward && a.reward.type==="unlock_shop_item") ? `<div class="t-reward">🔓 ${a.reward.label||"New shop item"} unlocked</div>`
+    : (a.reward && a.reward.type==="unlock_card") ? `<div class="t-reward">🎁 ${a.reward.label||"New upgrade"} ready to collect</div>` : "";
   el.innerHTML=`<div class="t-icon">${a.icon}</div><div><div class="t-kicker">ACHIEVEMENT UNLOCKED</div><div class="t-name">${a.name}</div>${rewardLine}</div>`;
   layer.appendChild(el); setTimeout(()=>el.remove(),4000);
   logEvent("Achievement: "+a.name); SFX.achievement(); vibrate([0,30,60,30]);
@@ -5131,6 +5243,13 @@ const SFX=(()=>{ let muted=false, volume=1, heartbeatTimer=null;
     // with a soft triangle harmonic on top plus a brief high-passed sparkle,
     // going for "crystalline"/soul-toned rather than "coin".
     talentUpgrade(){ tone({freq:660,slideTo:880,dur:0.12,type:'sine',gain:0.12}); tone({freq:990,dur:0.14,type:'triangle',gain:0.08,delay:0.06}); noise({dur:0.15,gain:0.05,delay:0.02,filterFreq:4500}); },
+    // Plays layered on top of talentUpgrade() specifically on the purchase that
+    // completes a branch (every stat line at tier 5) — see the buy click handler
+    // in renderTalentTree(), PART 17. A distinct ascending arpeggio (A major, not
+    // achievement()'s C major or victory()'s longer run) so it's recognizably its
+    // own moment, not a reuse of an existing fanfare.
+    talentBranchMastered(){ const notes=[440,554.37,659.25,880]; notes.forEach((f,i)=>tone({freq:f,dur:0.28,type:'triangle',gain:0.16,delay:i*0.09}));
+      tone({freq:1108.73,dur:0.5,type:'sine',gain:0.1,delay:notes.length*0.09}); noise({dur:0.35,gain:0.07,delay:0.05,filterFreq:5500}); },
     // Character-pick confirm — a weightier "locked in" tone, distinct from the
     // plain uiClick() tap and from runStart()'s own fanfare (which still plays
     // separately once startRun() actually fires behind the stripe wipe).
@@ -5623,17 +5742,39 @@ function renderTalentTree(activeBranch){
   const graphW=maxCol*STEP_X+20, graphH=maxRow*STEP_Y+20;
   graph.style.width=graphW+'px';
   graph.style.height=graphH+'px';
-  // Some shapes (hunter's diagonal arrow, survivor's 9-node web) are wider than
-  // .meta-wrap's own budget on a narrow phone (94vw can be well under 400px) —
-  // rather than letting them clip/overflow, scale the whole graph down to fit
-  // and shrink the scroll wrapper's reserved box to match the scaled size (a
-  // transform alone doesn't change how much space the untransformed layout box
-  // would otherwise reserve, which would leave dead space below a shrunk graph).
+  // Some shapes (hunter's diagonal arrow, survivor's 10-node web) are wider AND/OR
+  // taller than .meta-wrap's own budget — on a narrow phone (94vw can be well under
+  // 400px) or just because a branch's own graphH exceeds .meta-wrap's fixed 600px/
+  // 70vh height (survivor's 10th node, added for the Weapon Forge talent, pushed it
+  // to 605px — past the box on every viewport, not just narrow ones, which is
+  // exactly the scroll bug this was reported against). Scaling only by width used
+  // to leave height unchecked, so a too-tall shape (even one that fit horizontally)
+  // still had to scroll — now both axes are checked and the smaller resulting scale
+  // wins, so the whole graph always fits both ways at once. Shrinks the scroll
+  // wrapper's reserved box to match the scaled size too (a transform alone doesn't
+  // change how much space the untransformed layout box would otherwise reserve,
+  // which would leave dead space around a shrunk graph).
   const availW=Math.min(640, window.innerWidth*0.94)-16;
-  const graphScale=Math.min(1, availW/graphW);
+  // Mirrors .meta-wrap's own height:600px / max-height:70vh CSS cascade as a formula
+  // instead of reading wrap.clientHeight directly — the very first render of this
+  // screen (btnMeta.onclick) calls renderTalentTree('warrior') BEFORE show(), so
+  // #screen-meta (an ancestor) is still display:none at that point and clientHeight
+  // reads 0, making availH negative -> graphScale negative -> the graph rendered
+  // flipped and shrunk to near-invisible (the "Warrior graph not visible" bug), and
+  // a negative CSS width on the scroll wrapper for anything rendered right after in
+  // that same broken state (the "Survivor drifted + scrolling again" bug). This
+  // formula never touches the DOM, so it can't be wrong just because the screen
+  // hasn't been shown yet.
+  const availH=Math.min(600, window.innerHeight*0.70)-16;
+  const graphScale=Math.min(1, availW/graphW, availH/Math.max(1,graphH));
   if(graphScale<1){
     graph.style.transform=`scale(${graphScale})`;
-    graph.style.transformOrigin='top left';
+    // 'top center' (not 'top left') — .talent-graph-scroll now centers this box via
+    // flexbox regardless of its unscaled-vs-scaled size mismatch (see that rule's
+    // comment), so the scale itself should shrink from the box's own horizontal
+    // center to stay visually aligned with that flex-centered position, while still
+    // anchoring vertically at the top to match the scaled-height reservation below.
+    graph.style.transformOrigin='top center';
     scroll.style.width=(graphW*graphScale)+'px';
     scroll.style.height=(graphH*graphScale)+'px';
   } else {
@@ -5686,6 +5827,12 @@ function renderTalentTree(activeBranch){
       const lockedBefore = lines.map((l,i)=>lineLocked(activeBranch,i));
       save.soul-=cost; save.talentLevels[activeBranch+"_"+line.key]=lvl+1; persistSave(); refreshSoulBadges();
       SFX.talentUpgrade();
+      // A branch can only ever transition from "not fully maxed" to "fully maxed"
+      // once, on the purchase that brings its last remaining line to tier 5 — so
+      // just checking the post-purchase state here (no separate before/after
+      // tracking needed) is exactly the "just completed it" moment, matching the
+      // maxed glow+particles renderTalentTree() already adds when this is true.
+      if(lines.every(l=>talentLevel(activeBranch,l.key)>=5)) SFX.talentBranchMastered();
       hideTooltip();
       const newlyIdx = lines.findIndex((l,i)=>lockedBefore[i] && !lineLocked(activeBranch,i));
       renderTalentTree(activeBranch);
@@ -5710,6 +5857,23 @@ function renderTalentTree(activeBranch){
     el.dataset.nodeId=nodeId;
     graph.appendChild(el);
   });
+  // Fully-maxed branch (every stat line at tier 5) gets an intensified pulsing glow
+  // (reuses --branch-glow-strong, already defined for the per-node unlock pulse)
+  // plus a handful of floating particle motes in the branch color — a small
+  // "you've completed this" flourish. Pure CSS keyframe animation once spawned, no
+  // per-frame JS loop needed for a screen that isn't the canvas gameplay renderer.
+  const branchMaxed = lines.every(l=>talentLevel(activeBranch,l.key)>=5);
+  graph.classList.toggle('maxed', branchMaxed);
+  if(branchMaxed){
+    for(let i=0;i<10;i++){
+      const p=document.createElement('div'); p.className='talent-particle';
+      p.style.left=(Math.random()*graphW)+'px';
+      p.style.top=(Math.random()*graphH)+'px';
+      p.style.animationDelay=(Math.random()*3.2)+'s';
+      p.style.animationDuration=(2.6+Math.random()*1.6)+'s';
+      graph.appendChild(p);
+    }
+  }
   scroll.appendChild(graph); wrap.appendChild(scroll);
 }
 document.getElementById('btnMeta').onclick=()=>{ setState('meta'); renderTalentTree('warrior'); show('screen-meta'); };
@@ -5742,9 +5906,46 @@ function renderAchievementsScreen(){
   const unlocked=save.achievements.unlocked;
   document.getElementById('achSummary').textContent=`${Object.keys(unlocked).length} / ${ACHIEVEMENTS.length} unlocked`;
   const wrap=document.getElementById('achWrap'); wrap.innerHTML="";
-  for(const a of ACHIEVEMENTS){ const ts=unlocked[a.id]; const el=document.createElement('div'); el.className='ach-card '+(ts?'unlocked':'locked');
-    el.innerHTML=`<div class="ach-icon ${ts?'':'locked-icon'}">${ts?a.icon:'🔒'}</div><div><div class="ach-name">${a.name}</div><div class="ach-desc">${a.desc}</div></div>`;
-    wrap.appendChild(el); }
+  for(const a of ACHIEVEMENTS){
+    const ts=unlocked[a.id]; const el=document.createElement('div'); el.className='ach-card '+(ts?'unlocked':'locked');
+    el.innerHTML=`<div class="ach-icon ${ts?'':'locked-icon'}">${ts?a.icon:'🔒'}</div><div class="ach-text"><div class="ach-name">${a.name}</div><div class="ach-desc">${a.desc}</div></div>`;
+    // Reward slot: an achievement that actually grants something (unlock_card) gets
+    // its own lock+tooltip preview before completion, a blinking Collect button
+    // once unlocked but not yet collected, and a static "collected" chip after —
+    // see requiresCollect on CARDS / applyAchievementReward's unlock_card case.
+    // Appended as its own sibling flex item on .ach-card (not nested inside
+    // .ach-text), so it sits at the card's right edge, vertically centered against
+    // the whole row via .ach-card's own align-items:center.
+    if(a.reward && a.reward.type==="unlock_card"){
+      const card=CARDS.find(c=>c.id===a.reward.cardId);
+      const label=a.reward.label||(card&&card.name)||"Reward";
+      const tooltipHtml=()=>`<div class="tt-name">${label}</div><div class="tt-desc">${card?card.desc:"Unlocks a new upgrade."}</div>`;
+      const slot=document.createElement('div'); slot.className='ach-reward-slot';
+      if(!ts){
+        const chip=document.createElement('div'); chip.className='ach-reward-chip locked';
+        chip.innerHTML=`<span>🔒</span><span>${card?cardIcon(card.cat):'🎁'}</span><span>${label}</span>`;
+        wireTooltip(chip,'achreward_'+a.id,tooltipHtml);
+        slot.appendChild(chip);
+      } else if(!save.collectedRewards[a.reward.cardId]){
+        const btn=document.createElement('button'); btn.className='ach-collect-btn'; btn.textContent=`Collect ${label}`;
+        wireTooltip(btn,'achreward_'+a.id,tooltipHtml);
+        btn.addEventListener('click',e=>{
+          e.stopPropagation();
+          save.collectedRewards[a.reward.cardId]=true; persistSave(); SFX.uiClick();
+          showAchievementLikeToast("COLLECTED",label,card?cardIcon(card.cat):'🎁');
+          renderAchievementsScreen();
+        });
+        slot.appendChild(btn);
+      } else {
+        const chip=document.createElement('div'); chip.className='ach-reward-chip collected';
+        chip.innerHTML=`<span>✓</span><span>${label}</span>`;
+        wireTooltip(chip,'achreward_'+a.id,tooltipHtml);
+        slot.appendChild(chip);
+      }
+      el.appendChild(slot);
+    }
+    wrap.appendChild(el);
+  }
 }
 document.getElementById('btnAchievements').onclick=()=>{ setState('achievements'); renderAchievementsScreen(); show('screen-achievements'); };
 document.getElementById('achBack').onclick=goMenu;
