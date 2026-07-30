@@ -113,6 +113,11 @@
   .weapon-row{display:flex; gap:6px; flex-wrap:wrap; justify-content:center; max-width:90vw;}
   .wpn-icon{width:34px; height:34px; border:1px solid var(--line); background:var(--panel); border-radius:4px; display:flex; align-items:center; justify-content:center; font-size:15px; position:relative;}
   .wpn-icon.evolved{border-color:var(--gold); box-shadow:0 0 10px rgba(255,179,71,0.35) inset; filter:drop-shadow(0 0 4px rgba(255,179,71,0.7));}
+  /* Shrine of Silence etc. — previously a disabled weapon had zero visual cue
+     (only a one-time log line), reading as a bug ("my weapon just stopped").
+     Grayscale + a corner ⛔ makes the state legible at a glance in the HUD. */
+  .wpn-icon.disabled{filter:grayscale(1); opacity:0.55;}
+  .wpn-icon.disabled::after{content:'⛔'; position:absolute; bottom:-3px; left:-3px; font-size:10px;}
   .wpn-icon .wlvl{position:absolute; bottom:-2px; right:-2px; background:var(--accent); color:#000; font-size:8.5px; font-weight:700; border-radius:8px; padding:0 4px; font-family:'JetBrains Mono',monospace;}
   .passive-row{display:flex; gap:6px;}
   .psv-icon{width:26px; height:26px; border:1px solid var(--soul); background:var(--panel); border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:12px;}
@@ -135,10 +140,22 @@
   .cards-wrap{display:flex; flex-wrap:wrap; align-items:stretch; justify-content:center; gap:16px; z-index:2; width:min(92vw,820px); max-height:78vh; overflow-y:auto; padding:4px;}
   .card{width:220px; background:var(--panel); border:1px solid var(--line); border-top:3px solid var(--line); border-radius:6px; padding:16px 15px 18px; cursor:pointer; transition:transform .15s, border-color .15s, box-shadow .15s; display:flex; flex-direction:column; position:relative;}
   .card:hover{border-color:var(--accent); border-top-color:var(--accent); box-shadow:0 12px 30px rgba(185,140,255,0.15);}
-  .card .icon{font-size:28px; margin-bottom:12px;}
-  .card .name{font-family:'Rajdhani',sans-serif; font-weight:700; font-size:18px; letter-spacing:0.5px; margin-bottom:6px;}
+  /* POLISH_PLAN_2 item 9 — keyboard focus ring for the level-up screen, visually
+     distinct from :hover (outline, not border-color) so it stays visible even on
+     a rarity-tinted border, and doesn't fight mouse-hover on a different card. */
+  .card.kbd-focus{outline:2px solid var(--accent); outline-offset:3px;}
+  /* POLISH_PLAN_2 item 6 — icon+name+tag used to be three stacked lines (icon alone,
+     then name, ..., then tag at the very bottom); icon is now bigger with its own
+     "frame" (more eye-catching per the request) and sits beside name+tag instead
+     of above them, with the tag shrunk down right under the name instead of a
+     full-width line at the card's bottom. */
+  .card-head{display:flex; align-items:flex-start; gap:10px; margin-bottom:10px;}
+  .card .icon{font-size:36px; width:50px; height:50px; flex-shrink:0; display:flex; align-items:center; justify-content:center;
+    background:var(--panel2); border:1px solid var(--line); border-radius:8px;}
+  .card-head-text{min-width:0;}
+  .card .name{font-family:'Rajdhani',sans-serif; font-weight:700; font-size:16px; letter-spacing:0.5px; line-height:1.25;}
   .card .desc{font-size:12px; color:var(--dim); line-height:1.5; flex:1;}
-  .card .tag{display:inline-block; margin-top:12px; font-family:'JetBrains Mono',monospace; font-size:9px; letter-spacing:1.5px; color:var(--accent); border:1px solid var(--accent); padding:2px 6px; border-radius:2px; text-align:center;}
+  .card .tag{display:inline-block; margin-top:4px; font-family:'JetBrains Mono',monospace; font-size:8px; letter-spacing:1px; color:var(--accent); border:1px solid var(--accent); padding:1px 5px; border-radius:2px; text-align:center;}
   .card .tag.cat-legendary{color:var(--gold); border-color:var(--gold);}
   .card .tag.cat-elemental{color:var(--accent2); border-color:var(--accent2);}
   .card .tag.cat-defensive{color:var(--crystal); border-color:var(--crystal);}
@@ -147,11 +164,23 @@
      matching glow — independent of the .tag's cat color, since cat and rarity are
      related but not the same axis (see CARD_CAT_RARITY). Common is intentionally
      unstyled (falls back to --line) so only the tiers worth noticing stand out. */
-  .card.rarity-uncommon{border-top-color:var(--xp);}
-  .card.rarity-rare{border-top-color:var(--crystal); box-shadow:0 0 18px rgba(126,224,255,0.14) inset;}
+  /* POLISH_PLAN_2 item 6 — "переливы" (shimmer) on every rarity, not just mythic's
+     existing full animated treatment: a diagonal shine band as a *second*
+     background-image layer (background-color still shows through everywhere the
+     gradient is transparent) so it never needs overflow:hidden — that would've
+     clipped .rarity-label, which intentionally pokes out above the card's own
+     top edge. Intensity/speed both scale up with tier. */
+  .card.rarity-common, .card.rarity-uncommon, .card.rarity-rare, .card.rarity-legendary{
+    background-repeat:no-repeat; background-size:220% 100%;
+  }
+  .card.rarity-common{background-image:linear-gradient(115deg, transparent 40%, rgba(255,255,255,0.05) 50%, transparent 60%); animation:cardShimmer 6.5s ease-in-out infinite;}
+  .card.rarity-uncommon{border-top-color:var(--xp); background-image:linear-gradient(115deg, transparent 40%, rgba(255,255,255,0.08) 50%, transparent 60%); animation:cardShimmer 5.5s ease-in-out infinite;}
+  .card.rarity-rare{border-top-color:var(--crystal); box-shadow:0 0 18px rgba(126,224,255,0.14) inset; background-image:linear-gradient(115deg, transparent 40%, rgba(255,255,255,0.12) 50%, transparent 60%); animation:cardShimmer 4.5s ease-in-out infinite;}
   .card.rarity-rare .name{color:var(--crystal);}
-  .card.rarity-legendary{border-top-color:var(--gold); animation:legendaryGlow 2.2s ease-in-out infinite;}
+  .card.rarity-legendary{border-top-color:var(--gold); background-image:linear-gradient(115deg, transparent 40%, rgba(255,255,255,0.18) 50%, transparent 60%);
+    animation:legendaryGlow 2.2s ease-in-out infinite, cardShimmer 3.2s ease-in-out infinite;}
   @keyframes legendaryGlow{0%,100%{box-shadow:0 0 22px rgba(255,179,71,0.2) inset;} 50%{box-shadow:0 0 30px rgba(255,179,71,0.4) inset;}}
+  @keyframes cardShimmer{0%{background-position:-60% 0;} 100%{background-position:160% 0;}}
   .card.rarity-legendary .name{color:var(--gold);}
   .card.rarity-legendary:hover{border-top-color:var(--gold);}
   /* Mythic (5th tier, above legendary) is the only rarity that animates — reserved for a
@@ -172,18 +201,23 @@
   .card.rarity-legendary .rarity-label{border-color:var(--gold); color:var(--gold);}
   .card.rarity-mythic .rarity-label{border-color:var(--artifact); color:var(--artifact); animation:mythicLabel 2.4s ease-in-out infinite;}
   @keyframes mythicLabel{0%,100%{border-color:var(--artifact); color:var(--artifact);} 33%{border-color:var(--accent); color:var(--accent);} 66%{border-color:var(--crystal); color:var(--crystal);}}
-  .shop-card{ padding:10px 9px; width:100%; }
-  /* !important to win over whatever .rarity-* border-top color is also on the element (locked
-     items keep their rarity class for when they unlock, but should read as locked first). */
+  /* POLISH_PLAN_2 item 5 — was a plain vertical stack (icon/name/desc/price/buy each
+     on their own line); icon+text now sit in one row, price+buy in another
+     (price left, buy right) instead of four separate lines. */
+  .shop-card{ padding:10px 9px; width:100%; display:flex; flex-direction:column; gap:8px; }
   .shop-card.locked{ background:#0a0b10; border-top-color:var(--line) !important; box-shadow:none !important; cursor:not-allowed; }
   .shop-card.locked .icon{ opacity:0.7; }
   .shop-card.locked .name, .shop-card.locked .desc{ color:var(--dim); }
   .shop-card:hover:not(:disabled){ transform:none !important; }
-  .shop-card .icon{ font-size:18px; margin-bottom:4px; }
+  .shop-card-top{ display:flex; align-items:center; gap:10px; }
+  .shop-card .icon{ font-size:28px; width:42px; height:42px; flex-shrink:0; display:flex; align-items:center; justify-content:center;
+    background:var(--panel2); border:1px solid var(--line); border-radius:7px; margin-bottom:0; }
+  .shop-card-text{ min-width:0; flex:1; }
   .shop-card .name{ font-family:'Rajdhani',sans-serif; font-weight:700; font-size:13px; margin-bottom:2px; line-height:1.1; }
   .shop-card .desc{ font-size:10px; line-height:1.3; color:var(--dim); display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
-  .shop-card .price{ font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--gold); margin-top:6px; font-weight:700; }
-  .shop-card .buy-btn{ width:fit-content; border:1px solid var(--gold); color:var(--gold); background:transparent; padding:5px; border-radius:2px; cursor:pointer; font-family:'JetBrains Mono',monospace; font-size:10px; font-weight:700; margin-top:5px; text-transform:uppercase; }
+  .shop-card-bottom{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
+  .shop-card .price{ font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--gold); margin-top:0; font-weight:700; }
+  .shop-card .buy-btn{ width:fit-content; border:1px solid var(--gold); color:var(--gold); background:transparent; padding:5px 8px; border-radius:2px; cursor:pointer; font-family:'JetBrains Mono',monospace; font-size:10px; font-weight:700; margin-top:0; text-transform:uppercase; flex-shrink:0; }
   .shop-card .buy-btn:hover:not(:disabled){ background:rgba(255,179,71,0.15); }
   .shop-card .buy-btn:disabled{ opacity:0.3; cursor:not-allowed; border-color:var(--dim); color:var(--dim); }
   #screen-shop .cards-wrap, #screen-events-shop .cards-wrap { display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; width:min(680px,94vw); max-height:62vh; overflow-y:auto; padding:4px 6px; }
@@ -192,16 +226,23 @@
   .stat-row .k{color:var(--dim);}
   .soul-gain{font-family:'JetBrains Mono',monospace; color:var(--soul); font-size:15px; margin-bottom:16px; z-index:2;}
   /* Fixed height for the same reason as .settings-wrap below: every branch's graph
-     is the same shape (5 nodes, same grid) so row-count itself can't jump, but
+     is the same shape (7 nodes, same grid) so row-count itself can't jump, but
      .screen still vertically centers this column, so a fixed height keeps tab
-     switches from nudging anything above it. */
-  .meta-wrap{width:640px; max-width:94vw; height:420px; max-height:70vh; max-height:70dvh; overflow-y:auto; overflow-x:hidden; z-index:2; padding:8px 4px; touch-action:pan-y;}
+     switches from nudging anything above it. Bumped 420->600px (POLISH_PLAN_2
+     item 4) for the taller vertical graph — max-height:70vh/70dvh is still the
+     floor's safety net on short viewports, unchanged. */
+  .meta-wrap{width:640px; max-width:94vw; height:600px; max-height:70vh; max-height:70dvh; overflow-y:auto; overflow-x:hidden; z-index:2; padding:8px 4px; touch-action:pan-y;}
   /* overflow-y left visible (not hidden) on purpose: a locked convergence node
      listing two prerequisites can wrap taller than its row band, and clipping it
      would hide the very text explaining why it's locked — .meta-wrap's own
      overflow-y:auto is the fallback if that pushes past the graph's box. */
-  .talent-graph-scroll{overflow-x:auto; overflow-y:visible; touch-action:pan-x;}
-  .talent-graph{position:relative; width:900px; height:390px; margin:6px auto 0; transition:width .25s, height .25s;}
+  /* Vertical layout (POLISH_PLAN_2 item 4) fits within .meta-wrap's own
+     overflow-y:auto in the overwhelming majority of cases (300x540 comfortably
+     under .meta-wrap's max-width:94vw / new height:600px) — this wrapper is kept
+     as a light safety net, not the primary scroll surface anymore (that was the
+     old wide horizontal layout's job). */
+  .talent-graph-scroll{overflow-x:visible; overflow-y:visible;}
+  .talent-graph{position:relative; width:300px; height:540px; margin:6px auto 0; transition:width .25s, height .25s;}
   .talent-lines{position:absolute; inset:0; width:100%; height:100%; pointer-events:none; overflow:visible;}
   .talent-lines line{stroke:var(--line); stroke-width:2; transition:stroke .2s, x1 .3s, y1 .3s, x2 .3s, y2 .3s;}
   .talent-lines line.unlocked{stroke:var(--accent);}
@@ -1778,6 +1819,10 @@ function weaponDef(wid){
   return player.evolvedWeapons && player.evolvedWeapons[wid] ? player.evolvedWeapons[wid] : WEAPONS[wid];
 }
 function weaponEvo(wid){ const d=weaponDef(wid); return (d && d.evoId) ? d.evoId : null; }
+// Single source of truth for "is this weapon currently disabled" — weaponFire()'s
+// own early-return (below) and the HUD's weapon-row indicator both need the exact
+// same condition, so this is shared rather than duplicated.
+function isWeaponDisabled(wid){ const t=player.disabledWeapons[wid]; return !!t && (t===Infinity || runTime<t); }
 // softMult/effDmgMult/effAtkSpeedMult/effGoldMult/effXpMult/elementalMultForTags
 // now live in the BALANCE MODEL section (end of PART 3, before PART 4) alongside
 // playerCP/enemyPressure, which need the exact same formulas to analyze a
@@ -1788,7 +1833,7 @@ const ARCANE_TYPES = new Set(["area","beam","aura","chain","trap"]);
 function typeDmgMult(def){ return ARCANE_TYPES.has(def.type) ? (player.stats.arcaneDmgMult||1) : 1; }
 
 function weaponFire(wid, lvl, dt){
-  if(player.disabledWeapons[wid] && (player.disabledWeapons[wid]===Infinity || runTime<player.disabledWeapons[wid])) return;
+  if(isWeaponDisabled(wid)) return;
   const def = weaponDef(wid);
   const evo = def.evoId || null;
   const dmgMult = effDmgMult() * elementalMultForTags(def.tags||[]) * (def.evoDmgMult||1)
@@ -2316,7 +2361,7 @@ function resetEnemyFields(o){
   o.mutArmor=0; o.mutExplode=false; o.mutRegen=0; o.mutVampiric=false;
   o.mutDasher=false; o.dashCd=undefined; o.dashState="idle"; o.dashDx=0; o.dashDy=0; o.dashT=0; o.dashTelegraph=null;
   o.mutBruiser=false; o.mutQuaker=false; o.quakeCd=undefined;
-  o.chaseTime=0;
+  o.chaseTime=0; o.leashCd=0;
   o.dead=false; o.vx=0; o.vy=0;
   return o;
 }
@@ -2727,6 +2772,31 @@ function updateEnemies(dt){
       if(doTick) e.aiTimer = AI_TICK_INTERVAL*rand(0.85,1.15);
     }
 
+    // Anti-kiting leash (POLISH_PLAN_2 item 3): a "chase"-brain enemy that's fallen
+    // so far behind it's nowhere near the visible view (not just off to one side —
+    // the same generous, camera/zoom-aware distance ordinary off-screen spawns
+    // already use) relocates ahead of the player's current heading instead of
+    // trudging back on foot via the rubber-band catch-up below (which can take up
+    // to 30s). Reusing offscreenSpawnRadius() means the jump is exactly as
+    // invisible as any normal spawn already is countless times per run — the
+    // player only ever sees the *result* (a fresh wall of enemies ahead), never
+    // the relocation itself, which is what keeps this feeling seamless instead of
+    // a visible teleport. Skipped for elite/boss (their own patterns matter more
+    // than never being outrun) and swarm (already an intentionally wide-orbiting
+    // "cloud", not a chase — see Round 8 history) and while mid-dash (skipBrain).
+    if(!skipBrain && e.brain==="chase"){
+      if(e.leashCd>0) e.leashCd-=dt;
+      if(doTick && (e.leashCd||0)<=0 && d>offscreenSpawnRadius(0)*2){
+        let fx=player.facingX, fy=player.facingY; if(!fx && !fy){ fx=0; fy=-1; }
+        const ang=Math.atan2(fy,fx)+rand(-0.55,0.55); // ~±31 deg spread so a cluster arrives as a loose wall, not stacked on one point
+        const dist=offscreenSpawnRadius(); // no margin arg = same rand(80,160) margin ordinary trickle spawns use
+        e.x=clamp(player.x+Math.cos(ang)*dist, e.radius, WORLD.w-e.radius);
+        e.y=clamp(player.y+Math.sin(ang)*dist, e.radius, WORLD.h-e.radius);
+        e.chaseTime=0; e.leashCd=rand(4,6);
+        continue; // repositioned this frame — dx/dy/d below are stale, resume normal behavior next frame
+      }
+    }
+
     if(skipBrain){
       // actively dashing this frame — position already updated above, nothing else to do
     } else if(e.brain==="phaseboss"){
@@ -3089,16 +3159,17 @@ function weightedPick(pool,n){
 }
 function renderCardEl(entry){
   const el=document.createElement('div'); el.className='card';
-  if(entry.kind==="unlock"){ const d=WEAPONS[entry.wid]; el.innerHTML=`<div class="icon">${d.icon}</div><div class="name">${d.name}</div><div class="desc">Unlocks a new weapon: ${d.type} type.</div><div class="tag">NEW WEAPON</div>`;
+  if(entry.kind==="unlock"){ const d=WEAPONS[entry.wid];
+    el.innerHTML=`<div class="card-head"><div class="icon">${d.icon}</div><div class="card-head-text"><div class="name">${d.name}</div><div class="tag">NEW WEAPON</div></div></div><div class="desc">Unlocks a new weapon: ${d.type} type.</div>`;
     el.onclick=()=>{ SFX.uiClick(); player.weapons[entry.wid]=1; logEvent(d.name+" acquired."); afterCardPicked(); }; }
   else if(entry.kind==="levelup"){ const d=WEAPONS[entry.wid]; const lvl=player.weapons[entry.wid];
-    el.innerHTML=`<div class="icon">${d.icon}</div><div class="name">${d.name} +1</div><div class="desc">Level ${lvl} → ${lvl+1}.</div><div class="tag">WEAPON LVL</div>`;
+    el.innerHTML=`<div class="card-head"><div class="icon">${d.icon}</div><div class="card-head-text"><div class="name">${d.name} +1</div><div class="tag">WEAPON LVL</div></div></div><div class="desc">Level ${lvl} → ${lvl+1}.</div>`;
     el.onclick=()=>{ SFX.uiClick(); player.weapons[entry.wid]++; logEvent(d.name+" leveled up."); performEvolution(entry.wid); afterCardPicked(); }; }
   else { const c=entry.card;
     el.className='card rarity-'+(c.rarity||'common');
     const stackNote = c.stackable ? ` <span style="color:var(--dim)">(${player.cardsTaken.filter(id=>id===c.id).length}/${c.maxStacks||99} taken)</span>` : "";
     const rarityTag = c.rarity && c.rarity!=="common" ? `<div class="rarity-label">${c.rarity}</div>` : "";
-    el.innerHTML=`${rarityTag}<div class="icon">${cardIcon(c.cat)}</div><div class="name">${c.name}</div><div class="desc">${c.desc}${stackNote}</div><div class="tag cat-${c.cat}">${c.cat.toUpperCase().replace('_',' ')}</div>`;
+    el.innerHTML=`${rarityTag}<div class="card-head"><div class="icon">${cardIcon(c.cat)}</div><div class="card-head-text"><div class="name">${c.name}</div><div class="tag cat-${c.cat}">${c.cat.toUpperCase().replace('_',' ')}</div></div></div><div class="desc">${c.desc}${stackNote}</div>`;
     el.onclick=()=>{ SFX.uiClick(); c.apply(player); player.cardsTaken.push(c.id); if(c.cat==="legendary") runStats.legendaryCardsTaken=(runStats.legendaryCardsTaken||0)+1; logEvent(c.name+" acquired."); afterCardPicked(); }; }
   return el;
 }
@@ -3128,6 +3199,16 @@ function showLevelUpCards(){
   const wrap=document.getElementById('cardsWrap'); wrap.innerHTML="";
   choices.forEach(entry=>wrap.appendChild(renderCardEl(entry)));
   show('screen-levelup');
+  levelUpKbdIndex=0; focusLevelUpCard(0);
+}
+// POLISH_PLAN_2 item 9 — WASD/arrows cycle a keyboard focus ring among the offered
+// cards, Space/Enter confirms via the *same* onclick the mouse path already uses
+// (see the keydown handler below) rather than duplicating the purchase logic.
+let levelUpKbdIndex=0;
+function focusLevelUpCard(idx){
+  const cards=document.getElementById('cardsWrap').children; if(!cards.length) return;
+  levelUpKbdIndex=((idx%cards.length)+cards.length)%cards.length;
+  for(let i=0;i<cards.length;i++) cards[i].classList.toggle('kbd-focus', i===levelUpKbdIndex);
 }
 
 // growth (default 1 = flat) compounds cost per purchase already made this run —
@@ -3172,8 +3253,8 @@ function renderShop(){
     const el=document.createElement('div'); el.className='card shop-card rarity-'+(item.rarity||'common')+(locked?' locked':'');
     if(locked){
       const achName = (ACHIEVEMENTS.find(a=>a.id===item.unlockAchievement)||{}).name || item.unlockAchievement;
-      el.innerHTML=`<div class="icon">🔒</div><div class="name">${item.name}</div><div class="desc">Requires achievement: ${achName}</div>
-        <div class="price" style="color:var(--dim)">LOCKED</div><button class="buy-btn" disabled>LOCKED</button>`;
+      el.innerHTML=`<div class="shop-card-top"><div class="icon">🔒</div><div class="shop-card-text"><div class="name">${item.name}</div><div class="desc">Requires achievement: ${achName}</div></div></div>
+        <div class="shop-card-bottom"><div class="price" style="color:var(--dim)">LOCKED</div><button class="buy-btn" disabled>LOCKED</button></div>`;
       wrap.appendChild(el); return;
     }
     const purchased=player.shopPurchases[item.id]||0; const maxed=purchased>=item.max;
@@ -3181,9 +3262,9 @@ function renderShop(){
     const wallet = item.curr==="gold"?player.gold:player.crystals;
     const canAfford = wallet>=cost;
     const rarityTag = item.rarity && item.rarity!=="common" ? `<div class="rarity-label">${item.rarity}</div>` : "";
-    el.innerHTML=`${rarityTag}<div class="icon">${item.icon}</div><div class="name">${item.name}</div><div class="desc">${item.desc}</div>
-      <div class="price" style="color:${maxed?'var(--dim)':item.curr==='gold'?'var(--gold)':'var(--crystal)'}">${maxed?"MAXED":cost+" "+(item.curr==="gold"?"GOLD":"CRYSTALS")}</div>
-      <button class="buy-btn" ${(!canAfford||maxed)?'disabled':''}>${maxed?"MAXED OUT":"BUY"}</button>`;
+    el.innerHTML=`${rarityTag}<div class="shop-card-top"><div class="icon">${item.icon}</div><div class="shop-card-text"><div class="name">${item.name}</div><div class="desc">${item.desc}</div></div></div>
+      <div class="shop-card-bottom"><div class="price" style="color:${maxed?'var(--dim)':item.curr==='gold'?'var(--gold)':'var(--crystal)'}">${maxed?"MAXED":cost+" "+(item.curr==="gold"?"GOLD":"CRYSTALS")}</div>
+      <button class="buy-btn" ${(!canAfford||maxed)?'disabled':''}>${maxed?"MAXED OUT":"BUY"}</button></div>`;
     el.querySelector('.buy-btn').onclick=()=>{
       if(maxed) return; if(item.curr==="gold"){ if(player.gold<cost) return; player.gold-=cost; } else { if(player.crystals<cost) return; player.crystals-=cost; }
       player.shopPurchases[item.id]=purchased+1; item.apply(player); SFX.uiClick(); SFX.pickupGold(); logEvent(`Bought ${item.name}`); renderShop(); refreshHud();
@@ -3321,8 +3402,14 @@ function renderMerchantCardOffers(){
   }
   offers.forEach(entry=>{
     const c = entry.card; const cost=costFor(c);
-    const el=document.createElement('div'); el.className='card shop-card';
-    el.innerHTML=`<div class="icon">${cardIcon(c.cat)}</div><div class="name">${c.name}</div><div class="desc">${c.desc}</div><div class="price">${cost} GOLD</div><button class="buy-btn" ${player.gold<cost?'disabled':''}>BUY</button>`;
+    // Same shop-card-top/-bottom layout as renderShop() (POLISH_PLAN_2 items 5/7 —
+    // this function has its own innerHTML, doesn't reuse renderShop()'s, so the
+    // redesign there didn't carry over here automatically) plus rarity, which this
+    // offer screen never showed at all despite CARDS entries already having it.
+    const el=document.createElement('div'); el.className='card shop-card rarity-'+(c.rarity||'common');
+    const rarityTag = c.rarity && c.rarity!=="common" ? `<div class="rarity-label">${c.rarity}</div>` : "";
+    el.innerHTML=`${rarityTag}<div class="shop-card-top"><div class="icon">${cardIcon(c.cat)}</div><div class="shop-card-text"><div class="name">${c.name}</div><div class="desc">${c.desc}</div></div></div>
+      <div class="shop-card-bottom"><div class="price">${cost} GOLD</div><button class="buy-btn" ${player.gold<cost?'disabled':''}>BUY</button></div>`;
     el.querySelector('.buy-btn').onclick=()=>{
       if(player.gold<cost) return; player.gold-=cost; c.apply(player); player.cardsTaken.push(c.id);
       if(c.cat==='legendary') runStats.legendaryCardsTaken=(runStats.legendaryCardsTaken||0)+1;
@@ -3475,12 +3562,50 @@ function applyRunStatsIncrement(final){
   save.lifetime.bestTime=Math.max(save.lifetime.bestTime,runTime); save.lifetime.bestLevel=Math.max(save.lifetime.bestLevel,player.level);
   if(final){ save.lifetime.runs++; save.lifetime.deaths++; }
 }
-function snapshotPlayer(p){ return JSON.parse(JSON.stringify({ x:p.x,y:p.y,radius:p.radius,hp:p.hp,maxHp:p.maxHp,level:p.level,xp:p.xp,xpNext:p.xpNext,gold:p.gold,crystals:p.crystals,
-  weapons:p.weapons,stats:p.stats,passives:p.passives,cardsTaken:p.cardsTaken,synergiesActive:p.synergiesActive,shopPurchases:p.shopPurchases,hasRevive:p.hasRevive,extraWeaponSlots:p.extraWeaponSlots,character:p.character })); }
+// JSON.stringify(Infinity) silently becomes null (not an error, so it's easy to
+// miss) — anything with a permanent/undying duration (Shrine of Silence's
+// duration:Infinity disable, most summon minions' life:Infinity) would quietly
+// lose that "permanent" meaning across an autosave/resume without this. Generic
+// (walks arrays/objects) so every save-system field below can reuse it instead of
+// each needing its own hand-rolled sentinel.
+function packInfinity(v){
+  if(v===Infinity) return "__inf__";
+  if(Array.isArray(v)) return v.map(packInfinity);
+  if(v && typeof v==="object"){ const o={}; for(const k in v) o[k]=packInfinity(v[k]); return o; }
+  return v;
+}
+function unpackInfinity(v){
+  if(v==="__inf__") return Infinity;
+  if(Array.isArray(v)) return v.map(unpackInfinity);
+  if(v && typeof v==="object"){ const o={}; for(const k in v) o[k]=unpackInfinity(v[k]); return o; }
+  return v;
+}
+// disabledWeapons is included so a "permanently" disabled weapon (e.g. Shrine of
+// Silence's downside) actually stays disabled across an autosave/resume — it
+// used to only live on the in-memory player object, so continueRun() silently
+// un-disabled it while the event's +2 passive slots upside (stored in stats,
+// already saved) stuck around. fusionsAvailable is *not* saved here on purpose —
+// checkFusions() cheaply re-derives it from weapon levels (which are saved) on
+// every continueRun(), so persisting it separately would just be redundant state
+// that could drift.
+function snapshotPlayer(p){
+  return JSON.parse(JSON.stringify({ x:p.x,y:p.y,radius:p.radius,hp:p.hp,maxHp:p.maxHp,level:p.level,xp:p.xp,xpNext:p.xpNext,gold:p.gold,crystals:p.crystals,
+  weapons:p.weapons,stats:p.stats,passives:p.passives,cardsTaken:p.cardsTaken,synergiesActive:p.synergiesActive,shopPurchases:p.shopPurchases,hasRevive:p.hasRevive,extraWeaponSlots:p.extraWeaponSlots,character:p.character,disabledWeapons:packInfinity(p.disabledWeapons) }));
+}
+// World-state save (POLISH_PLAN_2 item 2) — deliberately narrow scope: orbs/
+// zones/minions/warnedBossIds are cheap flat data (packInfinity handles most
+// summon minions' life:Infinity). enemies[]/bullets[] are NOT included — bullets
+// carry a Set (b.hitset) needing its own conversion, and serializing a full
+// high-density enemy roster on every autosave tick risks a frame hitch that
+// hasn't been profiled; see POLISH_PLAN_2.md for the full reasoning. particles/
+// chainArcs/novaPulses are pure sub-second VFX, not worth persisting at all.
 async function doAutosave(showIndicator){
   if((state!=='playing'&&state!=='paused')||!player) return;
   applyRunStatsIncrement(false);
-  save.activeRun = { player:snapshotPlayer(player), runTime, killCount, appliedKills, appliedGold, eliteKillsRun, bossKilledRun, appliedEliteKills, appliedBossFolded, bossesSpawned:Array.from(spawnedBossIds), runStatsSnap:JSON.parse(JSON.stringify(runStats)), savedAt:Date.now() };
+  save.activeRun = { player:snapshotPlayer(player), runTime, killCount, appliedKills, appliedGold, eliteKillsRun, bossKilledRun, appliedEliteKills, appliedBossFolded,
+    bossesSpawned:Array.from(spawnedBossIds), bossesWarned:Array.from(warnedBossIds),
+    orbs:packInfinity(orbs), zones:packInfinity(zones), minions:packInfinity(minions),
+    runStatsSnap:JSON.parse(JSON.stringify(runStats)), savedAt:Date.now() };
   await persistSave(); if(showIndicator) flashSavedIndicator();
 }
 function flashSavedIndicator(){ const el=document.getElementById('saveIndicator'); if(!el) return; el.classList.remove('show'); void el.offsetWidth; el.classList.add('show'); }
@@ -3610,12 +3735,18 @@ function refreshHud(){
   const now=runTime; dpsWindow=dpsWindow.filter(x=>now-x.t<3);
   const dps=dpsWindow.reduce((s,x)=>s+x.dmg,0)/3;
   document.getElementById('dpsVal').textContent=Math.round(dps)+" dps";
-  const weaponSig=Object.keys(player.weapons).map(wid=>wid+':'+player.weapons[wid]+(player.evolvedWeapons&&player.evolvedWeapons[wid]?'e':'')).join(',');
+  // Disabled-state is folded into the signature (not just weapon/level/evolved) so
+  // a *temporary* disable (jam action, non-Infinity duration) expiring on its own
+  // mid-run still triggers a re-render — Infinity ones (Shrine of Silence) never
+  // change back so they'd be covered either way, but the check is the same either way.
+  const weaponSig=Object.keys(player.weapons).map(wid=>wid+':'+player.weapons[wid]+(player.evolvedWeapons&&player.evolvedWeapons[wid]?'e':'')+(isWeaponDisabled(wid)?'d':'')).join(',');
   if(weaponSig!==lastWeaponSig){
     lastWeaponSig=weaponSig; const row=document.getElementById('weaponRow'); row.innerHTML="";
     for(const wid of Object.keys(player.weapons)){
-      const def=weaponDef(wid); const el=document.createElement('div'); el.className='wpn-icon'+(def.evolved?' evolved':'');
-      el.innerHTML=`${def.icon}<span class="wlvl">${player.weapons[wid]}</span>`; row.appendChild(el);
+      const def=weaponDef(wid); const el=document.createElement('div'); el.className='wpn-icon'+(def.evolved?' evolved':'')+(isWeaponDisabled(wid)?' disabled':'');
+      el.innerHTML=`${def.icon}<span class="wlvl">${player.weapons[wid]}</span>`;
+      if(isWeaponDisabled(wid)) el.title="Disabled"+(player.disabledWeapons[wid]===Infinity?" (permanent)":"");
+      row.appendChild(el);
     }
     const prow=document.getElementById('passiveRow'); prow.innerHTML="";
     for(const pid of player.passives){ const d=PASSIVES.find(x=>x.id===pid); if(!d) continue; const el=document.createElement('div'); el.className='psv-icon'; el.title=d.name; el.textContent=d.icon; prow.appendChild(el); }
@@ -3782,11 +3913,19 @@ function render(){
   }
   for(const m of minions){
     // Colored per-summon-weapon (Necro Staff/Spirit Wolves/Turret Deployer/Swarm Hive used to all
-    // render as the same flat green dot) and topped with the weapon's own icon, already stored on
-    // the minion but never actually drawn — so each summon type reads as itself at a glance.
+    // render as the same flat green dot). POLISH_PLAN_2 item 8: the weapon's own icon (already
+    // stored on the minion) is now the minion's actual body, sized to its radius, instead of a
+    // small 12px label floating above a plain colored circle — a summon now reads as *itself* at
+    // a glance, not as an anonymous dot with a tiny badge.
     const mc = m.weaponId==="raised" ? "#c8c8d8" : weaponColor(m.weaponId);
-    ctx2d.beginPath(); ctx2d.fillStyle=mc; ctx2d.shadowColor=mc; ctx2d.shadowBlur=glow(8); ctx2d.arc(m.x,m.y,m.radius,0,7); ctx2d.fill();
-    if(m.icon && quality!=='low'){ ctx2d.font="12px sans-serif"; ctx2d.textAlign="center"; ctx2d.shadowBlur=0; ctx2d.fillText(m.icon,m.x,m.y-m.radius-6); }
+    ctx2d.shadowColor=mc; ctx2d.shadowBlur=glow(8);
+    if(m.icon && quality!=='low'){
+      ctx2d.font=(m.radius*2)+"px sans-serif"; ctx2d.textAlign="center";
+      ctx2d.fillText(m.icon,m.x,m.y+m.radius*0.35);
+    } else {
+      ctx2d.beginPath(); ctx2d.fillStyle=mc; ctx2d.arc(m.x,m.y,m.radius,0,7); ctx2d.fill();
+    }
+    ctx2d.shadowBlur=0;
   }
   ctx2d.shadowBlur=0;
   for(const e of enemies){
@@ -4183,14 +4322,24 @@ function continueRun(){
     passives:snap.player.passives||[], cardsTaken:snap.player.cardsTaken||[], synergiesActive:snap.player.synergiesActive||[],
     fusionsAvailable:snap.player.fusionsAvailable||[],
     shopPurchases:Object.assign({},snap.player.shopPurchases||{}), hasRevive:!!snap.player.hasRevive, extraWeaponSlots:snap.player.extraWeaponSlots||0,
-    disabledWeapons:{}, shield:0, character:snap.player.character||"warrior", momentumStacks:0, evolvedWeapons:{},
+    disabledWeapons:unpackInfinity(snap.player.disabledWeapons||{}), shield:0, character:snap.player.character||"warrior", momentumStacks:0, evolvedWeapons:{},
     lifestealHealedThisSec:0, lifestealWindowStart:0, facingX:0, facingY:-1, hitFlash:0, hurtFlash:0,
     abilities:{ dash:{cd:0,charges:1,maxCharges:1,active:false,t:0,dx:0,dy:1}, heal:{cd:0} } };
   for(const wid of Object.keys(player.weapons)) performEvolution(wid);
   checkFusions();
-  enemies=[]; bullets=[]; orbs=[]; particles=[]; floaters=[]; zones=[]; minions=[]; pendingShots=[]; chainArcs=[]; novaPulses=[];
+  // orbs/zones/minions restored from the snapshot (POLISH_PLAN_2 item 2) instead of
+  // wiped — enemies[]/bullets[]/particles[]/pendingShots[]/chainArcs[]/novaPulses[]
+  // still reset (not saved, see doAutosave's comment).
+  enemies=[]; bullets=[]; orbs=unpackInfinity(snap.orbs||[]); particles=[]; floaters=[];
+  zones=unpackInfinity(snap.zones||[]); minions=unpackInfinity(snap.minions||[]); pendingShots=[]; chainArcs=[]; novaPulses=[];
   runTime=snap.runTime||0; killCount=snap.killCount||0; dpsWindow=[]; lastSpawn=0; eliteTimer=0; keys={};
-  spawnedBossIds=new Set(snap.bossesSpawned||[]); warnedBossIds=new Set(snap.bossesSpawned||[]);
+  spawnedBossIds=new Set(snap.bossesSpawned||[]);
+  // Previously seeded from bossesSpawned (a copy-paste of the line above) as a
+  // "warned implies later spawned" approximation — worked except for the window
+  // after a warning fires but before the boss actually spawns, where a save/resume
+  // there would replay the warning once the boss finally spawned. Now saved as its
+  // own field (doAutosave) so this is exact instead of an approximation.
+  warnedBossIds=new Set(snap.bossesWarned||snap.bossesSpawned||[]);
   appliedKills=snap.appliedKills!=null?snap.appliedKills:killCount; appliedGold=snap.appliedGold!=null?snap.appliedGold:Math.floor(player.gold);
   eliteKillsRun=snap.eliteKillsRun||0; bossKilledRun=!!snap.bossKilledRun;
   appliedEliteKills=snap.appliedEliteKills!=null?snap.appliedEliteKills:eliteKillsRun; appliedBossFolded=snap.appliedBossFolded!=null?snap.appliedBossFolded:false;
@@ -4243,8 +4392,15 @@ function renderTalentTree(activeBranch){
   const wrap=document.getElementById('metaWrap'); wrap.innerHTML="";
   const scroll=document.createElement('div'); scroll.className='talent-graph-scroll';
   const graph=document.createElement('div'); graph.className='talent-graph';
-  const COL_W=145, ROW_H=125, NODE_W=58;
-  const cellPos=(col,row)=>({left:(col-1)*COL_W+(COL_W-NODE_W)/2, top:(row-1)*ROW_H+(ROW_H-NODE_W)/2});
+  // POLISH_PLAN_2 item 4 — transposed from the original left-to-right layout: the
+  // long chain axis (TALENT_NODE_LAYOUT's `col`, 6 steps root->final) now maps to
+  // the *vertical* screen axis (STEP_Y) instead of horizontal, and the branch-
+  // spread axis (`row`, 3 steps) maps to horizontal (STEP_X) — data unchanged,
+  // only which screen axis each one draws along. Smaller node/step sizes than the
+  // old horizontal layout so the now-tall graph still fits without scrolling on
+  // most screens (.meta-wrap's own height was bumped to match, see its CSS rule).
+  const STEP_X=95, STEP_Y=88, NODE_W=46;
+  const cellPos=(col,row)=>({left:(row-1)*STEP_X+(STEP_X-NODE_W)/2, top:(col-1)*STEP_Y+(STEP_Y-NODE_W)/2});
   const lines=TALENT_STAT_LINES[activeBranch];
   const svgNS="http://www.w3.org/2000/svg";
   const svg=document.createElementNS(svgNS,"svg"); svg.setAttribute('class','talent-lines');
@@ -4300,9 +4456,13 @@ function renderTalentTree(activeBranch){
           const newlyId=activeBranch+"_"+lines[newlyIdx].key, freshNew=w.querySelector(`[data-node-id="${newlyId}"]`);
           if(freshNew){
             freshNew.classList.add('just-unlocked');
-            const scrollEl=w.querySelector('.talent-graph-scroll');
-            const targetLeft=freshNew.offsetLeft-scrollEl.clientWidth/2+freshNew.offsetWidth/2;
-            scrollEl.scrollTo({left:Math.max(0,targetLeft), behavior:'smooth'});
+            // #metaWrap itself is the scroll surface now (vertical layout — see
+            // .talent-graph-scroll's CSS comment); getBoundingClientRect() diff
+            // rather than offsetTop, since freshNew's offsetParent is .talent-graph,
+            // not metaWrap, through an extra nested wrapper.
+            const wrapRect=w.getBoundingClientRect(), nodeRect=freshNew.getBoundingClientRect();
+            const targetTop=w.scrollTop+(nodeRect.top-wrapRect.top)-w.clientHeight/2+nodeRect.height/2;
+            w.scrollTo({top:Math.max(0,targetTop), behavior:'smooth'});
           }
         }
       });
@@ -4390,7 +4550,13 @@ const CODE_TO_WASD = {KeyW:'w',KeyA:'a',KeyS:'s',KeyD:'d'};
 window.addEventListener('keydown',e=>{ keys[e.key.toLowerCase()]=true; const wasd=CODE_TO_WASD[e.code]; if(wasd) keys[wasd]=true;
   if(e.key==='Escape' && ["playing","paused","shop","ingame-stats"].includes(state)){ if(state==='shop'||state==='ingame-stats'){ hideAll(); setState('playing'); MUSIC.start(); } else togglePause(); }
   if(e.code==='Space' && state==='playing'){ e.preventDefault(); tryDash(); }
-  if(e.key==='Shift' && state==='playing'){ tryFastHeal(); } });
+  if(e.key==='Shift' && state==='playing'){ tryFastHeal(); }
+  if(state==='levelup'){
+    const k=e.key.toLowerCase();
+    if(k==='a'||k==='arrowleft'||k==='w'||k==='arrowup'){ e.preventDefault(); focusLevelUpCard(levelUpKbdIndex-1); }
+    else if(k==='d'||k==='arrowright'||k==='s'||k==='arrowdown'){ e.preventDefault(); focusLevelUpCard(levelUpKbdIndex+1); }
+    else if(e.code==='Space'||e.key==='Enter'){ e.preventDefault(); const cards=document.getElementById('cardsWrap').children; if(cards[levelUpKbdIndex]) cards[levelUpKbdIndex].click(); }
+  } });
 window.addEventListener('keyup',e=>{ keys[e.key.toLowerCase()]=false; const wasd=CODE_TO_WASD[e.code]; if(wasd) keys[wasd]=false; });
 
 /* =========================================================================
