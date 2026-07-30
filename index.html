@@ -143,6 +143,13 @@
   .menu-resources .res-chip{font-family:'JetBrains Mono',monospace; font-size:12.5px; color:var(--text);}
   .menu-resources .lbl{color:var(--dim); font-size:9px; letter-spacing:1.5px; margin-right:1px;}
   #hud{position:absolute; inset:0; z-index:5; pointer-events:none; font-family:'Rajdhani',sans-serif;}
+  /* PERFORMANCE_AUDIT — toggleable debug overlay (task #34): FPS/frame-time + live
+     entity counts, so future optimization claims can be measured on a real run
+     instead of judged by feel. Off by default, opt-in via Settings > Video. */
+  #debugOverlay{position:fixed; top:calc(8px + var(--safe-top)); left:calc(8px + var(--safe-left)); z-index:9999;
+    pointer-events:none; font-family:'JetBrains Mono',monospace; font-size:11px; line-height:1.5;
+    color:#8fffcf; background:rgba(8,10,14,0.72); border:1px solid rgba(143,255,207,0.35); border-radius:6px;
+    padding:6px 9px; white-space:pre; text-shadow:none;}
   .hud-top{position:absolute; top:0; left:0; right:0; z-index:8; display:flex; justify-content:space-between; align-items:flex-start;
     padding:calc(16px + var(--safe-top)) calc(20px + var(--safe-right)) 16px calc(20px + var(--safe-left));}
   .hp-wrap{width:250px;}
@@ -796,6 +803,7 @@
           <div class="seg-control" id="vidDensity"><button class="seg-btn" data-val="low">Low</button><button class="seg-btn" data-val="medium">Medium</button><button class="seg-btn" data-val="high">High</button></div></div>
         <div class="setting-row"><div><div class="s-name">Screen Shake</div><div class="s-desc">Camera shake on hits and impacts.</div></div><div class="toggle-switch" id="vidShake"><div class="knob"></div></div></div>
         <div class="setting-row"><div><div class="s-name">Fullscreen</div><div class="s-desc">Expand the game to fill your entire screen.</div></div><button class="buy-btn" id="fullscreenToggleBtn" style="border-color:var(--accent); color:var(--accent);">ENTER FULLSCREEN</button></div>
+        <div class="setting-row"><div><div class="s-name">Debug Overlay</div><div class="s-desc">Shows FPS, frame time, and live entity counts — useful for diagnosing slowdowns.</div></div><div class="toggle-switch" id="vidDebugOverlay"><div class="knob"></div></div></div>
       </div>
       <div class="settings-pane hidden" id="pane-audio">
         <div class="setting-row"><div><div class="s-name">SFX Volume</div><div class="s-desc">Volume for hit, weapon and UI sound effects.</div></div><div class="slider-row"><input type="range" id="audioVolume" min="0" max="100" value="100"><span class="slider-val" id="audioVolumeVal">100</span></div></div>
@@ -813,6 +821,7 @@
 
 <div id="achToastLayer"></div>
 <div id="gameTooltip"></div>
+<div id="debugOverlay" class="hidden"></div>
 <div id="bossWarning"><div class="bw-vignette"></div><div class="bw-text">⚠ INCOMING ⚠</div><div class="bw-name" id="bossWarningName">THE DRAGON</div></div>
 
 <script>
@@ -1937,7 +1946,7 @@ const DEFAULT_SAVE = { soul:0, artifacts:0, talentLevels:{}, armoryUnlocks:{},
   lifetime:{ runs:0, kills:0, deaths:0, bestTime:0, bestLevel:0, totalGold:0, totalSoul:0, eliteKills:0, bossKills:0,
     charactersCompleted:[], uniqueBossesKilled:[], uniqueElitesKilled:[] },
   activeRun:null, achievements:{ unlocked:{} },
-  settings:{ muted:false, sfxVolume:1, musicVolume:0.35, controlMode:'auto', haptics:true, quality:'high', enemyDensity:'high', screenShake:true } };
+  settings:{ muted:false, sfxVolume:1, musicVolume:0.35, controlMode:'auto', haptics:true, quality:'high', enemyDensity:'high', screenShake:true, debugOverlay:false } };
 let save = JSON.parse(JSON.stringify(DEFAULT_SAVE));
 
 /* ---- Armory: a real spending sink for the previously-unused `save.artifacts`
@@ -2035,7 +2044,19 @@ const WORLD = { w:4600, h:4600 };
 
 let player, enemies, bullets, orbs, particles, floaters, zones, minions;
 let camera = {x:0,y:0,zoom:null,lagX:0,lagY:0};
-let runTime=0, killCount=0, dpsWindow=[];
+let runTime=0, killCount=0, dpsWindow=[], dpsWindowStart=0, dpsWindowSum=0;
+// PERFORMANCE_AUDIT item 2.3 — dpsWindow entries are always pushed in
+// increasing runTime order, so expiry only ever happens from the front: a
+// running sum + a start-index into the same array (advanced past expired
+// entries, subtracting as it goes) replaces the old filter()+reduce() pair
+// that reallocated a new array and rescanned the whole window every frame.
+// The consumed prefix is periodically sliced off so the backing array
+// doesn't grow forever across a long endless run.
+function dpsWindowSumFor(now){
+  while(dpsWindowStart<dpsWindow.length && now-dpsWindow[dpsWindowStart].t>=3){ dpsWindowSum-=dpsWindow[dpsWindowStart].dmg; dpsWindowStart++; }
+  if(dpsWindowStart>512 && dpsWindowStart*2>=dpsWindow.length){ dpsWindow=dpsWindow.slice(dpsWindowStart); dpsWindowStart=0; }
+  return dpsWindowSum;
+}
 let state = "menu";
 let lastSpawn=0, eliteTimer=0;
 let keys={};
@@ -2100,7 +2121,7 @@ function startRun(){
   player = newPlayer(selectedCharacter);
   enemies=[]; bullets=[]; orbs=[]; particles=[]; floaters=[]; zones=[]; minions=[]; pendingShots=[];
   chainArcs=[]; novaPulses=[]; camera.zoom=null; camera.lagX=0; camera.lagY=0;
-  runTime=0; killCount=0; dpsWindow=[]; lastPhaseName=null; nextHudGlitchAt=null;
+  runTime=0; killCount=0; dpsWindow=[]; dpsWindowStart=0; dpsWindowSum=0; lastPhaseName=null; nextHudGlitchAt=null;
   lastSpawn=0; eliteTimer=0; keys={};
   spawnedBossIds=new Set(); warnedBossIds=new Set();
   appliedKills=0; appliedGold=0; autosaveTimer=AUTOSAVE_INTERVAL;
@@ -2287,7 +2308,7 @@ function weaponFire(wid, lvl, dt){
     const tx = clamp(player.x+Math.cos(ang)*dist,20,WORLD.w-20), ty=clamp(player.y+Math.sin(ang)*dist,20,WORLD.h-20);
     // Bear Trap Array: auto-resetting traps that also root (heavy slow) enemies caught in them.
     const rooting = evo==="bear_trap_array";
-    zones.push({x:tx,y:ty,radius,dmg,life: rooting?9999:6,maxLife: rooting?9999:6,tickCd:0,tag:wid==="tesla_coil"?"lightning":"physical",ownerWeapon:wid,jumps:def.base.jumps||0,root:rooting});
+    spawnZone({x:tx,y:ty,radius,dmg,life: rooting?9999:6,maxLife: rooting?9999:6,tickCd:0,tag:wid==="tesla_coil"?"lightning":"physical",ownerWeapon:wid,jumps:def.base.jumps||0,root:rooting});
     if(wid==="tesla_coil") SFX.chainZap(); else SFX.novaBurst();
     return;
   }
@@ -2300,7 +2321,7 @@ function weaponFire(wid, lvl, dt){
       const ang = rand(0,Math.PI*2);
       // Siege Battery: turrets become permanent (Infinity life instead of the normal 8s).
       const permanentTurret = wid==="turret_deployer" && evo==="siege_battery";
-      minions.push({ x:player.x+Math.cos(ang)*40, y:player.y+Math.sin(ang)*40, weaponId:wid, dmg, hp:30+lvl*6,
+      spawnMinion({ x:player.x+Math.cos(ang)*40, y:player.y+Math.sin(ang)*40, weaponId:wid, dmg, hp:30+lvl*6,
         speed: wid==="turret_deployer"?0:200*(evo==="spirit_pack_alpha"?1.15:1), atkCd:0,
         life: wid==="turret_deployer" ? (permanentTurret?Infinity:8*(player.stats.summonDurationMult||1)) : Infinity,
         radius:10, icon:def.icon });
@@ -2322,7 +2343,7 @@ function weaponFire(wid, lvl, dt){
       if(wid==="poison_cloud") applyPoison(e, dmg*0.3, def.base.lingerLife||3);
     });
     // Inferno: leaves a persistent burning zone that keeps igniting anyone standing in it.
-    if(wid==="fire_nova" && evo==="inferno") zones.push({x:player.x,y:player.y,radius,dmg:dmg*0.35,life:5,maxLife:5,tickCd:0,tag:"burnzone",ownerWeapon:wid});
+    if(wid==="fire_nova" && evo==="inferno") spawnZone({x:player.x,y:player.y,radius,dmg:dmg*0.35,life:5,maxLife:5,tickCd:0,tag:"burnzone",ownerWeapon:wid});
     // Plague Zone: poison cloud spreads without limit (handled generically via poisonSpread-like logic on poison ticks, see applyPoison/updateEnemies)
     if(wid==="poison_cloud" && evo==="plague_zone") player.stats.poisonSpread = true;
     // Absolute Zero: enemies under 30% HP caught in the field are fully frozen (near-total slow).
@@ -2418,7 +2439,7 @@ function spawnBullet(props){
   if(bullets.length>=MAX_BULLETS) return null;
   const b = bulletPool.pop() || {};
   b.traveled=0; b.returning=false; b.weaponId=undefined; b.pierce=0; b.forceCrit=false; b.detonate=false;
-  b.shape=undefined; b.evolved=false;
+  b.shape=undefined; b.evolved=false; b.homing=undefined; b.orbit=null; b.wobble=undefined; b.dead=false;
   Object.assign(b, props);
   if(b.owner==="player"){ if(!b.hitset) b.hitset=new Set(); else b.hitset.clear(); }
   bullets.push(b);
@@ -2613,7 +2634,7 @@ function dealDamage(enemy, dmg, weaponId){
     if(enemy.shield>0){ const absorbed=Math.min(enemy.shield,dmg); enemy.shield-=absorbed; dmg-=absorbed; if(dmg<=0){ spawnFloater(enemy.x,enemy.y-10,"BLOCK","#7ee0ff"); return; } }
     dmg = Math.max(0, Math.min(dmg, 999999)); // sanity clamp against NaN/Infinity from broken combos
     enemy.hp -= dmg; enemy.hitFlash=1;
-    dpsWindow.push({t:runTime,dmg});
+    dpsWindow.push({t:runTime,dmg}); dpsWindowSum+=dmg;
     spawnFloater(enemy.x,enemy.y-10,Math.round(dmg), crit?"#ffe15c":(isEliteOrBoss?"#ffb347":"#fff"));
     if(player.stats.lifesteal>0){
       if(runTime-player.lifestealWindowStart>=1){ player.lifestealWindowStart=runTime; player.lifestealHealedThisSec=0; }
@@ -2671,8 +2692,8 @@ function killEnemy(enemy){
   spawnParticle(enemy.x,enemy.y,enemy.color,10);
   if(enemy.id==="imp" && !enemy.isSplit){ for(let i=0;i<2;i++){ const ang=rand(0,Math.PI*2); spawnEnemy("imp",{x:enemy.x+Math.cos(ang)*14,y:enemy.y+Math.sin(ang)*14},{isSplit:true,hpMult:0.4,radiusMult:0.65}); } }
   if(enemy.special==="explodeOnDeath"){ for(let i=0;i<4;i++){ const ang=(i/4)*Math.PI*2; spawnEnemy("rat_swarm",{x:enemy.x+Math.cos(ang)*30,y:enemy.y+Math.sin(ang)*30}); } logEvent("It explodes into a swarm!"); }
-  if(enemy.mutExplode){ spawnParticle(enemy.x,enemy.y,"#ff9d4d",14); zones.push({x:enemy.x,y:enemy.y,radius:75,dmg:enemy.dmg*1.2,life:0.35,maxLife:0.35,tickCd:0,tag:"boss",targetsPlayer:true}); }
-  if(player.stats.raiseDeadChance>0 && Math.random()<player.stats.raiseDeadChance){ minions.push({x:enemy.x,y:enemy.y,weaponId:"raised",dmg:enemy.dmg*0.5,hp:20,speed:180,atkCd:0,life:12,radius:9,icon:"💀"}); }
+  if(enemy.mutExplode){ spawnParticle(enemy.x,enemy.y,"#ff9d4d",14); spawnZone({x:enemy.x,y:enemy.y,radius:75,dmg:enemy.dmg*1.2,life:0.35,maxLife:0.35,tickCd:0,tag:"boss",targetsPlayer:true}); }
+  if(player.stats.raiseDeadChance>0 && Math.random()<player.stats.raiseDeadChance){ spawnMinion({x:enemy.x,y:enemy.y,weaponId:"raised",dmg:enemy.dmg*0.5,hp:20,speed:180,atkCd:0,life:12,radius:9,icon:"💀"}); }
   if(enemy.burning && player.stats.burnExplode){ forEachEnemyNear(enemy.x,enemy.y,80,e2=>{ if(!e2.dead){ e2.burning=true; e2.burnT=2; e2.burnDps=enemy.burnDps||4; } }); }
   if(enemy.slowed && player.stats.frostShatter){ forEachEnemyNear(enemy.x,enemy.y,90,e2=>{ if(e2!==enemy) queueSecondaryDamage(e2,20,null); }); }
   // Inferno Build synergy: burning enemies spread their burn to nearby enemies on death.
@@ -2939,7 +2960,7 @@ function bossCtx(dt){
     summon:(b,ids,count)=>{ for(let i=0;i<count;i++){ if(enemies.length<dynamicMaxEnemies()){ const ang=rand(0,Math.PI*2); spawnEnemy(pick(ids),{x:b.x+Math.cos(ang)*50,y:b.y+Math.sin(ang)*50}); } } },
     teleportAway:(b,dist)=>{ const ang=rand(0,Math.PI*2); b.x=clamp(b.x+Math.cos(ang)*dist,b.radius,WORLD.w-b.radius); b.y=clamp(b.y+Math.sin(ang)*dist,b.radius,WORLD.h-b.radius); spawnParticle(b.x,b.y,b.color,14); },
     teleportBehindAndStrike:(b)=>{ const ang=rand(0,Math.PI*2); b.x=clamp(player.x+Math.cos(ang)*(b.radius+player.radius+20),b.radius,WORLD.w-b.radius); b.y=clamp(player.y+Math.sin(ang)*(b.radius+player.radius+20),b.radius,WORLD.h-b.radius); spawnParticle(b.x,b.y,b.color,10); damagePlayer(b.dmg*1.1); },
-    zoneDenial:(b,dmgPerTick,radius,duration)=>{ zones.push({x:player.x,y:player.y,radius,dmg:dmgPerTick,life:duration,maxLife:duration,tickCd:0,tag:"boss",targetsPlayer:true}); },
+    zoneDenial:(b,dmgPerTick,radius,duration)=>{ spawnZone({x:player.x,y:player.y,radius,dmg:dmgPerTick,life:duration,maxLife:duration,tickCd:0,tag:"boss",targetsPlayer:true}); },
     sweepLaser:(b,range)=>{ for(let a=0;a<10;a++){ const ang=(a/10)*Math.PI*2; spawnBullet({owner:"enemy",x:b.x,y:b.y,vx:Math.cos(ang)*260,vy:Math.sin(ang)*260,dmg:b.dmg*0.5,radius:6,life:range/260,color:"#8a8f9e",pierce:0}); } },
     deployTurrets:(b,count)=>{ for(let i=0;i<count;i++){ if(enemies.length<dynamicMaxEnemies()){ const ang=(i/count)*Math.PI*2; const t=spawnEnemy("skeleton_archer",{x:b.x+Math.cos(ang)*70,y:b.y+Math.sin(ang)*70}); if(t){ t.speed=0; t.hp=t.maxHp=30; t.color="#8a8f9e"; } } } },
     grantShield:(b,amount)=>{ b.shield=(b.shield||0)+amount; },
@@ -3047,10 +3068,10 @@ function updateEliteSpecial(e,dt){
     case 'enrage': if(e.hp/e.maxHp<0.3 && !e.enraged){ e.enraged=true; e.speed*=1.3; e.dmg*=1.15; } break;
     case 'teleport': e.teleCd=(e.teleCd??rand(3,5))-dt; if(e.teleCd<=0){ const ang=rand(0,Math.PI*2); e.x=clamp(player.x+Math.cos(ang)*250,e.radius,WORLD.w-e.radius); e.y=clamp(player.y+Math.sin(ang)*250,e.radius,WORLD.h-e.radius); e.teleCd=rand(4,6); spawnParticle(e.x,e.y,e.color,8);} break;
     case 'summonAdds': e.sumCd=(e.sumCd??rand(4,6))-dt; if(e.sumCd<=0 && enemies.length<dynamicMaxEnemies()){ spawnEnemy(pick(["plague_rat","bat"]),{x:e.x+rand(-30,30),y:e.y+rand(-30,30)}); e.sumCd=rand(5,7);} break;
-    case 'periodicStrike': e.strikeCd=(e.strikeCd??2)-dt; if(e.strikeCd<=0){ zones.push({x:player.x,y:player.y,radius:70,dmg:e.dmg*0.5,life:0.6,maxLife:0.6,tickCd:0,tag:"boss",targetsPlayer:true}); e.strikeCd=3.2;} break;
+    case 'periodicStrike': e.strikeCd=(e.strikeCd??2)-dt; if(e.strikeCd<=0){ spawnZone({x:player.x,y:player.y,radius:70,dmg:e.dmg*0.5,life:0.6,maxLife:0.6,tickCd:0,tag:"boss",targetsPlayer:true}); e.strikeCd=3.2;} break;
     case 'curseHeal': player._curseActive=true; break;
     case 'lifesteal': if(e._lastDmgToPlayer){ e.hp=Math.min(e.maxHp,e.hp+e._lastDmgToPlayer*0.4); e._lastDmgToPlayer=0; } break;
-    case 'trailSlow': zones.push({x:e.x,y:e.y,radius:30,dmg:0,life:2,maxLife:2,tickCd:0,tag:"trail",slowOnly:true}); break;
+    case 'trailSlow': spawnZone({x:e.x,y:e.y,radius:30,dmg:0,life:2,maxLife:2,tickCd:0,tag:"trail",slowOnly:true}); break;
     case 'growingFreeze': e.freezeR=(e.freezeR||60)+dt*2; break;
     case 'mutate': if(!e._mutated && Math.random()<dt*0.05){ e._mutated=true; const r=Math.random(); if(r<0.33) e.speed*=1.5; else if(r<0.66) e.dmg*=1.4; else { e.maxHp*=1.3; e.hp*=1.3; } logEvent(`${e.name} mutates!`); } break;
     case 'steal': if(e._justHit){ const amt=Math.min(player.gold,3); player.gold-=amt; e._justHit=false; } break;
@@ -3122,7 +3143,7 @@ function updateEnemies(dt){
       e.quakeCd-=dt;
       if(e.quakeCd<=0){
         const crackAngles=[]; for(let i=0;i<5;i++) crackAngles.push(rand(0,Math.PI*2));
-        zones.push({x:player.x,y:player.y,radius:85,dmg:e.dmg*1.8,life:1.6,maxLife:1.6,armT:0.9,tickCd:0,tag:"quake",crackAngles,targetsPlayer:true});
+        spawnZone({x:player.x,y:player.y,radius:85,dmg:e.dmg*1.8,life:1.6,maxLife:1.6,armT:0.9,tickCd:0,tag:"quake",crackAngles,targetsPlayer:true});
         e.quakeCd=rand(4,6);
       }
     }
@@ -3227,7 +3248,7 @@ function updateEnemies(dt){
       }
       e.x += e.vx*dt*speedMult; e.y += e.vy*dt*speedMult;
       e.shootCd -= dt;
-      if(e.shootCd<=0){ bullets.push({owner:"enemy",x:e.x,y:e.y,vx:(dx/d)*260,vy:(dy/d)*260,dmg:e.dmg,radius:5,life:3,color:"#8fd8ff",pierce:0}); e.shootCd=1.6; }
+      if(e.shootCd<=0){ spawnBullet({owner:"enemy",x:e.x,y:e.y,vx:(dx/d)*260,vy:(dy/d)*260,dmg:e.dmg,radius:5,life:3,color:"#8fd8ff",pierce:0}); e.shootCd=1.6; }
     } else if(e.brain==="charge"){
       e.chargeCd -= dt;
       if(e.chargeState==="idle"){
@@ -3258,10 +3279,18 @@ function updateEnemies(dt){
     e.x=clamp(e.x,e.radius,WORLD.w-e.radius); e.y=clamp(e.y,e.radius,WORLD.h-e.radius);
   }
 }
+let minionPool = [];
+function spawnMinion(props){
+  const m = minionPool.pop() || {};
+  m.dead=false;
+  Object.assign(m, props);
+  minions.push(m);
+  return m;
+}
 function updateMinions(dt){
   for(let i=minions.length-1;i>=0;i--){
     const m=minions[i];
-    if(m.life!==Infinity){ m.life-=dt; if(m.life<=0){ minions.splice(i,1); continue; } }
+    if(m.life!==Infinity){ m.life-=dt; if(m.life<=0){ m.dead=true; continue; } }
     if(m.speed>0){
       const target = nearestEnemy(m.x,m.y,400);
       if(target){ const dx=target.x-m.x,dy=target.y-m.y,d=Math.hypot(dx,dy)||1; m.x+=(dx/d)*m.speed*dt; m.y+=(dy/d)*m.speed*dt;
@@ -3269,9 +3298,28 @@ function updateMinions(dt){
       else { m.x=clamp(m.x+(player.x-m.x)*0.02,m.radius,WORLD.w-m.radius); m.y=clamp(m.y+(player.y-m.y)*0.02,m.radius,WORLD.h-m.radius); }
     } else {
       const target=nearestEnemy(m.x,m.y,260); m.atkCd-=dt;
-      if(target && m.atkCd<=0){ const ang=Math.atan2(target.y-m.y,target.x-m.x); bullets.push({owner:"player",x:m.x,y:m.y,vx:Math.cos(ang)*400,vy:Math.sin(ang)*400,dmg:m.dmg,radius:4,life:1.5,color:"#8fffcf",pierce:0,hitset:new Set()}); m.atkCd=0.6; }
+      if(target && m.atkCd<=0){ const ang=Math.atan2(target.y-m.y,target.x-m.x); spawnBullet({owner:"player",x:m.x,y:m.y,vx:Math.cos(ang)*400,vy:Math.sin(ang)*400,dmg:m.dmg,radius:4,life:1.5,color:"#8fffcf",pierce:0}); m.atkCd=0.6; }
     }
   }
+  pruneMinions();
+}
+function pruneMinions(){
+  let write=0;
+  for(let read=0; read<minions.length; read++){
+    const m=minions[read];
+    if(m.dead){ minionPool.push(m); continue; }
+    minions[write++]=m;
+  }
+  minions.length=write;
+}
+let zonePool = [];
+function spawnZone(props){
+  const z = zonePool.pop() || {};
+  z.tag=undefined; z.ownerWeapon=undefined; z.jumps=undefined; z.root=false; z.targetsPlayer=false;
+  z.slowOnly=false; z.armT=0; z.crackAngles=undefined; z.dead=false;
+  Object.assign(z, props);
+  zones.push(z);
+  return z;
 }
 function updateZones(dt){
   for(let i=zones.length-1;i>=0;i--){
@@ -3279,7 +3327,7 @@ function updateZones(dt){
     // armT is a pure telegraph window (Quaker mutation's ground fissure) — no damage ticks at
     // all while it's counting down, render() draws the crack pattern instead. Once it expires
     // the zone behaves exactly like any other for its remaining life.
-    if(z.armT>0){ z.armT-=dt; if(z.life<=0) zones.splice(i,1); continue; }
+    if(z.armT>0){ z.armT-=dt; if(z.life<=0) z.dead=true; continue; }
     z.tickCd-=dt;
     if(z.tickCd<=0){
       z.tickCd=0.5;
@@ -3294,8 +3342,18 @@ function updateZones(dt){
       }
       if(z.slowOnly){ forEachEnemyNear(z.x,z.y,z.radius,e=>{ e.slowed=true; e.slowT=1; }); }
     }
-    if(z.life<=0) zones.splice(i,1);
+    if(z.life<=0) z.dead=true;
   }
+  pruneZones();
+}
+function pruneZones(){
+  let write=0;
+  for(let read=0; read<zones.length; read++){
+    const z=zones[read];
+    if(z.dead){ zonePool.push(z); continue; }
+    zones[write++]=z;
+  }
+  zones.length=write;
 }
 
 /* =========================================================================
@@ -4030,11 +4088,34 @@ function buildAchievementContext(){
     meta:{ maxedBranches },
   };
 }
+// PERFORMANCE_AUDIT item 2.2 — checkAchievements() used to run unthrottled from
+// loop(), 60x/sec, each call rebuilding a full context (Object.assign clone of
+// save.lifetime + a TALENT_BRANCHES x TALENT_STAT_LINES nested scan) that's
+// mostly static moment-to-moment. First attempt at fixing this was a manually-
+// invalidated cache (refresh on startRun/continueRun) — turned out fragile:
+// save.lifetime *also* mutates on every elite/boss kill (killEnemy), every
+// doAutosave() tick, and inside a couple of event-context functions
+// (grantSoulImmediate/convertGoldToSoul) — a growing list of call sites found by
+// grepping for `save.lifetime.` assignments, with real risk more were missed.
+// Simpler and impossible to get wrong: throttle the whole check to ~6Hz instead
+// of caching anything — nothing to invalidate, every check reads fully live
+// data, just less often (achievement toasts appearing up to ~160ms late is
+// imperceptible). Still call it once immediately at both playing-state entry
+// points (below) so newly-met conditions from before this run started aren't
+// held back by the throttle's own first interval.
+const ACHIEVEMENT_CHECK_INTERVAL=0.16;
+let achievementCheckTimer=0;
 function checkAchievements(){
   if(!player) return;
   const ctx=buildAchievementContext(); let changed=false;
   for(const a of ACHIEVEMENTS){ if(save.achievements.unlocked[a.id]) continue; if(a.check(ctx)){ save.achievements.unlocked[a.id]=Date.now(); applyAchievementReward(a.reward); showAchievementToast(a); changed=true; } }
   if(changed){ persistSave(); refreshSoulBadges(); }
+}
+function maybeCheckAchievements(dt){
+  achievementCheckTimer-=dt;
+  if(achievementCheckTimer>0) return;
+  achievementCheckTimer=ACHIEVEMENT_CHECK_INTERVAL;
+  checkAchievements();
 }
 // Generic achievement-reward mechanic (previously achievements were pure cosmetic tracking —
 // unlock timestamp + toast, nothing else). unlock_shop_item doesn't mutate anything itself: the
@@ -4180,7 +4261,8 @@ function win(){
   const soulMult=player.stats.soulMult||1;
   const soulGain=Math.floor((150+player.gold*0.12+player.level*2+Math.floor(runTime/10))*soulMult);
   save.soul+=soulGain; save.lifetime.totalSoul+=soulGain; save.artifacts+=5;
-  applyRunStatsIncrement(false); checkAchievements(); persistSave();
+  applyRunStatsIncrement(false);
+  checkAchievements(); persistSave();
   document.getElementById('victorySoulGain').textContent=`+ ${soulGain} SOUL earned (includes victory bonus)`;
   refreshSoulBadges(); show('screen-victory');
 }
@@ -4250,8 +4332,7 @@ function refreshHud(){
   const lowHp = player.hp/player.maxHp<0.25;
   if(lowHp) SFX.startHeartbeat(); else SFX.stopHeartbeat();
   document.querySelector('.hp-wrap').classList.toggle('low-hp', lowHp);
-  const now=runTime; dpsWindow=dpsWindow.filter(x=>now-x.t<3);
-  const dps=dpsWindow.reduce((s,x)=>s+x.dmg,0)/3;
+  const dps=dpsWindowSumFor(runTime)/3;
   document.getElementById('dpsVal').textContent=Math.round(dps)+" dps";
   // Disabled-state is folded into the signature (not just weapon/level/evolved) so
   // a *temporary* disable (jam action, non-Infinity duration) expiring on its own
@@ -4658,8 +4739,26 @@ function render(){
    PART 13 — MAIN LOOP
    ========================================================================= */
 let lastT=performance.now();
+// PERFORMANCE_AUDIT — debug overlay (task #34). debugFpsEma smooths the RAW
+// (pre-clamp) frame delta so a real stutter shows up as a dropped number
+// instead of being hidden by dt's 0.05s clamp (which exists to stop physics
+// from exploding on a lag spike, not to make frame time look better than it
+// is). The DOM text write itself is throttled to 4Hz — the numbers don't
+// need to update 60x/sec to be readable, and textContent writes aren't free.
+let debugFpsEma=60, debugOverlayTimer=0;
+function updateDebugOverlay(rawMs){
+  const el=document.getElementById('debugOverlay'); if(!el) return;
+  let text=`FPS ${Math.round(debugFpsEma)}  frame ${rawMs.toFixed(1)}ms`;
+  if(enemies) text+=`\nenemies ${enemies.length}  bullets ${bullets.length}\n`+
+    `particles ${particles.length}  floaters ${floaters.length}\n`+
+    `minions ${minions.length}  zones ${zones.length}\n`+
+    `grid cells ${spatialGrid.size}`;
+  el.textContent=text;
+}
 function loop(now){
-  const dt=Math.min(0.05,(now-lastT)/1000); lastT=now;
+  const rawMs=now-lastT;
+  const dt=Math.min(0.05,rawMs/1000); lastT=now;
+  if(debugOverlayOn && rawMs>0) debugFpsEma += (1000/rawMs-debugFpsEma)*0.1;
   if(state==="playing"){
     runTime+=dt;
     updateSpawns(dt); updatePlayer(dt); updateEnemies(dt); rebuildSpatialGrid();
@@ -4667,11 +4766,15 @@ function loop(now){
     updateTempModifiers(dt);
     pruneDeadEnemies(); // single end-of-frame removal pass (also returns objects to the enemy pool)
     eventTimer-=dt; if(eventTimer<=0){ triggerRandomEvent(); eventTimer=rand(90,140); }
-    checkAchievements(); updateJuice(dt); refreshHud();
+    maybeCheckAchievements(dt); updateJuice(dt); refreshHud();
     MUSIC.setIntense(enemies.some(e=>e.boss));
     autosaveTimer-=dt; if(autosaveTimer<=0){ doAutosave(true); autosaveTimer=AUTOSAVE_INTERVAL; }
   }
   if(["playing","levelup","paused","dead","victory","shop","ingame-stats","event"].includes(state)) render();
+  if(debugOverlayOn){
+    debugOverlayTimer-=dt;
+    if(debugOverlayTimer<=0){ debugOverlayTimer=0.25; updateDebugOverlay(rawMs); }
+  }
   requestAnimationFrame(loop);
 }
 
@@ -4679,8 +4782,28 @@ function loop(now){
    PART 14 — SPATIAL GRID / BULLETS / HELPERS (from base engine)
    ========================================================================= */
 const GRID_CELL=160; const spatialGrid=new Map();
-function gridKey(cx,cy){ return cx+','+cy; }
-function rebuildSpatialGrid(){ spatialGrid.clear(); for(const e of enemies){ const cx=Math.floor(e.x/GRID_CELL),cy=Math.floor(e.y/GRID_CELL); const key=gridKey(cx,cy); let b=spatialGrid.get(key); if(!b){b=[];spatialGrid.set(key,b);} b.push(e); } }
+// PERFORMANCE_AUDIT item 3 (gridKey) — numeric Map keys hash faster than string
+// concatenation; called every enemy every frame during rebuild plus every
+// forEachEnemyNear() cell lookup. Offset keeps the key positive even for cells
+// outside world bounds (forEachEnemyNear's search radius can push min/max cell
+// indices negative near world edges) — cx/cy never get remotely close to +-1000
+// given WORLD is 4600x4600 and GRID_CELL=160 (~29 cells per axis).
+function gridKey(cx,cy){ return (cx+1000)*100000+(cy+1000); }
+// PERFORMANCE_AUDIT item 1.2 — the world is bounded (WORLD.w/h=4600, GRID_CELL=160),
+// so the total number of distinct cells that can ever be touched is small (~29x29)
+// and finite. That makes it safe to never spatialGrid.clear() (which would force a
+// fresh array allocation for every re-populated bucket, every single frame) —
+// instead reuse existing bucket arrays via .length=0 and only allocate a new array
+// the first time a given cell is ever touched. The Map's size stabilizes at (at
+// most) the total cell count instead of new arrays being GC'd every frame.
+function rebuildSpatialGrid(){
+  for(const b of spatialGrid.values()) b.length=0;
+  for(const e of enemies){
+    const cx=Math.floor(e.x/GRID_CELL),cy=Math.floor(e.y/GRID_CELL); const key=gridKey(cx,cy);
+    let b=spatialGrid.get(key); if(!b){ b=[]; spatialGrid.set(key,b); }
+    b.push(e);
+  }
+}
 function forEachEnemyNear(x,y,radius,fn){ const minCx=Math.floor((x-radius)/GRID_CELL),maxCx=Math.floor((x+radius)/GRID_CELL),minCy=Math.floor((y-radius)/GRID_CELL),maxCy=Math.floor((y+radius)/GRID_CELL);
   for(let cx=minCx;cx<=maxCx;cx++) for(let cy=minCy;cy<=maxCy;cy++){ const b=spatialGrid.get(gridKey(cx,cy)); if(!b) continue; for(const e of b){ if(!e.dead) fn(e); } } }
 // Lets a boss attack schedule a bullet a few frames in the future instead of firing it
@@ -4725,7 +4848,7 @@ function updateBullets(dt){
       b.x+=perpX*off*dt; b.y+=perpY*off*dt;
     }
     b.life-=dt;
-    if(b.life<=0){ bullets.splice(i,1); continue; }
+    if(b.life<=0){ b.dead=true; continue; }
     if(b.owner==="player"){
       let removed=false;
       forEachEnemyNear(b.x,b.y,b.radius+60,e=>{ if(removed||b.hitset.has(e)) return;
@@ -4734,12 +4857,22 @@ function updateBullets(dt){
           spawnParticle(e.x,e.y,weaponColor(b.weaponId),1+weaponVisualTier(player.weapons[b.weaponId]||1));
           // World Ender: detonates on impact (small extra AoE around the hit target).
           if(b.detonate && !e.dead) forEachEnemyNear(e.x,e.y,70,other=>{ if(other!==e) queueSecondaryDamage(other,b.dmg*0.4,b.weaponId); });
-          if(b.pierce<=0){ bullets.splice(i,1); removed=true; } else b.pierce--; } });
+          if(b.pierce<=0){ b.dead=true; removed=true; } else b.pierce--; } });
       if(removed) continue;
     } else {
-      if(dist2(b.x,b.y,player.x,player.y)<(b.radius+player.radius)*(b.radius+player.radius)){ damagePlayer(b.dmg); bullets.splice(i,1); }
+      if(dist2(b.x,b.y,player.x,player.y)<(b.radius+player.radius)*(b.radius+player.radius)){ damagePlayer(b.dmg); b.dead=true; }
     }
   }
+  pruneBullets();
+}
+function pruneBullets(){
+  let write=0;
+  for(let read=0; read<bullets.length; read++){
+    const b=bullets[read];
+    if(b.dead){ bulletPool.push(b); continue; }
+    bullets[write++]=b;
+  }
+  bullets.length=write;
 }
 function dist2(ax,ay,bx,by){ const dx=ax-bx,dy=ay-by; return dx*dx+dy*dy; }
 function rand(a,b){ return a+Math.random()*(b-a); }
@@ -4850,12 +4983,14 @@ window.addEventListener('keydown',()=>{ SFX.unlock(); AUDIO_CORE.unlock(); },{on
    PART 16 — SETTINGS / FULLSCREEN / JOYSTICK (unchanged from base prototype)
    ========================================================================= */
 const isTouchDevice=('ontouchstart' in window)||navigator.maxTouchPoints>0||navigator.msMaxTouchPoints>0;
-let quality='high', enemyDensity='high', screenShakeOn=true, hapticsOn=true;
+let quality='high', enemyDensity='high', screenShakeOn=true, hapticsOn=true, debugOverlayOn=false;
 function vibrate(ms){ if(hapticsOn && navigator.vibrate){ try{ navigator.vibrate(ms); }catch(e){} } }
 function shouldShowJoystick(){ const mode=save.settings.controlMode; return mode==='joystick'||(mode==='auto'&&isTouchDevice); }
 function applySettings(){
   SFX.setMuted(!!save.settings.muted); SFX.setVolume(save.settings.sfxVolume); MUSIC.setVolume(save.settings.muted?0:save.settings.musicVolume);
   quality=save.settings.quality; enemyDensity=save.settings.enemyDensity||save.settings.quality||'high'; screenShakeOn=!!save.settings.screenShake; hapticsOn=!!save.settings.haptics;
+  debugOverlayOn=!!save.settings.debugOverlay;
+  document.getElementById('debugOverlay').classList.toggle('hidden', !debugOverlayOn);
   const joyCapture=document.getElementById('joystickCapture');
   if(joyCapture){ const show=shouldShowJoystick(); joyCapture.style.pointerEvents=show?'auto':'none'; if(!show){ touchVec.x=0; touchVec.y=0; const zone=document.getElementById('joystickZone'); if(zone) zone.style.display='none'; } }
 }
@@ -4966,7 +5101,7 @@ document.getElementById('fullscreenToggleBtn').onclick=()=>{ SFX.uiClick(); togg
 if(!fullscreenSupported()){ const toggleBtn=document.getElementById('fullscreenToggleBtn'); if(toggleBtn){ toggleBtn.disabled=true; toggleBtn.textContent="UNAVAILABLE"; } const hudBtn=document.getElementById('fullscreenBtnHud'); if(hudBtn) hudBtn.style.opacity='0.35'; }
 function setSegActive(containerId,value){ document.querySelectorAll('#'+containerId+' .seg-btn').forEach(b=>b.classList.toggle('active',b.dataset.val===value)); }
 function setToggle(id,on){ const el=document.getElementById(id); if(el) el.classList.toggle('on',!!on); }
-function refreshSettingsUI(){ setSegActive('ctrlMode',save.settings.controlMode); setSegActive('vidQuality',save.settings.quality); setSegActive('vidDensity',save.settings.enemyDensity||'high'); setToggle('ctrlHaptics',save.settings.haptics); setToggle('vidShake',save.settings.screenShake); setToggle('audioMuted',save.settings.muted); updateFullscreenButtons();
+function refreshSettingsUI(){ setSegActive('ctrlMode',save.settings.controlMode); setSegActive('vidQuality',save.settings.quality); setSegActive('vidDensity',save.settings.enemyDensity||'high'); setToggle('ctrlHaptics',save.settings.haptics); setToggle('vidShake',save.settings.screenShake); setToggle('vidDebugOverlay',save.settings.debugOverlay); setToggle('audioMuted',save.settings.muted); updateFullscreenButtons();
   const vol=Math.round(save.settings.sfxVolume*100); document.getElementById('audioVolume').value=vol; document.getElementById('audioVolumeVal').textContent=vol;
   const mvol=Math.round(save.settings.musicVolume*100); document.getElementById('musicVolume').value=mvol; document.getElementById('musicVolumeVal').textContent=mvol; }
 let settingsReturnTo='menu';
@@ -4977,6 +5112,7 @@ document.getElementById('vidQuality').addEventListener('click',e=>{ const b=e.ta
 document.getElementById('vidDensity').addEventListener('click',e=>{ const b=e.target.closest('.seg-btn'); if(!b) return; save.settings.enemyDensity=b.dataset.val; persistSave(); applySettings(); refreshSettingsUI(); });
 document.getElementById('ctrlHaptics').onclick=()=>{ save.settings.haptics=!save.settings.haptics; persistSave(); applySettings(); refreshSettingsUI(); vibrate(20); };
 document.getElementById('vidShake').onclick=()=>{ save.settings.screenShake=!save.settings.screenShake; persistSave(); applySettings(); refreshSettingsUI(); };
+document.getElementById('vidDebugOverlay').onclick=()=>{ save.settings.debugOverlay=!save.settings.debugOverlay; persistSave(); applySettings(); refreshSettingsUI(); };
 document.getElementById('audioVolume').addEventListener('input',e=>{ const v=Number(e.target.value); document.getElementById('audioVolumeVal').textContent=v; save.settings.sfxVolume=v/100; SFX.setVolume(save.settings.sfxVolume); });
 document.getElementById('audioVolume').addEventListener('change',()=>persistSave());
 document.getElementById('musicVolume').addEventListener('input',e=>{ const v=Number(e.target.value); document.getElementById('musicVolumeVal').textContent=v; save.settings.musicVolume=v/100; if(!save.settings.muted) MUSIC.setVolume(save.settings.musicVolume); });
@@ -5082,7 +5218,7 @@ function continueRun(){
   // still reset (not saved, see doAutosave's comment).
   enemies=[]; bullets=[]; orbs=unpackInfinity(snap.orbs||[]); particles=[]; floaters=[];
   zones=unpackInfinity(snap.zones||[]); minions=unpackInfinity(snap.minions||[]); pendingShots=[]; chainArcs=[]; novaPulses=[];
-  runTime=snap.runTime||0; killCount=snap.killCount||0; dpsWindow=[]; lastSpawn=0; eliteTimer=0; keys={}; lastPhaseName=null; nextHudGlitchAt=null;
+  runTime=snap.runTime||0; killCount=snap.killCount||0; dpsWindow=[]; dpsWindowStart=0; dpsWindowSum=0; lastSpawn=0; eliteTimer=0; keys={}; lastPhaseName=null; nextHudGlitchAt=null;
   spawnedBossIds=new Set(snap.bossesSpawned||[]);
   // Previously seeded from bossesSpawned (a copy-paste of the line above) as a
   // "warned implies later spawned" approximation — worked except for the window
