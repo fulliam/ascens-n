@@ -155,6 +155,8 @@
     display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; max-width:min(280px,44vw);}
   .menu-resources .res-chip{font-family:'JetBrains Mono',monospace; font-size:12.5px; color:var(--text);}
   .menu-resources .lbl{color:var(--dim); font-size:9px; letter-spacing:1.5px; margin-right:1px;}
+  .version-tag{position:absolute; bottom:calc(14px + var(--safe-bottom)); left:calc(16px + var(--safe-left)); z-index:2;
+    font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:1px; color:var(--dim); opacity:0.55; pointer-events:none;}
   #hud{position:absolute; inset:0; z-index:5; pointer-events:none; font-family:'Rajdhani',sans-serif;}
   /* PERFORMANCE_AUDIT — toggleable debug overlay (task #34): FPS/frame-time + live
      entity counts, so future optimization claims can be measured on a real run
@@ -783,6 +785,7 @@
       <button class="btn" id="btnArmory">Armory <span id="armoryChip" class="ach-chip"></span></button>
       <button class="btn" id="btnSettings">Settings</button>
     </div>
+    <div class="version-tag" id="versionTag"></div>
   </div>
 
   <div class="screen hidden" id="screen-charselect">
@@ -935,6 +938,11 @@
 <script>
 (() => {
 "use strict";
+
+// Semver-ish display version (shown in the main menu, see #versionTag) — bump
+// by hand per notable batch of work. Independent from SAVE_VERSION below:
+// this one is purely informational, the other one gates save migrations.
+const GAME_VERSION = "0.29.3";
 
 /* =========================================================================
    PART 1 — BUILD LAYER DATA (weapons, evolutions, cards, passives, synergies, characters)
@@ -2092,7 +2100,12 @@ function xpForLevel(level){
 /* =========================================================================
    PART 4 — SAVE / META STATE
    ========================================================================= */
-const DEFAULT_SAVE = { soul:0, artifacts:0, talentLevels:{}, armoryUnlocks:{},
+// Bumped only when a save-breaking change needs a real migration step (see
+// loadSave — compares the loaded save's own `version` against this before
+// merging). Distinct from GAME_VERSION above, which is just the display
+// number and changes far more often.
+const SAVE_VERSION = 1;
+const DEFAULT_SAVE = { version:SAVE_VERSION, soul:0, artifacts:0, talentLevels:{}, armoryUnlocks:{},
   lifetime:{ runs:0, kills:0, deaths:0, bestTime:0, bestLevel:0, totalGold:0, totalSoul:0, eliteKills:0, bossKills:0,
     charactersCompleted:[], uniqueBossesKilled:[], uniqueElitesKilled:[] },
   activeRun:null, achievements:{ unlocked:{} },
@@ -2126,10 +2139,12 @@ function armoryLevel(id){ return (save.armoryUnlocks && save.armoryUnlocks[id]) 
 function armoryCost(item, currentLevel){ return Math.ceil(item.cost*Math.pow(1.6,currentLevel)); }
 
 async function loadSave(){
+  let loadedVersion = SAVE_VERSION; // fresh saves start already "current" — nothing to migrate
   try{
     const raw = localStorage.getItem('ascension_save_v2');
     if(raw){
       const loaded = JSON.parse(raw);
+      loadedVersion = loaded.version||0; // pre-versioning saves had no field at all — treat as 0
       save = Object.assign(JSON.parse(JSON.stringify(DEFAULT_SAVE)), loaded);
       save.settings = Object.assign({}, DEFAULT_SAVE.settings, loaded.settings||{});
       save.lifetime = Object.assign({}, DEFAULT_SAVE.lifetime, loaded.lifetime||{});
@@ -2140,9 +2155,19 @@ async function loadSave(){
       save.collectedRewards = Object.assign({}, loaded.collectedRewards||{});
     }
   }catch(e){}
+  migrateSaveVersion(loadedVersion);
   migrateTalents();
+  save.version = SAVE_VERSION;
   applySettings();
   refreshSoulBadges();
+}
+// Versioned migration hook — add a `if(fromVersion<N){...}` block here (and
+// bump SAVE_VERSION) whenever a future change needs real data surgery on
+// existing saves, the same way migrateTalents() already does for one
+// specific past regression. Empty today: SAVE_VERSION=1 is the first
+// version saves ever carried, so there's nothing prior to migrate from yet.
+function migrateSaveVersion(fromVersion){
+  if(fromVersion>=SAVE_VERSION) return;
 }
 // One-time migration: refund Soul spent on talent lines that used to exist but
 // were never wired to any real effect (see REMOVED_TALENT_KEYS), so past players
@@ -6094,7 +6119,7 @@ window.__ASCENSION_DEBUG__ = {
 /* =========================================================================
    BOOT
    ========================================================================= */
-(async function boot(){ await loadSave(); goMenu(); requestAnimationFrame(loop); })();
+(async function boot(){ document.getElementById('versionTag').textContent='v'+GAME_VERSION; await loadSave(); goMenu(); requestAnimationFrame(loop); })();
 
 })();
 </script>
