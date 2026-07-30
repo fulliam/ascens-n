@@ -14,6 +14,8 @@
   :root{
     --void:#08090d; --panel:#12141b; --panel2:#191c26; --line:#2a2e3a; --text:#dfe3ee; --dim:#7b8194;
     --xp:#7cff6b; --gold:#ffb347; --soul:#5ce1e6; --hp:#ff4d5e; --accent:#b98cff; --accent2:#ff6f9c; --crystal:#7ee0ff; --artifact:#ff9ecb;
+    --safe-top:env(safe-area-inset-top,0px); --safe-bottom:env(safe-area-inset-bottom,0px);
+    --safe-left:env(safe-area-inset-left,0px); --safe-right:env(safe-area-inset-right,0px);
   }
   *{box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent;}
   html,body{width:100%; height:100%; overflow:hidden; background:var(--void); color:var(--text); font-family:'Inter',sans-serif;
@@ -42,15 +44,16 @@
   .btn:active:not(:disabled){transform:scale(0.98);}
   .btn:disabled{opacity:0.35; cursor:not-allowed;}
   .btn.primary{border-color:var(--accent); box-shadow:0 0 30px rgba(185,140,255,0.15) inset;}
-  .soul-badge{position:absolute; top:22px; right:26px; z-index:2; display:flex; align-items:center; gap:8px;
+  .soul-badge{position:absolute; top:calc(22px + var(--safe-top)); right:calc(26px + var(--safe-right)); z-index:2; display:flex; align-items:center; gap:8px;
     font-family:'JetBrains Mono',monospace; font-size:14px; color:var(--soul); border:1px solid var(--line); background:var(--panel);
     padding:7px 12px; border-radius:2px;}
   .soul-badge .lbl{color:var(--dim); font-size:9px; letter-spacing:2px; margin-right:2px;}
-  .artifact-badge{position:absolute; top:22px; right:150px; z-index:2; display:flex; align-items:center; gap:8px;
+  .artifact-badge{position:absolute; top:calc(22px + var(--safe-top)); right:calc(150px + var(--safe-right)); z-index:2; display:flex; align-items:center; gap:8px;
     font-family:'JetBrains Mono',monospace; font-size:14px; color:var(--artifact); border:1px solid var(--line); background:var(--panel);
     padding:7px 12px; border-radius:2px;}
   #hud{position:absolute; inset:0; z-index:5; pointer-events:none; font-family:'Rajdhani',sans-serif;}
-  .hud-top{position:absolute; top:0; left:0; right:0; z-index:8; display:flex; justify-content:space-between; align-items:flex-start; padding:16px 20px;}
+  .hud-top{position:absolute; top:0; left:0; right:0; z-index:8; display:flex; justify-content:space-between; align-items:flex-start;
+    padding:calc(16px + var(--safe-top)) calc(20px + var(--safe-right)) 16px calc(20px + var(--safe-left));}
   .hp-wrap{width:250px;}
   .bar-track{width:100%; height:15px; background:#1a1c24; border:1px solid var(--line); border-radius:3px; overflow:hidden; position:relative;}
   .bar-fill{height:100%; transition:width .12s linear;}
@@ -64,7 +67,14 @@
   .dot{width:8px; height:8px; border-radius:50%;}
   .timer{font-family:'JetBrains Mono',monospace; font-size:24px; letter-spacing:2px; color:var(--text); text-align:center;}
   .timer .phase{display:block; font-size:10px; letter-spacing:3px; color:var(--accent); text-align:center; margin-top:2px;}
-  .hud-bottom{position:absolute; bottom:0; left:0; right:0; padding:14px 20px; display:flex; flex-direction:column; gap:8px; align-items:center;}
+  .hud-bottom{position:absolute; bottom:0; left:0; right:0; padding:14px calc(20px + var(--safe-right)) calc(14px + var(--safe-bottom)) calc(20px + var(--safe-left)); display:flex; flex-direction:column; gap:8px; align-items:center;}
+  .ability-hud{position:absolute; right:calc(20px + var(--safe-right)); bottom:calc(96px + var(--safe-bottom)); z-index:7; display:flex; flex-direction:column; gap:12px; pointer-events:auto;}
+  .ability-btn{position:relative; width:52px; height:52px; border-radius:50%; background:var(--panel); border:2px solid var(--line); display:flex; align-items:center; justify-content:center; font-size:22px; cursor:pointer; user-select:none; transition:border-color .15s;}
+  .ability-btn.ready{border-color:var(--accent); box-shadow:0 0 12px rgba(185,140,255,0.3);}
+  .ability-btn .ab-icon{position:relative; z-index:1; filter:drop-shadow(0 1px 2px rgba(0,0,0,0.6));}
+  .ability-btn .ab-cd{position:absolute; inset:0; border-radius:50%; background:transparent; pointer-events:none;}
+  .ability-btn .ab-label{position:absolute; bottom:-15px; left:50%; transform:translateX(-50%); font-family:'JetBrains Mono',monospace; font-size:8px; letter-spacing:1px; color:var(--dim); white-space:nowrap;}
+  .ability-btn .ab-charges{position:absolute; bottom:-2px; right:-2px; z-index:1; background:var(--accent); color:#000; font-size:8.5px; font-weight:700; border-radius:8px; padding:0 4px; font-family:'JetBrains Mono',monospace;}
   .xp-track{width:min(560px,70vw); height:10px;}
   .weapon-row{display:flex; gap:6px; flex-wrap:wrap; justify-content:center; max-width:90vw;}
   .wpn-icon{width:34px; height:34px; border:1px solid var(--line); background:var(--panel); border-radius:4px; display:flex; align-items:center; justify-content:center; font-size:15px; position:relative;}
@@ -78,9 +88,19 @@
   @keyframes logout{to{opacity:0;}}
   .pause-hint{display:flex; align-items:center; justify-content:center; font-family:'JetBrains Mono',monospace; font-size:13px; color:var(--dim); pointer-events:auto; cursor:pointer; border:1px solid var(--line); background:var(--panel); padding:6px 9px; border-radius:2px;}
   .pause-hint:hover{color:var(--text); border-color:var(--accent);}
+  #fusionBtnHud:not(.hidden){border-color:var(--gold); animation:fusionPulse 1.4s ease-in-out infinite;}
+  @keyframes fusionPulse{0%,100%{box-shadow:0 0 0 rgba(255,179,71,0);} 50%{box-shadow:0 0 14px rgba(255,179,71,0.65);}}
+  .fusion-card{width:280px;}
+  .fusion-card .fuse-row{display:flex; align-items:center; justify-content:center; gap:10px; margin-bottom:10px;}
+  .fusion-card .fuse-icon{font-size:26px; width:44px; height:44px; display:flex; align-items:center; justify-content:center; background:var(--panel2); border:1px solid var(--line); border-radius:6px;}
+  .fusion-card .fuse-plus{color:var(--dim); font-size:16px;}
+  .fusion-card .fuse-arrow{color:var(--gold); font-size:18px;}
+  .fusion-card .fuse-result{font-size:30px; width:50px; height:50px; display:flex; align-items:center; justify-content:center; background:var(--panel2); border:2px solid var(--gold); border-radius:8px; box-shadow:0 0 12px rgba(255,179,71,0.25);}
+  .fusion-card .fuse-result.forging{animation:fuseForge 0.6s ease-out;}
+  @keyframes fuseForge{0%{transform:scale(0.6); box-shadow:0 0 0 rgba(255,179,71,0);} 55%{transform:scale(1.25); box-shadow:0 0 30px rgba(255,179,71,0.9);} 100%{transform:scale(1); box-shadow:0 0 12px rgba(255,179,71,0.25);}}
   .cards-wrap{display:flex; flex-wrap:wrap; align-items:stretch; justify-content:center; gap:16px; z-index:2; width:min(92vw,820px); max-height:78vh; overflow-y:auto; padding:4px;}
-  .card{width:220px; background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:18px 15px; cursor:pointer; transition:transform .15s, border-color .15s, box-shadow .15s; display:flex; flex-direction:column;}
-  .card:hover{border-color:var(--accent); box-shadow:0 12px 30px rgba(185,140,255,0.15);}
+  .card{width:220px; background:var(--panel); border:1px solid var(--line); border-top:3px solid var(--line); border-radius:6px; padding:16px 15px 18px; cursor:pointer; transition:transform .15s, border-color .15s, box-shadow .15s; display:flex; flex-direction:column; position:relative;}
+  .card:hover{border-color:var(--accent); border-top-color:var(--accent); box-shadow:0 12px 30px rgba(185,140,255,0.15);}
   .card .icon{font-size:28px; margin-bottom:12px;}
   .card .name{font-family:'Rajdhani',sans-serif; font-weight:700; font-size:18px; letter-spacing:0.5px; margin-bottom:6px;}
   .card .desc{font-size:12px; color:var(--dim); line-height:1.5; flex:1;}
@@ -89,6 +109,20 @@
   .card .tag.cat-elemental{color:var(--accent2); border-color:var(--accent2);}
   .card .tag.cat-defensive{color:var(--crystal); border-color:var(--crystal);}
   .card .playstyle{font-size:11px; color:var(--soul); margin-top:8px; font-family:'JetBrains Mono',monospace;}
+  /* Rarity ramp (common/uncommon/rare/legendary) drives the top-border accent + a
+     matching glow — independent of the .tag's cat color, since cat and rarity are
+     related but not the same axis (see CARD_CAT_RARITY). Common is intentionally
+     unstyled (falls back to --line) so only the tiers worth noticing stand out. */
+  .card.rarity-uncommon{border-top-color:var(--xp);}
+  .card.rarity-rare{border-top-color:var(--crystal); box-shadow:0 0 18px rgba(126,224,255,0.14) inset;}
+  .card.rarity-rare .name{color:var(--crystal);}
+  .card.rarity-legendary{border-top-color:var(--gold); box-shadow:0 0 22px rgba(255,179,71,0.2) inset;}
+  .card.rarity-legendary .name{color:var(--gold);}
+  .card.rarity-legendary:hover{border-top-color:var(--gold);}
+  .rarity-label{position:absolute; top:-9px; right:10px; font-family:'JetBrains Mono',monospace; font-size:8px; letter-spacing:1.5px; padding:1px 6px; border-radius:8px; background:var(--panel); border:1px solid var(--line); color:var(--dim); text-transform:uppercase;}
+  .card.rarity-uncommon .rarity-label{border-color:var(--xp); color:var(--xp);}
+  .card.rarity-rare .rarity-label{border-color:var(--crystal); color:var(--crystal);}
+  .card.rarity-legendary .rarity-label{border-color:var(--gold); color:var(--gold);}
   .shop-card{ padding:10px 9px; width:100%; }
   .shop-card:hover:not(:disabled){ transform:none !important; }
   .shop-card .icon{ font-size:18px; margin-bottom:4px; }
@@ -99,15 +133,37 @@
   .shop-card .buy-btn:hover:not(:disabled){ background:rgba(255,179,71,0.15); }
   .shop-card .buy-btn:disabled{ opacity:0.3; cursor:not-allowed; border-color:var(--dim); color:var(--dim); }
   #screen-shop .cards-wrap, #screen-events-shop .cards-wrap { display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; width:min(680px,94vw); max-height:62vh; overflow-y:auto; padding:4px 6px; }
-  .stats-grid{display:grid; grid-template-columns:1fr 1fr; gap:9px 40px; width:440px; margin:22px 0; z-index:2; max-height:56vh; overflow-y:auto;}
+  .stats-grid{display:grid; grid-template-columns:1fr; gap:9px 40px; width:440px; margin:22px 0; z-index:2; max-height:56vh; overflow-y:auto; padding:0 20px;}
   .stat-row{display:flex; justify-content:space-between; font-family:'JetBrains Mono',monospace; font-size:13px; border-bottom:1px solid var(--line); padding-bottom:6px;}
   .stat-row .k{color:var(--dim);}
   .soul-gain{font-family:'JetBrains Mono',monospace; color:var(--soul); font-size:15px; margin-bottom:16px; z-index:2;}
-  .meta-wrap{width:660px; max-width:94vw; max-height:64vh; overflow-y:auto; z-index:2; padding-right:6px; touch-action:pan-y;}
-  .meta-item{display:flex; align-items:center; justify-content:space-between; background:var(--panel); border:1px solid var(--line); border-radius:4px; padding:11px 16px; margin-bottom:8px;}
-  .meta-item .m-name{font-family:'Rajdhani',sans-serif; font-weight:700; font-size:15px;}
-  .meta-item .m-desc{color:var(--dim); font-size:11.5px; margin-top:2px;}
-  .meta-item .m-level{font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--accent); margin-top:3px;}
+  /* Fixed height for the same reason as .settings-wrap below: every branch's graph
+     is the same shape (5 nodes, same grid) so row-count itself can't jump, but
+     .screen still vertically centers this column, so a fixed height keeps tab
+     switches from nudging anything above it. */
+  .meta-wrap{width:640px; max-width:94vw; height:420px; max-height:70vh; max-height:70dvh; overflow-y:auto; overflow-x:hidden; z-index:2; padding:8px 4px; touch-action:pan-y;}
+  /* overflow-y left visible (not hidden) on purpose: a locked convergence node
+     listing two prerequisites can wrap taller than its row band, and clipping it
+     would hide the very text explaining why it's locked — .meta-wrap's own
+     overflow-y:auto is the fallback if that pushes past the graph's box. */
+  .talent-graph-scroll{overflow-x:auto; overflow-y:visible; touch-action:pan-x;}
+  .talent-graph{position:relative; width:600px; height:390px; margin:6px auto 0;}
+  .talent-lines{position:absolute; inset:0; width:100%; height:100%; pointer-events:none; overflow:visible;}
+  .talent-lines line{stroke:var(--line); stroke-width:2; transition:stroke .2s;}
+  .talent-lines line.unlocked{stroke:var(--accent);}
+  .talent-node{position:absolute; width:132px; background:var(--panel); border:2px solid var(--line); border-radius:8px;
+    padding:9px 10px; cursor:pointer; transition:border-color .15s, opacity .15s, box-shadow .15s; display:flex; flex-direction:column; gap:4px;}
+  .talent-node:hover:not(.locked){border-color:var(--accent);}
+  .talent-node.locked{opacity:0.4; filter:grayscale(0.7); cursor:not-allowed;}
+  .talent-node.maxed{border-color:var(--gold); box-shadow:0 0 16px rgba(255,179,71,0.22);}
+  .talent-node .tn-name{font-family:'Rajdhani',sans-serif; font-weight:700; font-size:12.5px; padding-right:14px;}
+  .talent-node .tn-desc{font-size:9.5px; color:var(--dim); line-height:1.3;}
+  .talent-node .tn-pips{display:flex; gap:3px; margin-top:2px;}
+  .talent-node .pip{flex:1; height:5px; background:var(--line); border-radius:2px;}
+  .talent-node .pip.filled{background:var(--accent);}
+  .talent-node.maxed .pip.filled{background:var(--gold);}
+  .talent-node .tn-lock{position:absolute; top:8px; right:9px; font-size:11px;}
+  .talent-node .tn-buy{margin-top:2px; align-self:flex-start; font-size:9.5px; padding:3px 7px;}
   .buy-btn{font-family:'JetBrains Mono',monospace; font-size:12.5px; border:1px solid var(--soul); color:var(--soul); background:transparent; padding:7px 12px; border-radius:2px; cursor:pointer; white-space:nowrap;}
   .buy-btn:hover:not(:disabled){background:rgba(92,225,230,0.1);}
   .buy-btn:disabled{opacity:0.3; cursor:not-allowed; border-color:var(--dim); color:var(--dim);}
@@ -116,7 +172,7 @@
   .continue-sub{display:block; font-size:10px; color:var(--dim); letter-spacing:1px; margin-top:3px; text-transform:none; font-family:'JetBrains Mono',monospace;}
   .mute-btn{font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--dim); cursor:pointer; border:1px solid var(--line); background:var(--panel); padding:8px 12px; border-radius:2px; letter-spacing:1px;}
   .mute-btn:hover{color:var(--text); border-color:var(--accent);}
-  .save-indicator{position:absolute; bottom:58px; right:20px; font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:2px; color:var(--soul); opacity:0; pointer-events:none;}
+  .save-indicator{position:absolute; bottom:calc(58px + var(--safe-bottom)); right:calc(20px + var(--safe-right)); font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:2px; color:var(--soul); opacity:0; pointer-events:none;}
   .save-indicator.show{animation: saveFade 1.6s ease forwards;}
   @keyframes saveFade{ 0%{opacity:0; transform:translateY(4px);} 15%{opacity:1; transform:translateY(0);} 78%{opacity:1;} 100%{opacity:0;} }
   ::-webkit-scrollbar{width:6px;} ::-webkit-scrollbar-thumb{background:var(--line); border-radius:3px;}
@@ -130,7 +186,7 @@
   .ach-name{font-family:'Rajdhani',sans-serif; font-weight:700; font-size:14px; margin-bottom:2px;}
   .ach-card.unlocked .ach-name{color:var(--gold);}
   .ach-desc{font-size:11px; color:var(--dim); line-height:1.35;}
-  #achToastLayer{position:absolute; top:22px; left:50%; transform:translateX(-50%); z-index:40; display:flex; flex-direction:column; gap:8px; align-items:center; pointer-events:none;}
+  #achToastLayer{position:absolute; top:calc(22px + var(--safe-top)); left:50%; transform:translateX(-50%); z-index:40; display:flex; flex-direction:column; gap:8px; align-items:center; pointer-events:none;}
   .ach-toast{display:flex; align-items:center; gap:12px; background:linear-gradient(180deg,#1c1710,#141821); border:1px solid var(--gold); border-radius:5px; padding:10px 18px; box-shadow:0 10px 30px rgba(0,0,0,0.5), 0 0 24px rgba(255,179,71,0.15);
     animation:toastIn .35s cubic-bezier(.2,.9,.3,1) forwards, toastOut .4s ease-in 3.6s forwards;}
   .ach-toast .t-icon{font-size:22px;} .ach-toast .t-kicker{font-family:'JetBrains Mono',monospace; font-size:9px; letter-spacing:2px; color:var(--gold);}
@@ -144,7 +200,7 @@
      above it, since .screen vertically centers its whole column of children. Tall
      enough for the Data/Video panes (4 rows); overflow-y still saves anything that
      doesn't fit on very short viewports. */
-  .settings-wrap{width:640px; max-width:92vw; height:420px; max-height:70vh; overflow-y:auto; z-index:2; padding-right:6px;}
+  .settings-wrap{width:640px; max-width:92vw; height:420px; max-height:70vh; max-height:70dvh; overflow-y:auto; z-index:2; padding-right:6px;}
   .settings-tabs{display:flex; gap:8px; margin-bottom:14px; z-index:2; flex-wrap:wrap;}
   .settings-tab{flex:1; min-width:70px; text-align:center; font-family:'Rajdhani',sans-serif; font-weight:600; font-size:13px; letter-spacing:1px;
     text-transform:uppercase; padding:9px 6px; border:1px solid var(--line); background:var(--panel); color:var(--dim); cursor:pointer; border-radius:2px; transition:border-color .15s,color .15s;}
@@ -172,21 +228,27 @@
   #bossWarning{position:absolute; inset:0; z-index:30; display:flex; align-items:center; justify-content:center; flex-direction:column; pointer-events:none; opacity:0;}
   #bossWarning.show{animation: bwFade 4.2s ease forwards;}
   #bossWarning .bw-vignette{position:absolute; inset:0; background:radial-gradient(ellipse at center, rgba(255,20,20,0) 42%, rgba(140,10,10,0.4) 100%); animation: bwPulse 0.7s ease-in-out infinite;}
+  /* TODO item 10 — player.hurtFlash-driven damage feedback: opacity set per-frame
+     in refreshHud(), scaled by hit size relative to max HP (see damagePlayer()).
+     transition smooths the frame-to-frame decay set in updatePlayer(). */
+  #hurtVignette{position:absolute; inset:0; z-index:9; pointer-events:none; opacity:0; transition:opacity .08s linear;
+    background:radial-gradient(ellipse at center, rgba(255,20,20,0) 35%, rgba(200,10,10,0.65) 100%);}
   #bossWarning .bw-text{position:relative; font-family:'JetBrains Mono',monospace; font-weight:700; font-size:15px; letter-spacing:8px; color:#ff5f6d; text-shadow:0 0 20px rgba(255,60,60,0.8);}
   #bossWarning .bw-name{position:relative; font-family:'Rajdhani',sans-serif; font-weight:700; font-size:clamp(30px,6vw,58px); letter-spacing:4px; color:#fff; text-shadow:0 0 30px rgba(255,60,60,0.9); margin-top:8px; text-align:center;}
   @keyframes bwFade{0%{opacity:0;} 8%{opacity:1;} 85%{opacity:1;} 100%{opacity:0;}}
   @keyframes bwPulse{0%,100%{opacity:0.5;} 50%{opacity:1;}}
   .elite-toast{border-color:#ff8a4d !important;} .elite-toast .t-kicker{color:#ff8a4d !important;}
+  .event-toast .t-name{max-width:280px; white-space:normal; line-height:1.3;}
   #screen-victory .title{background:linear-gradient(180deg,#fff,#ffd479 140%); -webkit-background-clip:text; background-clip:text; color:transparent;}
   .event-desc-box{width:min(560px,88vw); background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:16px 20px; margin-bottom:20px; font-size:13px; color:var(--dim); line-height:1.6; z-index:2;}
   @media (max-width:760px), (pointer:coarse){
     .title{font-size:38px; letter-spacing:3px;} .subtitle{font-size:11px;} .menu-col{width:min(300px,84vw);}
     .btn{padding:14px 16px; font-size:15px;} .meta-wrap, .settings-wrap, .stats-grid, .ach-wrap{width:94vw;}
-    .stats-grid, .ach-wrap{grid-template-columns:1fr;} .hud-top{padding:calc(10px + env(safe-area-inset-top,0px)) 12px 10px;}
+    .stats-grid, .ach-wrap{grid-template-columns:1fr;} .hud-top{padding:calc(10px + var(--safe-top)) calc(12px + var(--safe-right)) 10px calc(12px + var(--safe-left));}
     .hp-wrap{width:170px;} .resource-row{gap:6px; font-size:10.5px; max-width:180px;} .timer{font-size:18px;}
     .event-log{display:none;} .xp-track{width:min(420px,60vw);}
     #screen-shop .cards-wrap, #screen-events-shop .cards-wrap{grid-template-columns:repeat(2, 1fr);}
-    .artifact-badge{right:auto; left:26px; top:70px;}
+    .artifact-badge{right:auto; left:calc(26px + var(--safe-left)); top:calc(70px + var(--safe-top));}
   }
 </style>
 </head>
@@ -195,6 +257,7 @@
   <canvas id="game"></canvas>
 
   <div id="hud" class="hidden">
+    <div id="hurtVignette"></div>
     <div class="joystick-capture" id="joystickCapture"></div>
     <div class="joystick-zone" id="joystickZone"><div class="joystick-base"></div><div class="joystick-knob" id="joystickKnob"></div></div>
     <div class="hud-top">
@@ -216,6 +279,7 @@
         <div class="pause-hint" id="pauseBtn" style="pointer-events:auto;" title="Pause">⏸</div>
         <div class="pause-hint" id="statsBtnHud" style="pointer-events:auto;" title="Character Stats">📊</div>
         <div class="pause-hint" id="shopBtnHud" style="pointer-events:auto;" title="In-Game Shop">🛒</div>
+        <div class="pause-hint hidden" id="fusionBtnHud" style="pointer-events:auto;" title="Weapon Fusion Ready">🧬</div>
       </div>
     </div>
     <div class="event-log" id="eventLog"></div>
@@ -224,11 +288,15 @@
       <div class="weapon-row" id="weaponRow"></div>
       <div class="bar-track xp-track"><div class="bar-fill" id="xpFill" style="width:0%;background:linear-gradient(90deg,#2f8f22,var(--xp));"></div><div class="bar-label" id="xpLabel">0 / 10 XP</div></div>
     </div>
+    <div class="ability-hud" id="abilityHud">
+      <div class="ability-btn" id="dashBtn" title="Dash (Space / swipe)"><span class="ab-icon">💨</span><div class="ab-cd" id="dashCd"></div><div class="ab-label">DASH</div></div>
+      <div class="ability-btn" id="healBtn" title="Fast Heal (Shift / tap)"><span class="ab-icon">✚</span><div class="ab-cd" id="healCd"></div><div class="ab-label">HEAL</div></div>
+    </div>
   </div>
 
   <div class="screen" id="screen-menu">
     <div class="veil"></div>
-    <div class="mute-btn" id="muteBtnMenu" style="position:absolute; top:22px; left:26px; z-index:2;">🔊 SOUND</div>
+    <div class="mute-btn" id="muteBtnMenu" style="position:absolute; top:calc(22px + var(--safe-top)); left:calc(26px + var(--safe-left)); z-index:2;">🔊 SOUND</div>
     <div class="artifact-badge"><span class="lbl">ARTIFACTS</span><span id="menuArtifacts">0</span></div>
     <div class="soul-badge"><span class="lbl">SOUL</span><span id="menuSoul">0</span></div>
     <div class="title-wrap">
@@ -267,6 +335,13 @@
     </div>
     <div class="cards-wrap" id="shopWrap"></div>
     <div class="back-link" id="shopBack" style="margin-top:20px;">← RESUME RUN</div>
+  </div>
+
+  <div class="screen hidden" id="screen-fusion">
+    <div class="veil"></div>
+    <div class="title-wrap" style="margin-bottom:22px;"><div class="kicker">weapon fusion</div><div class="title" style="font-size:36px;">FORGE A NEW WEAPON</div></div>
+    <div class="cards-wrap" id="fusionWrap"></div>
+    <div class="back-link" id="fusionBack" style="margin-top:20px;">← RESUME RUN</div>
   </div>
 
   <div class="screen hidden" id="screen-ingame-stats">
@@ -422,6 +497,15 @@ const WEAPONS = {
   swarm_hive:{name:"Swarm Hive",icon:"🐝",type:"summon",tags:["summon","swarm","beast"],base:{minionDmg:4,cd:5,maxMinions:4},perLevel:{minionDmg:1.6,maxMinions:0.3},maxLevel:8,evolvesInto:"hive_overmind"},
   glacier_totem:{name:"Glacier Totem",icon:"🧊",type:"trap",tags:["frost","control"],base:{dmg:15,cd:3.4,radius:125},perLevel:{dmg:6},maxLevel:8,evolvesInto:"absolute_glacier"},
   storm_chain:{name:"Storm Chain",icon:"🌩",type:"chain",tags:["lightning","crowd"],base:{dmg:8,cd:0.9,jumps:4,jumpRange:230},perLevel:{dmg:3.5,jumps:0.4},maxLevel:8,evolvesInto:"thunderstorm_cascade"},
+  // ---- Fusion results (TODO items 1-3, see FUSIONS below) — only obtainable by
+  // fusing their two source weapons, never offered as a normal unlock, so no
+  // "evolvesInto": they're already an endgame-tier payoff. Not yet mirrored into
+  // balance-lab.html's simulation (fusion has no analog in pickLevelUpOption's
+  // model, same conscious gap as talents/mutations/armory per CLAUDE.md) — spot-
+  // check these numbers against the weapon tier list in a future balance session.
+  stormpiercer:{name:"Stormpiercer",icon:"🌠",type:"projectile",tags:["physical","pierce","speed"],base:{dmg:34,cd:0.5,speed:680,pierce:6,count:1,searchRadius:520,life:1.3},perLevel:{dmg:12,count:0.3},maxLevel:8,fusionOnly:true},
+  crimson_fang:{name:"Crimson Fang",icon:"⚔️",type:"melee",tags:["bleed","lifesteal","crit"],base:{dmg:22,cd:0.28,radius:80,pierce:99},perLevel:{dmg:8,radius:3},maxLevel:8,fusionOnly:true},
+  entropy_bloom:{name:"Entropy Bloom",icon:"🌌",type:"area",tags:["fire","poison","slow"],base:{dmg:30,cd:1.8,radius:150},perLevel:{dmg:11,radius:7},maxLevel:8,fusionOnly:true},
 };
 // Global weapon rework/nerf pass: the player was reported as too strong overall.
 // Rather than hand-tuning 20 separate weapons' dmg/dps fields (error-prone and
@@ -446,12 +530,13 @@ const WEAPON_COLORS = {
   spike_trap:"#ff8a4d", tesla_coil:"#ffe15c", holy_aura:"#ffffff", thorn_aura:"#8aff6b", chain_lightning:"#ffe15c",
   whip:"#ff8a4d", twin_daggers:"#dfe3ee", javelin:"#c8c8d8", hand_cannon:"#ffb347", gauss_needle:"#7ee0ff",
   arc_lance:"#ffe15c", void_rift:"#b98cff", swarm_hive:"#e0b48a", glacier_totem:"#8fd8ff", storm_chain:"#ffe15c",
+  stormpiercer:"#e8c96b", crimson_fang:"#ff7a8a", entropy_bloom:"#c97fdb",
 };
 // Per-weapon bullet silhouette, reusing the shape-render branches render() already has for boss
 // attack patterns (spiral/diamond/petal/wave/homing/blade — see PART 12) instead of every player
 // projectile being an identical plain circle. Weapons not listed here keep the default circle,
 // which fits their identity (plasma_rifle is a rapid spray of small energy bolts).
-const PROJECTILE_SHAPES = { bow:"wave", railgun:"spiral", shuriken_storm:"blade", javelin:"homing", hand_cannon:"diamond", gauss_needle:"petal" };
+const PROJECTILE_SHAPES = { bow:"wave", railgun:"spiral", shuriken_storm:"blade", javelin:"homing", hand_cannon:"diamond", gauss_needle:"petal", stormpiercer:"homing" };
 // Visual tier from weapon level (1-4) — drives bullet size/glow, melee afterimage count, chain arc
 // thickness, area/aura pulse intensity, etc. so leveling up reads as a growing presence on screen,
 // not just a bigger number in the level-up card.
@@ -490,6 +575,20 @@ const EVOLUTIONS = {
   absolute_glacier:{from:"glacier_totem",catalyst:"permafrost_idol",name:"Absolute Glacier",icon:"🏔",desc:"An ever-expanding field of ice."},
   thunderstorm_cascade:{from:"storm_chain",catalyst:"static_charm",name:"Thunderstorm Cascade",icon:"⚡",desc:"Lightning cascades further and faster."},
 };
+
+// ---- Weapon Fusion (TODO items 1-3) ---------------------------------------
+// Trigger: checkFusions() (below checkAllEvolutions in PART 7) fires wherever
+// checkAllEvolutions() already does — it flags a fusion as *offered*, not
+// auto-applied, once both `from` weapons reach minLevel, storing the id in
+// player.fusionsAvailable (dedup, same pattern as synergiesActive). The player
+// confirms it from the 🧬 HUD button (only visible while something's available) —
+// applyFusion() then removes both source weapons and grants `result` at a
+// starting level reflecting the sacrifice, netting the player from 2 slots to 1.
+const FUSIONS = [
+  {id:"stormpiercer_fusion", from:["bow","javelin"], minLevel:6, result:"stormpiercer", name:"Stormpiercer", desc:"Bow's speed and Javelin's pierce, forged into one relentless spear of light."},
+  {id:"crimson_fang_fusion", from:["blood_blade","twin_daggers"], minLevel:6, result:"crimson_fang", name:"Crimson Fang", desc:"Twin Daggers' speed married to Blood Blade's hunger for blood."},
+  {id:"entropy_bloom_fusion", from:["fire_nova","void_rift"], minLevel:6, result:"entropy_bloom", name:"Entropy Bloom", desc:"Fire and void collapse into one another, again and again."},
+];
 
 const CARDS = [
   {id:"heavy_bullets",cat:"offensive",name:"Heavy Bullets",tags:["damage"],stackable:true,maxStacks:5,desc:"+16% damage with all weapons.",apply:p=>p.stats.dmgMult*=1.16},
@@ -549,6 +648,24 @@ const CARDS = [
   {id:"ascendant_power",cat:"offensive",name:"Ascendant Power",tags:["damage"],stackable:true,maxStacks:99999,desc:"+5% damage multiplier.",apply:p=>p.stats.dmgMult*=1.05},
   {id:"ascendant_velocity",cat:"offensive",name:"Ascendant Velocity",tags:["speed"],stackable:true,maxStacks:99999,desc:"+5% attack speed.",apply:p=>p.stats.atkSpeedMult*=1.05},
   {id:"ascendant_vitality",cat:"defensive",name:"Ascendant Vitality",tags:["hp"],stackable:true,maxStacks:99999,desc:"+10 max HP, heal to full.",apply:p=>{p.maxHp+=10;p.hp=p.maxHp;}},
+  // ---- Dash build (TODO item 13) — cooldown, an extra charge, and an on-landing
+  // impact all tag "dash" so the dash_build synergy below can detect the archetype.
+  // verify-balance.js's Monte Carlo has no movement/kiting model at all (same
+  // caveat as Round 8's kiting trim) — these 3 cards read as complete no-ops to
+  // it, so their presence alone measures ~6pt lower winRate under "random pick"
+  // (confirmed by A/B: 37.5% pool-without-them vs 31-32% with, at n=500-1000).
+  // That's pool dilution from an unmodeled mechanic, not an actual power drop —
+  // don't chase this number back up by buffing dash stats blind; verify dash's
+  // real-game feel by playtesting instead. ----
+  {id:"blink_step",cat:"utility",name:"Blink Step",tags:["dash"],stackable:true,maxStacks:3,desc:"-25% dash cooldown.",apply:p=>p.stats.dashCdrMult=(p.stats.dashCdrMult||1)*0.75},
+  {id:"twin_dash",cat:"build_defining",name:"Twin Dash",tags:["dash"],stackable:true,maxStacks:2,desc:"+1 dash charge.",apply:p=>p.stats.dashExtraCharges=(p.stats.dashExtraCharges||0)+1},
+  {id:"blink_strike",cat:"offensive",name:"Blink Strike",tags:["dash","damage"],stackable:true,maxStacks:3,desc:"Landing from a dash damages nearby enemies.",apply:p=>p.stats.dashImpactDmg=(p.stats.dashImpactDmg||0)+35},
+  // ---- Summon build (TODO item 14) — deepens the necromancer archetype seeded by
+  // summoner/bone_idol/necromancer_build; raises packBuff's existing 0.6 cap and
+  // adds a second raise-dead source stacking with necromancers_pact. ----
+  {id:"grave_covenant",cat:"build_defining",name:"Grave Covenant",tags:["summon"],desc:"+20% summon damage and count.",apply:p=>{p.stats.summonDmgMult=(p.stats.summonDmgMult||1)*1.2;p.stats.summonCountMult=(p.stats.summonCountMult||1)*1.2;}},
+  {id:"restless_dead",cat:"offensive",name:"Restless Dead",tags:["summon"],stackable:true,maxStacks:2,desc:"+8% chance a killed enemy rises as your minion.",apply:p=>p.stats.raiseDeadChance=(p.stats.raiseDeadChance||0)+0.08},
+  {id:"legion_of_bone",cat:"legendary",name:"Legion of Bone",tags:["summon"],desc:"Spirit Wolves' pack bonus cap raised from +60% to +100% damage.",apply:p=>p.stats.packBuffCap=Math.max(p.stats.packBuffCap||0.6,1.0)},
 ];
 // Rarity tiers derived from each card's existing `cat`, not hand-picked per card —
 // offense/defense/utility are the bread-and-butter picks (common), elemental is a
@@ -602,6 +719,11 @@ const SYNERGIES = [
   {id:"vampiric_build",name:"Vampiric Build",requires:{lifesteal:3},desc:"Lifesteal grants a shield equal to 25% healed.",apply:p=>{p.stats.lifestealShield=(p.stats.lifestealShield||0)+0.25;}},
   {id:"frostbound_build",name:"Frostbound Build",requires:{frost:2},desc:"Slowed enemies take +20% damage.",apply:p=>{p.stats.dmgToSlowedMult=(p.stats.dmgToSlowedMult||1)*1.2;}},
   {id:"plague_build",name:"Plague Build",requires:{poison:2},desc:"Poisoned enemies spread their poison to nearby foes on death.",apply:p=>{p.stats.poisonSpread=true;}},
+  {id:"dash_build",name:"Phase Walker",requires:{dash:2},desc:"+1 dash charge, -15% dash cooldown.",apply:p=>{p.stats.dashExtraCharges=(p.stats.dashExtraCharges||0)+1;p.stats.dashCdrMult=(p.stats.dashCdrMult||1)*0.85;}},
+  // Second, independent tier on top of necromancer_build (own id, own trigger —
+  // synergies don't re-fire once triggered, so a deeper payoff needs a higher
+  // threshold of its own rather than replacing the tier-1 entry above).
+  {id:"lich_lord_build",name:"Lich Lord",requires:{summon:4},desc:"+30% summon damage, +10% chance a killed enemy rises as your minion.",apply:p=>{p.stats.summonDmgMult=(p.stats.summonDmgMult||1)*1.3;p.stats.raiseDeadChance=(p.stats.raiseDeadChance||0)+0.1;}},
 ];
 
 const CHARACTERS = [
@@ -629,6 +751,52 @@ function roleColor(role, idx){
 }
 function brainForRole(role){
   return {melee:"chase",ranged:"keep_distance_shoot",tank:"chase",swarm:"swarm",assassin:"charge",support:"summon"}[role] || "chase";
+}
+// TODO item 9 — every enemy used to render as an identical filled circle
+// regardless of role; a shape per role (keyed the same way PROJECTILE_SHAPES
+// keys per-weapon bullets) reads at a glance without opening a menu. Bosses keep
+// the plain circle (render() below only calls drawEnemyShape for !e.boss) — they
+// already have their own size/glow/healthbar identity, no need to compete with it.
+const ENEMY_ROLE_SHAPE = { melee:"spike", tank:"hex", swarm:"blob", assassin:"blade", ranged:"diamond", support:"ring" };
+// Same weight class as the PROJECTILE_SHAPES draw branches (PART 12) — a handful
+// of path ops per shape, called once per enemy per frame like the existing plain
+// arc() it replaces. spike/blade orient along current velocity so a role's silhouette
+// also telegraphs facing, not just identity.
+function drawEnemyShape(ctx,e){
+  const r=e.radius;
+  switch(e.shape){
+    case "spike":{
+      const ang=Math.atan2(e.vy||0,e.vx||0);
+      ctx.save(); ctx.translate(e.x,e.y); ctx.rotate(ang);
+      ctx.beginPath(); ctx.moveTo(r*1.3,0); ctx.lineTo(-r*0.9,-r*0.9); ctx.lineTo(-r*0.4,0); ctx.lineTo(-r*0.9,r*0.9); ctx.closePath(); ctx.fill();
+      ctx.restore(); break;
+    }
+    case "hex":{
+      ctx.beginPath();
+      for(let i=0;i<6;i++){ const a=Math.PI/3*i-Math.PI/6, px=e.x+Math.cos(a)*r, py=e.y+Math.sin(a)*r; i===0?ctx.moveTo(px,py):ctx.lineTo(px,py); }
+      ctx.closePath(); ctx.fill(); break;
+    }
+    case "blob":{
+      ctx.beginPath();
+      for(let i=0;i<7;i++){ const a=(Math.PI*2/7)*i, rr=r*(0.85+0.15*Math.sin(i*2.3+e.x*0.01)), px=e.x+Math.cos(a)*rr, py=e.y+Math.sin(a)*rr; i===0?ctx.moveTo(px,py):ctx.lineTo(px,py); }
+      ctx.closePath(); ctx.fill(); break;
+    }
+    case "blade":{
+      const ang=Math.atan2(e.vy||0,e.vx||0);
+      ctx.save(); ctx.translate(e.x,e.y); ctx.rotate(ang);
+      ctx.beginPath(); ctx.moveTo(r*1.6,0); ctx.lineTo(0,-r*0.5); ctx.lineTo(-r*1.1,0); ctx.lineTo(0,r*0.5); ctx.closePath(); ctx.fill();
+      ctx.restore(); break;
+    }
+    case "diamond":{
+      ctx.save(); ctx.translate(e.x,e.y); ctx.rotate(Math.PI/4); ctx.fillRect(-r*0.85,-r*0.85,r*1.7,r*1.7); ctx.restore(); break;
+    }
+    case "ring":{
+      ctx.beginPath(); ctx.arc(e.x,e.y,r,0,7); ctx.fill();
+      ctx.globalAlpha=0.5; ctx.beginPath(); ctx.lineWidth=2; ctx.strokeStyle=ctx.fillStyle; ctx.arc(e.x,e.y,r*1.35,0,7); ctx.stroke(); ctx.globalAlpha=1;
+      break;
+    }
+    default: ctx.beginPath(); ctx.arc(e.x,e.y,r,0,7); ctx.fill();
+  }
 }
 
 const ENEMIES_NORMAL_RAW = [
@@ -692,7 +860,7 @@ const ENEMIES_NORMAL = ENEMIES_NORMAL_RAW.map(([id,role,hp,speed,dmg,behavior],i
   return { id,name:id.replace(/_/g," ").replace(/\b\w/g,c=>c.toUpperCase()), role, hp, speed, dmg,
     xp:Math.max(1,Math.round(hp/6)), gold:Math.max(1,Math.round(hp/14)),
     brain:brainForRole(role), radius:{melee:13,ranged:11,tank:20,swarm:9,assassin:10,support:14}[role]||12,
-    color:rc.color, glow:rc.glow, behavior };
+    color:rc.color, glow:rc.glow, behavior, shape:ENEMY_ROLE_SHAPE[role] };
 });
 
 const ENEMIES_ELITE_RAW = [
@@ -723,7 +891,7 @@ const ENEMIES_ELITE = ENEMIES_ELITE_RAW.map(([id,role,hp,speed,dmg,special,behav
   return { id,name:id.replace(/_/g," ").replace(/\b\w/g,c=>c.toUpperCase()), role, hp, speed, dmg, special,
     xp:Math.max(4,Math.round(hp/10)), gold:Math.max(2,Math.round(hp/18)),
     brain:brainForRole(role), radius:{melee:18,ranged:16,tank:24,swarm:14,assassin:16,support:19}[role]||18,
-    color:rc.color, glow:rc.glow, behavior, elite:true };
+    color:rc.color, glow:rc.glow, behavior, elite:true, shape:ENEMY_ROLE_SHAPE[role] };
 });
 
 // Merge into single lookup engine reads (spawnEnemy uses this + BOSS_ROSTER)
@@ -910,12 +1078,18 @@ const EVENTS = [
   {id:"shrine_of_the_swarm",cat:"cursed_shrine",name:"Shrine of the Swarm",desc:"Enemies spawn faster for the rest of the run, but you gain bonus projectiles.",resolve:(p,i,ctx)=>{ctx.applyTemporaryModifier("spawnRate",1.15,Infinity);p.stats.bonusProjectiles=(p.stats.bonusProjectiles||0)+2;}},
 ];
 
-const TALENT_BRANCHES = ["warrior","mage","hunter","survivor"];
+// "survivor" is intentionally not tied to any CHARACTERS entry — it's the generic/
+// economy branch (gold/soul/regen/xp/revive), open to every class. warrior/mage/
+// hunter/engineer/necromancer each mirror one CHARACTERS id's kit/uniqueBonus so
+// every playable class has a matching branch (was missing for engineer/necromancer).
+const TALENT_BRANCHES = ["warrior","mage","hunter","survivor","engineer","necromancer"];
 const TALENT_STAT_LINES = {
   warrior:[{key:"maxHp",label:"Vitality",perLevel:12},{key:"armor",label:"Iron Hide",perLevel:0.6},{key:"meleeDmg",label:"Might",perLevel:0.05},{key:"dmgReduction",label:"Steadfast",perLevel:0.02},{key:"startWeaponLvl",label:"Veteran's Edge",perLevel:1}],
   mage:[{key:"elementalMult",label:"Arcane Focus",perLevel:0.04},{key:"cdr",label:"Flow State",perLevel:0.02},{key:"aoeRadius",label:"Expanded Mind",perLevel:0.03},{key:"arcaneDmg",label:"Ley Attunement",perLevel:0.04},{key:"critDamage",label:"Volatile Casting",perLevel:0.06}],
   hunter:[{key:"critChance",label:"Deadeye",perLevel:0.015},{key:"moveSpeed",label:"Fleet Foot",perLevel:0.02},{key:"pierce",label:"Penetrating Shot",perLevel:1},{key:"range",label:"Eagle Eye",perLevel:0.03},{key:"eliteDmg",label:"Big Game Hunter",perLevel:0.02}],
   survivor:[{key:"goldMult",label:"Scavenger",perLevel:0.02},{key:"soulMult",label:"Soulbound",perLevel:0.02},{key:"regen",label:"Grit",perLevel:0.1},{key:"xpMult",label:"Quick Study",perLevel:0.02},{key:"reviveChance",label:"Undying",perLevel:0.04}],
+  engineer:[{key:"turretCdr",label:"Rapid Deployment",perLevel:0.02},{key:"turretRadius",label:"Blast Radius",perLevel:0.03},{key:"turretArmor",label:"Reinforced Chassis",perLevel:0.8},{key:"turretDmg",label:"Overcharged Core",perLevel:0.04},{key:"turretMastery",label:"Master Engineer",perLevel:1}],
+  necromancer:[{key:"boneDmg",label:"Grave Might",perLevel:0.05},{key:"boneCount",label:"Endless Horde",perLevel:0.04},{key:"boneDuration",label:"Undying Legion",perLevel:0.06},{key:"boneInherit",label:"Shared Malice",perLevel:0.03},{key:"boneRaise",label:"Reanimation",perLevel:0.03}],
 };
 // Talent lines that existed in older builds but had no implemented effect. Their
 // Soul cost is refunded once on load (see migrateTalents) instead of silently lost.
@@ -929,6 +1103,12 @@ const TALENT_LINE_DESCS = {
   pierce:"+1 pierce per tier.", range:"+3% weapon range per tier.", eliteDmg:"+2% damage vs elites/bosses per tier.",
   goldMult:"+2% gold per tier.", soulMult:"+2% Soul per tier.", regen:"+0.1 HP/s per tier.", xpMult:"+2% XP per tier.",
   reviveChance:"+4% chance to cheat death once per run, per tier.",
+  turretCdr:"-2% weapon cooldowns per tier.", turretRadius:"+3% area radius per tier.",
+  turretArmor:"+0.8 flat armor per tier.", turretDmg:"+4% damage for area/beam/aura/chain/trap weapons per tier.",
+  turretMastery:"Start with your weapon +1 level per tier.",
+  boneDmg:"+5% summon damage per tier.", boneCount:"+4% summon count per tier.",
+  boneDuration:"+6% summon duration per tier.", boneInherit:"+3% of your damage multiplier inherited by summons per tier.",
+  boneRaise:"+3% chance a killed enemy rises as your minion, per tier.",
 };
 function buildTalentTree(){
   const nodes=[];
@@ -938,6 +1118,26 @@ function buildTalentTree(){
       cost: Math.ceil(8*Math.pow(1.3,lvl-1)*(1+TALENT_BRANCHES.indexOf(branch)*0.05)) });
   }
   return nodes;
+}
+// Graph shape for the talent screen (item 16): every branch has exactly 5 lines,
+// laid out the same way — a root, two mid-tier lines branching off it, a
+// convergence node requiring both, and a capstone — so the shape is authored once
+// by line-index instead of by hand for all 6 branches x 5 lines. `requires` holds
+// {idx,tier} pairs into the *same branch's* TALENT_STAT_LINES array; a line is
+// locked (can't buy even tier 1) until every required sibling line is at least at
+// that tier. col/row are grid cells the graph UI positions nodes on.
+const TALENT_NODE_LAYOUT = [
+  {col:1,row:2,requires:[]},
+  {col:2,row:1,requires:[{idx:0,tier:2}]},
+  {col:2,row:3,requires:[{idx:0,tier:2}]},
+  {col:3,row:2,requires:[{idx:1,tier:3},{idx:2,tier:3}]},
+  {col:4,row:2,requires:[{idx:3,tier:2}]},
+];
+function lineRequiresFor(branch,lineIndex){
+  return TALENT_NODE_LAYOUT[lineIndex].requires.map(r=>({key:TALENT_STAT_LINES[branch][r.idx].key,tier:r.tier}));
+}
+function lineLocked(branch,lineIndex){
+  return lineRequiresFor(branch,lineIndex).some(r=>talentLevel(branch,r.key)<r.tier);
 }
 const TALENT_TREE = buildTalentTree();
 function applyTalentStat(p, statKey, totalPerLevelSum){
@@ -963,6 +1163,16 @@ function applyTalentStat(p, statKey, totalPerLevelSum){
     case "regen": p.stats.regen+=v; break;
     case "xpMult": p.stats.xpMult*=(1+v); break;
     case "reviveChance": p.stats.reviveChance=Math.min(0.5,(p.stats.reviveChance||0)+v); break;
+    case "turretCdr": p.stats.cdrMult=(p.stats.cdrMult||1)*(1-v); break;
+    case "turretRadius": p.stats.aoeRadiusMult=(p.stats.aoeRadiusMult||1)*(1+v); break;
+    case "turretArmor": p.stats.armor+=v; break;
+    case "turretDmg": p.stats.arcaneDmgMult=(p.stats.arcaneDmgMult||1)*(1+v); break;
+    case "turretMastery": p.stats.startWeaponBonusLvl=(p.stats.startWeaponBonusLvl||0)+Math.round(v); break;
+    case "boneDmg": p.stats.summonDmgMult=(p.stats.summonDmgMult||1)*(1+v); break;
+    case "boneCount": p.stats.summonCountMult=(p.stats.summonCountMult||1)*(1+v); break;
+    case "boneDuration": p.stats.summonDurationMult=(p.stats.summonDurationMult||1)*(1+v); break;
+    case "boneInherit": p.stats.summonInheritDmg=(p.stats.summonInheritDmg||0)+v; break;
+    case "boneRaise": p.stats.raiseDeadChance=(p.stats.raiseDeadChance||0)+v; break;
   }
 }
 
@@ -1342,7 +1552,8 @@ function freshStats(){
     lifestealShield:0, dmgToSlowedMult:1, bulwarkDR:0, aoeRadiusMult:1, rangeMult:1,
     startWeaponBonusLvl:0, extraChainCount:0,
     damageReduction:0, arcaneDmgMult:1, reviveChance:0, chillCap:0.35, burnStacks:1,
-    summonInheritDmg:0, packBuff:0, extraPassiveSlots:0 };
+    summonInheritDmg:0, packBuff:0, packBuffCap:0.6, extraPassiveSlots:0,
+    dashCdrMult:1, dashExtraCharges:0, dashImpactDmg:0 };
 }
 
 function newPlayer(characterId){
@@ -1350,9 +1561,11 @@ function newPlayer(characterId){
   const p = {
     x:WORLD.w/2, y:WORLD.h/2, vx:0, vy:0, radius:15, hp:100, maxHp:100, level:1, xp:0, xpNext:xpForLevel(1),
     gold:0, crystals:0, weapons:{}, weaponTimers:{}, stats:freshStats(),
-    passives:[], cardsTaken:[], synergiesActive:[], shopPurchases:{}, hasRevive:false, extraWeaponSlots:0,
+    passives:[], cardsTaken:[], synergiesActive:[], fusionsAvailable:[], shopPurchases:{}, hasRevive:false, extraWeaponSlots:0,
     disabledWeapons:{}, shield:0, character:characterId, momentumStacks:0,
     lifestealHealedThisSec:0, lifestealWindowStart:0,
+    facingX:0, facingY:-1, hitFlash:0, hurtFlash:0,
+    abilities:{ dash:{cd:0,charges:1,maxCharges:1,active:false,t:0,dx:0,dy:1}, heal:{cd:0} },
   };
   for(const branch of TALENT_BRANCHES) for(const line of TALENT_STAT_LINES[branch]){
     const lvl = talentLevel(branch, line.key);
@@ -1524,7 +1737,7 @@ function weaponFire(wid, lvl, dt){
         life: wid==="turret_deployer" ? (permanentTurret?Infinity:8*(player.stats.summonDurationMult||1)) : Infinity,
         radius:10, icon:def.icon });
       // Spirit Pack Alpha: wolves buff the player's own damage while alive.
-      if(evo==="spirit_pack_alpha") player.stats.packBuff = Math.min(0.6,(minions.filter(m=>m.weaponId===wid).length)*0.06);
+      if(evo==="spirit_pack_alpha") player.stats.packBuff = Math.min(player.stats.packBuffCap||0.6,(minions.filter(m=>m.weaponId===wid).length)*0.06);
       player.weaponTimers[wid] = def.base.cd*cdMult;
     }
     return;
@@ -1702,6 +1915,33 @@ function performEvolution(wid){
   return true;
 }
 function checkAllEvolutions(){ for(const wid of Object.keys(player.weapons)) performEvolution(wid); }
+function checkFusions(){
+  for(const f of FUSIONS){
+    if(player.fusionsAvailable.includes(f.id)) continue;
+    if(f.from.every(wid=>(player.weapons[wid]||0)>=f.minLevel)){
+      player.fusionsAvailable.push(f.id);
+      logEvent(`🧬 Fusion available: ${f.name}!`);
+    }
+  }
+}
+// Removes both source weapons, grants the result at a level reflecting the
+// sacrifice (average of the two, floor at 1) instead of resetting to 1 — the
+// player just gave up two near-maxed weapons for this, level 1 would feel like
+// a punishment rather than a payoff. evolvedWeapons entries for the consumed
+// weapons are cleaned up too, so a stale evolved-def can't linger under a wid
+// nothing owns anymore.
+function applyFusion(fusionId){
+  const f = FUSIONS.find(x=>x.id===fusionId); if(!f) return false;
+  if(!f.from.every(wid=>(player.weapons[wid]||0)>=f.minLevel)) return false;
+  const startLevel = Math.max(1, Math.floor(f.from.reduce((s,wid)=>s+(player.weapons[wid]||1),0)/f.from.length/2));
+  for(const wid of f.from){ delete player.weapons[wid]; if(player.evolvedWeapons) delete player.evolvedWeapons[wid]; }
+  player.weapons[f.result] = startLevel;
+  player.fusionsAvailable = player.fusionsAvailable.filter(id=>id!==fusionId);
+  logEvent(`🧬 ${f.name} forged!`);
+  showAchievementLikeToast("FUSION", f.name, "🧬");
+  checkAllEvolutions(); checkSynergies(); checkAchievements();
+  return true;
+}
 
 function collectBuildTags(){
   const tags=[];
@@ -1734,7 +1974,7 @@ function equipPassive(passiveId){
   player.passives.push(passiveId); def.apply(player);
   runStats.passiveSlotsFilled = player.passives.length;
   logEvent(`Equipped passive: ${def.name}`);
-  checkAllEvolutions(); checkSynergies(); checkAchievements();
+  checkAllEvolutions(); checkFusions(); checkSynergies(); checkAchievements();
   return true;
 }
 function randomPassive(excludeOwned=true){
@@ -1958,7 +2198,7 @@ function spawnEnemy(id, forcedPos, overrides={}){
   const e = resetEnemyFields(acquireEnemyObject());
   Object.assign(e, { id, name:def.name, x,y, hp:def.hp*scale*hpMult, maxHp:def.hp*scale*hpMult, speed:def.speed,
     radius:def.radius*radiusMult, dmg:def.dmg*Math.min(scale,ENEMY_DMG_SCALE_CAP), xp:def.xp, gold:def.gold, brain:def.brain,
-    color:def.color, glow:def.glow, elite:!!def.elite, boss:false, special:def.special||null,
+    color:def.color, glow:def.glow, shape:def.shape, elite:!!def.elite, boss:false, special:def.special||null,
     isSplit:!!overrides.isSplit, atkCd:0, shootCd:rand(0,1), hitFlash:0,
     chargeCd:rand(1,2.4), chargeState:"idle", chargeDx:0, chargeDy:0, summonCd:rand(2.5,4), swarmPhase:rand(0,Math.PI*2), shield:0,
     aiTimer:rand(0,AI_TICK_INTERVAL) });
@@ -2451,6 +2691,21 @@ function updateZones(dt){
 /* =========================================================================
    PART 9 — PLAYER / DAMAGE / PICKUPS / LEVEL-UP CARDS / SHOP / EVENTS
    ========================================================================= */
+// Player active abilities (TODO items 11+12): the game's first cooldown-gated,
+// input-triggered player actions — dash and a burst "Fast Heal" — share one
+// player.abilities structure so any future ability plugs into the same
+// input/cooldown/UI shape instead of growing its own ad-hoc fields.
+const DASH_COOLDOWN = 6;      // seconds
+const DASH_DURATION = 0.22;   // seconds the dash burst lasts
+const DASH_SPEED_MULT = 3.4;  // moveSpeed multiplier while dashing
+// Fast Heal is a *finite, cooldown-gated* burst, not continuous %-based healing
+// like lifesteal/regen — but it still competes with the same concern that led to
+// LIFESTEAL_HPS_CAP below (uncapped healing wiped out wave-pressure risk after
+// minute 5), so it's tuned conservatively and mirrored into balance-lab.html's
+// healing budget so verify-balance.js can catch the same collapse if ever pushed
+// too strong.
+const HEAL_ABILITY_COOLDOWN = 50; // seconds
+const HEAL_ABILITY_PCT = 0.12;    // fraction of maxHp restored per use
 /* ---- Anti-broken-build guardrails -----------------------------------------
    Cards, passives, talents and synergies all multiply the same handful of
    stats, so stacking enough of them (e.g. multiple elemental cards + Ascendant
@@ -2491,13 +2746,43 @@ function clampPlayerStats(){
   if(Object.keys(player.weapons).length > MAX_WEAPON_SLOTS_BASE+10) { /* safety valve, should never trigger via normal play */ }
 }
 
+// Cooldown a dash charge regenerates in, after dashCdrMult (Blink Step card etc).
+function dashRegenTime(){ return DASH_COOLDOWN*(player.stats.dashCdrMult||1); }
 function updatePlayer(dt){
   clampPlayerStats();
+  if(player.hitFlash>0) player.hitFlash=Math.max(0,player.hitFlash-dt*4);
+  if(player.hurtFlash>0) player.hurtFlash=Math.max(0,player.hurtFlash-dt*2.5);
+  const dash=player.abilities.dash, heal=player.abilities.heal;
+  // Charge system: dash.charges banks up to dash.maxCharges (1 + Twin Dash
+  // stacks), each spent charge starts a dashRegenTime() timer on dash.cd:
+  // ready to dash again the instant charges>0, independent of whether another
+  // charge is still refilling in the background.
+  dash.maxCharges = 1+Math.floor(player.stats.dashExtraCharges||0);
+  if(dash.charges<dash.maxCharges){
+    dash.cd=Math.max(0,dash.cd-dt);
+    if(dash.cd<=0){ dash.charges++; dash.cd = dash.charges<dash.maxCharges ? dashRegenTime() : 0; }
+  }
+  if(heal.cd>0) heal.cd=Math.max(0,heal.cd-dt);
   let dx=0,dy=0;
   if(keys['w']||keys['arrowup']) dy-=1; if(keys['s']||keys['arrowdown']) dy+=1;
   if(keys['a']||keys['arrowleft']) dx-=1; if(keys['d']||keys['arrowright']) dx+=1;
   dx+=touchVec.x; dy+=touchVec.y;
-  if(dx||dy){
+  if(dx||dy){ const flen=Math.hypot(dx,dy); player.facingX=dx/flen; player.facingY=dy/flen; }
+  if(dash.active){
+    dash.t-=dt;
+    if(dash.t<=0){
+      dash.active=false;
+      if(player.stats.dashImpactDmg>0){
+        const r=60*(player.stats.aoeRadiusMult||1);
+        forEachEnemyNear(player.x,player.y,r,e=>dealDamage(e,player.stats.dashImpactDmg*player.stats.dmgMult,null));
+        novaPulses.push({x:player.x,y:player.y,radius:r,life:0.35,maxLife:0.35,color:"#b98cff"});
+      }
+    }
+  }
+  if(dash.active){
+    player.vx=dash.dx*player.stats.moveSpeed*DASH_SPEED_MULT; player.vy=dash.dy*player.stats.moveSpeed*DASH_SPEED_MULT;
+    player.x=clamp(player.x+player.vx*dt,player.radius,WORLD.w-player.radius); player.y=clamp(player.y+player.vy*dt,player.radius,WORLD.h-player.radius);
+  } else if(dx||dy){
     const len=Math.hypot(dx,dy);
     player.vx=(dx/len)*player.stats.moveSpeed; player.vy=(dy/len)*player.stats.moveSpeed;
     player.x=clamp(player.x+player.vx*dt,player.radius,WORLD.w-player.radius); player.y=clamp(player.y+player.vy*dt,player.radius,WORLD.h-player.radius);
@@ -2507,7 +2792,39 @@ function updatePlayer(dt){
   if(player.stats.shieldCd>0){ player._shieldTimer=(player._shieldTimer??player.stats.shieldCd)-dt; if(player._shieldTimer<=0){ player.shield=Math.min(40,player.shield+30); player._shieldTimer=player.stats.shieldCd; } }
   if(player._abyssalMarked && runTime>player._abyssalMarked) player._abyssalMarked=null;
 }
+// Dash direction: explicit (dx,dy) if given (a mobile swipe passes its own
+// vector), else current movement input if any, else the last direction the
+// player faced (kept across frames on player.facingX/Y) — so a keyboard/click
+// trigger with no explicit direction never fails to have one, even standing still.
+function tryDash(dirX,dirY){
+  if(state!=='playing') return;
+  const dash=player.abilities.dash;
+  if(dash.charges<=0 || dash.active) return;
+  let dx=dirX, dy=dirY;
+  if(!dx && !dy){
+    dx=0; dy=0;
+    if(keys['w']||keys['arrowup']) dy-=1; if(keys['s']||keys['arrowdown']) dy+=1;
+    if(keys['a']||keys['arrowleft']) dx-=1; if(keys['d']||keys['arrowright']) dx+=1;
+    dx+=touchVec.x; dy+=touchVec.y;
+    if(!dx && !dy){ dx=player.facingX; dy=player.facingY; }
+  }
+  const len=Math.hypot(dx,dy)||1;
+  dash.charges--; if(dash.cd<=0) dash.cd=dashRegenTime();
+  dash.active=true; dash.t=DASH_DURATION; dash.dx=dx/len; dash.dy=dy/len;
+  SFX.dash();
+}
+function tryFastHeal(){
+  if(state!=='playing') return;
+  const heal=player.abilities.heal;
+  if(heal.cd>0) return;
+  heal.cd=HEAL_ABILITY_COOLDOWN;
+  const healed=Math.min(player.maxHp,player.hp+player.maxHp*HEAL_ABILITY_PCT)-player.hp;
+  player.hp+=healed;
+  SFX.fastHeal();
+  spawnFloater(player.x, player.y-player.radius-10, `+${Math.round(healed)}`, "#7cff6b");
+}
 function damagePlayer(amount){
+  if(player.abilities.dash.active) return; // dash i-frames
   let armor = player.stats.armor + (player.hp/player.maxHp<0.3?(player.stats.lastStandArmor||0)*player.stats.armor:0);
   let dmg = Math.max(1, amount-armor);
   if(player.stats.bulwarkDR && player.hp/player.maxHp>0.5) dmg *= (1-player.stats.bulwarkDR);
@@ -2518,6 +2835,12 @@ function damagePlayer(amount){
     if(player.stats.thorns>0){ const nearby=nearestEnemy(player.x,player.y,140); if(nearby) dealDamage(nearby, dmg*player.stats.thorns, null); }
     player.hp -= dmg;
     if(screenShakeOn){ camera.shake=Math.min(14,(camera.shake||0)+4); }
+    // TODO item 10: the player previously had zero visual hit feedback beyond
+    // camera shake — hitFlash mirrors enemies' own e.hitFlash (whitens the body
+    // briefly), hurtFlash drives a separate, stronger full-screen red vignette
+    // (see render()) scaled by how big a hit this was relative to max HP, so a
+    // grazing tick and a near-death blow don't look the same.
+    player.hitFlash=1; player.hurtFlash=Math.min(1,(player.hurtFlash||0)+clamp(dmg/player.maxHp,0.15,1));
     SFX.hurt(); vibrate(30);
   }
   if(player.hp<=0 && state==='playing'){
@@ -2563,7 +2886,9 @@ function openLevelUp(){ pendingLevelUps++; if(state==='playing') showLevelUpCard
 function buildCardPool(){
   const pool=[];
   for(const wid of Object.keys(WEAPONS)){
-    if(!player.weapons[wid]){ if(Object.keys(player.weapons).length<maxWeaponSlots(player)) pool.push({kind:"unlock",wid}); }
+    // fusionOnly weapons (Stormpiercer etc.) never enter the normal unlock pool —
+    // the whole point of fusion is that they're earned by fusing, not rolled.
+    if(!player.weapons[wid]){ if(!WEAPONS[wid].fusionOnly && Object.keys(player.weapons).length<maxWeaponSlots(player)) pool.push({kind:"unlock",wid}); }
     else if(player.weapons[wid]<WEAPONS[wid].maxLevel) pool.push({kind:"levelup",wid});
   }
   // Non-stackable cards are excluded once taken; stackable cards are excluded once
@@ -2608,13 +2933,15 @@ function renderCardEl(entry){
     el.innerHTML=`<div class="icon">${d.icon}</div><div class="name">${d.name} +1</div><div class="desc">Level ${lvl} → ${lvl+1}.</div><div class="tag">WEAPON LVL</div>`;
     el.onclick=()=>{ SFX.uiClick(); player.weapons[entry.wid]++; logEvent(d.name+" leveled up."); performEvolution(entry.wid); afterCardPicked(); }; }
   else { const c=entry.card;
+    el.className='card rarity-'+(c.rarity||'common');
     const stackNote = c.stackable ? ` <span style="color:var(--dim)">(${player.cardsTaken.filter(id=>id===c.id).length}/${c.maxStacks||99} taken)</span>` : "";
-    el.innerHTML=`<div class="icon">${cardIcon(c.cat)}</div><div class="name">${c.name}</div><div class="desc">${c.desc}${stackNote}</div><div class="tag cat-${c.cat}">${c.cat.toUpperCase().replace('_',' ')}</div>`;
+    const rarityTag = c.rarity && c.rarity!=="common" ? `<div class="rarity-label">${c.rarity}</div>` : "";
+    el.innerHTML=`${rarityTag}<div class="icon">${cardIcon(c.cat)}</div><div class="name">${c.name}</div><div class="desc">${c.desc}${stackNote}</div><div class="tag cat-${c.cat}">${c.cat.toUpperCase().replace('_',' ')}</div>`;
     el.onclick=()=>{ SFX.uiClick(); c.apply(player); player.cardsTaken.push(c.id); if(c.cat==="legendary") runStats.legendaryCardsTaken=(runStats.legendaryCardsTaken||0)+1; logEvent(c.name+" acquired."); afterCardPicked(); }; }
   return el;
 }
 function cardIcon(cat){ return {offensive:"⚔",defensive:"🛡",utility:"🧭",elemental:"🌪",build_defining:"🧩",legendary:"⭐"}[cat]||"✦"; }
-function afterCardPicked(){ checkSynergies(); checkAchievements(); pendingLevelUps--; hideAll(); if(pendingLevelUps>0) showLevelUpCards(); else setState('playing'); }
+function afterCardPicked(){ checkFusions(); checkSynergies(); checkAchievements(); pendingLevelUps--; hideAll(); if(pendingLevelUps>0) showLevelUpCards(); else setState('playing'); }
 function showLevelUpCards(){
   setState('levelup'); SFX.levelup();
   const pool = buildCardPool();
@@ -2649,25 +2976,25 @@ function showLevelUpCards(){
 // early/mid run, the expensive tier gives a swimming-in-gold late build
 // something worth spending it on instead of it just piling up unused.
 const SHOP_ITEMS = [
-  {id:"shop_heal",name:"Health Potion",icon:"🧪",desc:"Restore 40% of Max HP.",cost:50,growth:1.15,curr:"gold",max:99,apply:p=>{p.hp=Math.min(p.maxHp,p.hp+p.maxHp*0.4);}},
-  {id:"shop_maxhp",name:"Vitality Elixir",icon:"❤️",desc:"+25 Max HP and heal to full.",cost:120,growth:1.4,curr:"gold",max:5,apply:p=>{p.maxHp+=25;p.hp=p.maxHp;}},
-  {id:"shop_dmg",name:"Sharpening Stone",icon:"⚔️",desc:"+12% Damage multiplier.",cost:150,growth:1.4,curr:"gold",max:5,apply:p=>{p.stats.dmgMult+=0.12;}},
-  {id:"shop_atkspd",name:"Haste Rune",icon:"⚡",desc:"+12% Attack Speed.",cost:150,growth:1.4,curr:"gold",max:5,apply:p=>{p.stats.atkSpeedMult+=0.12;}},
-  {id:"shop_armor",name:"Iron Plating",icon:"🛡️",desc:"+2 Flat Armor.",cost:200,growth:1.4,curr:"gold",max:5,apply:p=>{p.stats.armor+=2;}},
-  {id:"shop_regen",name:"Regen Charm",icon:"✚",desc:"+1.0 HP regen/s.",cost:180,growth:1.4,curr:"gold",max:5,apply:p=>{p.stats.regen+=1.0;}},
-  {id:"shop_lifesteal",name:"Crimson Vial",icon:"🩸",desc:"+2% Lifesteal.",cost:220,growth:1.4,curr:"gold",max:4,apply:p=>{p.stats.lifesteal+=0.02;}},
-  {id:"shop_pickup",name:"Magnet Coil",icon:"🧲",desc:"+20% Pickup radius.",cost:130,growth:1.3,curr:"gold",max:4,apply:p=>{p.stats.pickupRadius*=1.2;}},
-  {id:"shop_revive",name:"Ankh of Rebirth",icon:"☥",desc:"Revive at 50% HP once. Gold resets.",cost:600,curr:"gold",max:1,apply:p=>{p.hasRevive=true;}},
-  {id:"shop_passive",name:"Mystery Passive",icon:"🔮",desc:"Equip a random passive item.",cost:8,growth:1.25,curr:"crystals",max:99,apply:p=>{equipPassive(randomPassive());}},
-  {id:"shop_evocatalyst",name:"Catalyst Cache",icon:"🌀",desc:"Attempt evolution on all eligible weapons.",cost:12,growth:1.25,curr:"crystals",max:99,apply:p=>{checkAllEvolutions();}},
+  {id:"shop_heal",name:"Health Potion",icon:"🧪",desc:"Restore 40% of Max HP.",cost:50,growth:1.15,curr:"gold",max:99,rarity:"common",apply:p=>{p.hp=Math.min(p.maxHp,p.hp+p.maxHp*0.4);}},
+  {id:"shop_maxhp",name:"Vitality Elixir",icon:"❤️",desc:"+25 Max HP and heal to full.",cost:120,growth:1.4,curr:"gold",max:5,rarity:"uncommon",apply:p=>{p.maxHp+=25;p.hp=p.maxHp;}},
+  {id:"shop_dmg",name:"Sharpening Stone",icon:"⚔️",desc:"+12% Damage multiplier.",cost:150,growth:1.4,curr:"gold",max:5,rarity:"uncommon",apply:p=>{p.stats.dmgMult+=0.12;}},
+  {id:"shop_atkspd",name:"Haste Rune",icon:"⚡",desc:"+12% Attack Speed.",cost:150,growth:1.4,curr:"gold",max:5,rarity:"uncommon",apply:p=>{p.stats.atkSpeedMult+=0.12;}},
+  {id:"shop_armor",name:"Iron Plating",icon:"🛡️",desc:"+2 Flat Armor.",cost:200,growth:1.4,curr:"gold",max:5,rarity:"uncommon",apply:p=>{p.stats.armor+=2;}},
+  {id:"shop_regen",name:"Regen Charm",icon:"✚",desc:"+1.0 HP regen/s.",cost:180,growth:1.4,curr:"gold",max:5,rarity:"uncommon",apply:p=>{p.stats.regen+=1.0;}},
+  {id:"shop_lifesteal",name:"Crimson Vial",icon:"🩸",desc:"+2% Lifesteal.",cost:220,growth:1.4,curr:"gold",max:4,rarity:"uncommon",apply:p=>{p.stats.lifesteal+=0.02;}},
+  {id:"shop_pickup",name:"Magnet Coil",icon:"🧲",desc:"+20% Pickup radius.",cost:130,growth:1.3,curr:"gold",max:4,rarity:"common",apply:p=>{p.stats.pickupRadius*=1.2;}},
+  {id:"shop_revive",name:"Ankh of Rebirth",icon:"☥",desc:"Revive at 50% HP once. Gold resets.",cost:600,curr:"gold",max:1,rarity:"rare",apply:p=>{p.hasRevive=true;}},
+  {id:"shop_passive",name:"Mystery Passive",icon:"🔮",desc:"Equip a random passive item.",cost:8,growth:1.25,curr:"crystals",max:99,rarity:"uncommon",apply:p=>{equipPassive(randomPassive());}},
+  {id:"shop_evocatalyst",name:"Catalyst Cache",icon:"🌀",desc:"Attempt evolution on all eligible weapons.",cost:12,growth:1.25,curr:"crystals",max:99,rarity:"uncommon",apply:p=>{checkAllEvolutions();}},
   // ---- Expensive late-game gold sinks — a surviving/snowballing build has millions
   // of gold by minute 20-30 with nothing to spend it on; these give that gold a job. ----
-  {id:"shop_maxhp_big",name:"Reinforced Vitality",icon:"💗",desc:"+60 Max HP and heal to full.",cost:2200,growth:1.5,curr:"gold",max:5,apply:p=>{p.maxHp+=60;p.hp=p.maxHp;}},
-  {id:"shop_dmg_big",name:"Berserker's Edge",icon:"🗡️",desc:"+20% Damage multiplier.",cost:3200,growth:1.5,curr:"gold",max:4,apply:p=>{p.stats.dmgMult+=0.2;}},
-  {id:"shop_atkspd_big",name:"Overdrive Core",icon:"🌀",desc:"+20% Attack Speed.",cost:3200,growth:1.5,curr:"gold",max:4,apply:p=>{p.stats.atkSpeedMult+=0.2;}},
-  {id:"shop_armor_big",name:"Fortress Plating",icon:"🏰",desc:"+6 Flat Armor.",cost:2800,growth:1.5,curr:"gold",max:4,apply:p=>{p.stats.armor+=6;}},
-  {id:"shop_goldmult",name:"Golden Idol",icon:"🗿",desc:"+15% Gold gained.",cost:4000,growth:1.6,curr:"gold",max:3,apply:p=>{p.stats.goldMult*=1.15;}},
-  {id:"shop_ascension",name:"Ascension Shard",icon:"💎",desc:"+30% Damage and +30% Attack Speed. Once per run.",cost:25000,curr:"gold",max:1,apply:p=>{p.stats.dmgMult+=0.3;p.stats.atkSpeedMult+=0.3;}},
+  {id:"shop_maxhp_big",name:"Reinforced Vitality",icon:"💗",desc:"+60 Max HP and heal to full.",cost:2200,growth:1.5,curr:"gold",max:5,rarity:"rare",apply:p=>{p.maxHp+=60;p.hp=p.maxHp;}},
+  {id:"shop_dmg_big",name:"Berserker's Edge",icon:"🗡️",desc:"+20% Damage multiplier.",cost:3200,growth:1.5,curr:"gold",max:4,rarity:"rare",apply:p=>{p.stats.dmgMult+=0.2;}},
+  {id:"shop_atkspd_big",name:"Overdrive Core",icon:"🌀",desc:"+20% Attack Speed.",cost:3200,growth:1.5,curr:"gold",max:4,rarity:"rare",apply:p=>{p.stats.atkSpeedMult+=0.2;}},
+  {id:"shop_armor_big",name:"Fortress Plating",icon:"🏰",desc:"+6 Flat Armor.",cost:2800,growth:1.5,curr:"gold",max:4,rarity:"rare",apply:p=>{p.stats.armor+=6;}},
+  {id:"shop_goldmult",name:"Golden Idol",icon:"🗿",desc:"+15% Gold gained.",cost:4000,growth:1.6,curr:"gold",max:3,rarity:"rare",apply:p=>{p.stats.goldMult*=1.15;}},
+  {id:"shop_ascension",name:"Ascension Shard",icon:"💎",desc:"+30% Damage and +30% Attack Speed. Once per run.",cost:25000,curr:"gold",max:1,rarity:"legendary",apply:p=>{p.stats.dmgMult+=0.3;p.stats.atkSpeedMult+=0.3;}},
 ];
 function shopItemCost(item, purchased){ return Math.ceil(item.cost*Math.pow(item.growth||1, purchased)); }
 function renderShop(){
@@ -2679,9 +3006,10 @@ function renderShop(){
     const cost = shopItemCost(item, purchased);
     const wallet = item.curr==="gold"?player.gold:player.crystals;
     const canAfford = wallet>=cost;
-    const el=document.createElement('div'); el.className='card shop-card';
-    el.innerHTML=`<div class="icon">${item.icon}</div><div class="name">${item.name}</div><div class="desc">${item.desc}</div>
-      <div class="price">${maxed?"MAXED":cost+" "+(item.curr==="gold"?"GOLD":"CRYSTALS")}</div>
+    const el=document.createElement('div'); el.className='card shop-card rarity-'+(item.rarity||'common');
+    const rarityTag = item.rarity && item.rarity!=="common" ? `<div class="rarity-label">${item.rarity}</div>` : "";
+    el.innerHTML=`${rarityTag}<div class="icon">${item.icon}</div><div class="name">${item.name}</div><div class="desc">${item.desc}</div>
+      <div class="price" style="color:${maxed?'var(--dim)':item.curr==='gold'?'var(--gold)':'var(--crystal)'}">${maxed?"MAXED":cost+" "+(item.curr==="gold"?"GOLD":"CRYSTALS")}</div>
       <button class="buy-btn" ${(!canAfford||maxed)?'disabled':''}>${maxed?"MAXED OUT":"BUY"}</button>`;
     el.querySelector('.buy-btn').onclick=()=>{
       if(maxed) return; if(item.curr==="gold"){ if(player.gold<cost) return; player.gold-=cost; } else { if(player.crystals<cost) return; player.crystals-=cost; }
@@ -2691,6 +3019,34 @@ function renderShop(){
   });
 }
 function openShop(){ if(state!=='playing'&&state!=='paused') return; setState('shop'); SFX.stopHeartbeat(); MUSIC.stop(); renderShop(); show('screen-shop'); }
+// "before -> after" fusion card (TODO item 3): both source icons, an arrow, and
+// the result icon in a gold-glowing slot. Confirming plays a short forge
+// animation (fuseForge keyframes) on the result icon before applyFusion() and a
+// re-render actually swap the weapons — so the player sees the merge happen
+// instead of the screen just instantly changing.
+function renderFusion(){
+  const wrap=document.getElementById('fusionWrap'); wrap.innerHTML="";
+  if(!player.fusionsAvailable.length){
+    const none=document.createElement('div'); none.className='card';
+    none.innerHTML=`<div class="icon">🧬</div><div class="name">No Fusion Ready</div><div class="desc">Level two of a matching weapon pair to Lv.6+ to unlock a fusion.</div>`;
+    wrap.appendChild(none); return;
+  }
+  for(const fid of player.fusionsAvailable){
+    const f=FUSIONS.find(x=>x.id===fid); if(!f) continue;
+    const resultDef=WEAPONS[f.result];
+    const iconsHtml=f.from.map((wid,i)=>`<div class="fuse-icon">${weaponDef(wid).icon}</div>`+(i<f.from.length-1?`<span class="fuse-plus">+</span>`:'')).join('');
+    const el=document.createElement('div'); el.className='card fusion-card';
+    el.innerHTML=`<div class="fuse-row">${iconsHtml}<span class="fuse-arrow">→</span><div class="fuse-result" id="fuseResult_${f.id}">${resultDef.icon}</div></div>
+      <div class="name">${f.name}</div><div class="desc">${f.desc}</div><div class="tag" style="border-color:var(--gold); color:var(--gold);">FUSE WEAPON</div>`;
+    el.onclick=()=>{
+      if(el.dataset.forging) return; el.dataset.forging='1';
+      SFX.uiClick(); const resultIcon=document.getElementById('fuseResult_'+f.id); if(resultIcon) resultIcon.classList.add('forging');
+      setTimeout(()=>{ applyFusion(f.id); renderFusion(); refreshHud(); }, 550);
+    };
+    wrap.appendChild(el);
+  }
+}
+function openFusion(){ if(state!=='playing'&&state!=='paused') return; setState('fusion'); SFX.stopHeartbeat(); MUSIC.stop(); renderFusion(); show('screen-fusion'); }
 
 function renderIngameStats(){
   const grid=document.getElementById('ingameStatsGrid'); const s=player.stats;
@@ -2744,7 +3100,7 @@ function eventCtx(){
     offerWeaponLevelForGold:(p,cost)=>{ if(p.gold>=cost){ const wids=Object.keys(p.weapons).filter(w=>p.weapons[w]<WEAPONS[w].maxLevel); if(wids.length){ p.gold-=cost; const w=pick(wids); p.weapons[w]++; performEvolution(w); logEvent(`${WEAPONS[w].name} leveled via Smith.`); } } },
     convertGoldToSoul:(p,rate)=>{ const amt=Math.floor(p.gold*rate*0.1); p.gold=0; save.soul+=amt; save.lifetime.totalSoul+=amt; persistSave(); refreshSoulBadges(); logEvent(`Converted gold into ${amt} Soul.`); },
     applyHpPenalty:(p,pct)=>{ p.maxHp=Math.max(10,Math.floor(p.maxHp*(1-pct))); p.hp=Math.min(p.hp,p.maxHp); },
-    grantRandomWeaponIfSlotOpen:(p)=>{ if(Object.keys(p.weapons).length<maxWeaponSlots(p)){ const avail=Object.keys(WEAPONS).filter(w=>!p.weapons[w]); if(avail.length){ const w=pick(avail); p.weapons[w]=1; logEvent(`${WEAPONS[w].name} acquired from cache!`); } } },
+    grantRandomWeaponIfSlotOpen:(p)=>{ if(Object.keys(p.weapons).length<maxWeaponSlots(p)){ const avail=Object.keys(WEAPONS).filter(w=>!p.weapons[w]&&!WEAPONS[w].fusionOnly); if(avail.length){ const w=pick(avail); p.weapons[w]=1; logEvent(`${WEAPONS[w].name} acquired from cache!`); } } },
     spawnGuardedTreasure:(p,eliteId,goldAmt)=>{ const b=spawnEnemy(eliteId,{x:p.x+rand(-200,200),y:p.y+rand(-200,200)}); if(b) b._treasureGold=goldAmt; logEvent("A guardian appears — defeat it for treasure!"); },
     startArenaWave:(p,opts)=>{
       runStats.arenasCleared=(runStats.arenasCleared||0)+1;
@@ -2761,7 +3117,7 @@ function eventCtx(){
       logEvent("A mini-boss emerges!");
     },
     rollRiftOutcome:(p)=>{ if(Math.random()<0.5){ p.stats.dmgMult*=1.3; logEvent("The rift empowers you!"); } else { p.maxHp=Math.max(10,Math.floor(p.maxHp*0.85)); p.hp=Math.min(p.hp,p.maxHp); logEvent("The rift weakens you!"); } },
-    grantCursedWeapon:(p)=>{ const avail=Object.keys(WEAPONS).filter(w=>!p.weapons[w]); if(avail.length){ const w=pick(avail); p.weapons[w]=Math.min(WEAPONS[w].maxLevel,4); p._cursedWeapon=w; logEvent(`Cursed ${WEAPONS[w].name} acquired — it drains your HP.`); } },
+    grantCursedWeapon:(p)=>{ const avail=Object.keys(WEAPONS).filter(w=>!p.weapons[w]&&!WEAPONS[w].fusionOnly); if(avail.length){ const w=pick(avail); p.weapons[w]=Math.min(WEAPONS[w].maxLevel,4); p._cursedWeapon=w; logEvent(`Cursed ${WEAPONS[w].name} acquired — it drains your HP.`); } },
     sacrificePassiveForCards:(p,n)=>{ if(p.passives.length){ p.passives.splice((Math.random()*p.passives.length)|0,1); } for(let i=0;i<n;i++){ const pool=buildCardPool().filter(e=>e.kind==="card"); if(!pool.length) break; const entry=pick(pool); entry.card.apply(p); p.cardsTaken.push(entry.card.id); } logEvent("Sacrifice complete — power gained."); },
     applyTemporaryModifier:(key,mult,life,extra)=>{
       // `extra` multipliers (e.g. goldMult/xpMult from Bloodmoon Wager) are stored on
@@ -2807,40 +3163,62 @@ function renderMerchantCardOffers(){
   leave.onclick=()=>{ SFX.uiClick(); closeEvent(); };
   wrap.appendChild(leave);
 }
+// Cat color also used to accent the full-screen event box (kicker text + left
+// border) and the no-choice toast border, so an event's "flavor" reads the same
+// way regardless of which presentation it gets.
+const EVENT_CAT_COLOR = { merchant:"var(--gold)", treasure:"var(--crystal)", elite_arena:"#ff8a4d", mini_boss:"var(--hp)", risk_reward:"var(--accent2)", cursed_shrine:"var(--accent)" };
+// Bookkeeping that must happen once an event's resolve() has run, regardless of
+// whether it was presented as a full-screen choice or an instant toast —
+// Shrine of Silence's "+2 passive slots" is a hardcoded special-case here (not in
+// resolve() itself — disableRandomWeapon() only takes a duration, so the
+// {grantPassiveSlots:2} it's called with is actually ignored; this is the one
+// place that grant really happens) plus achievement/synergy re-checks any event
+// reward might have newly unlocked.
+function settleEventEffects(def){
+  if(def && def.id==="shrine_of_silence"){ player.stats.extraPassiveSlots=(player.stats.extraPassiveSlots||0)+2; logEvent("+2 passive slots granted."); }
+  checkAchievements(); checkSynergies();
+}
+function showEventToast(def){
+  const layer=document.getElementById('achToastLayer'); const el=document.createElement('div'); el.className='ach-toast event-toast';
+  const color=EVENT_CAT_COLOR[def.cat]||"var(--accent)";
+  el.style.borderColor=color;
+  el.innerHTML=`<div class="t-icon">📜</div><div><div class="t-kicker" style="color:${color}">${def.cat.replace('_',' ')}</div><div class="t-name">${def.name} — ${def.desc}</div></div>`;
+  layer.appendChild(el); setTimeout(()=>el.remove(),4500); SFX.uiClick();
+}
 function triggerRandomEvent(forceId){
-  const def = forceId ? (EVENTS.find(e=>e.id===forceId)||pick(EVENTS)) : pick(EVENTS); activeEventDef=def;
+  const def = forceId ? (EVENTS.find(e=>e.id===forceId)||pick(EVENTS)) : pick(EVENTS);
   if(def.cat==="merchant") runStats.merchantEventsVisited=(runStats.merchantEventsVisited||0)+1;
   if(def.cat==="treasure") runStats.treasureEventsOpened=(runStats.treasureEventsOpened||0)+1;
   if(def.cat==="cursed_shrine") runStats.cursedShrinesActivated=(runStats.cursedShrinesActivated||0)+1;
+  // No-choice events (the majority — see TODO item 7) have nothing for the
+  // player to decide, so a full-screen stop was just friction for a foregone
+  // conclusion: resolve immediately and announce it with a toast, same as
+  // achievements/synergies, without pausing music/heartbeat or gameplay.
+  if(!def.choice && def.id!=="wandering_merchant"){
+    def.resolve(player,0,eventCtx()); settleEventEffects(def); showEventToast(def);
+    return;
+  }
+  activeEventDef=def;
   setState('event'); SFX.stopHeartbeat(); MUSIC.stop();
-  document.getElementById('eventKicker').textContent = def.cat.replace('_',' ');
+  const color=EVENT_CAT_COLOR[def.cat]||"var(--accent)";
+  const kickerEl=document.getElementById('eventKicker'); kickerEl.textContent=def.cat.replace('_',' '); kickerEl.style.color=color;
   document.getElementById('eventTitle').textContent = def.name;
-  document.getElementById('eventDesc').textContent = def.desc;
+  const descEl=document.getElementById('eventDesc'); descEl.textContent=def.desc; descEl.style.borderLeft=`3px solid ${color}`;
   const wrap=document.getElementById('eventChoices'); wrap.innerHTML="";
   if(def.id==="wandering_merchant"){ renderMerchantCardOffers(); show('screen-event'); return; }
   const c = eventCtx();
-  if(def.choice){
-    const accept=document.createElement('div'); accept.className='card';
-    accept.innerHTML=`<div class="icon">✅</div><div class="name">Accept</div><div class="desc">Take the risk / reward.</div>`;
-    accept.onclick=()=>{ SFX.uiClick(); runStats.riskyChoicesTaken=(runStats.riskyChoicesTaken||0)+1; def.resolve(player,0,c); closeEvent(); };
-    const decline=document.createElement('div'); decline.className='card';
-    decline.innerHTML=`<div class="icon">🚪</div><div class="name">Decline</div><div class="desc">Walk away safely.</div>`;
-    decline.onclick=()=>{ SFX.uiClick(); def.resolve(player,1,c); closeEvent(); };
-    wrap.appendChild(accept); wrap.appendChild(decline);
-  } else {
-    const cont=document.createElement('div'); cont.className='card';
-    cont.innerHTML=`<div class="icon">➡</div><div class="name">Continue</div><div class="desc">${def.desc}</div>`;
-    cont.onclick=()=>{ SFX.uiClick(); def.resolve(player,0,c); closeEvent(); };
-    wrap.appendChild(cont);
-  }
+  const accept=document.createElement('div'); accept.className='card';
+  accept.innerHTML=`<div class="icon">✅</div><div class="name">Accept</div><div class="desc">Take the risk / reward.</div>`;
+  accept.onclick=()=>{ SFX.uiClick(); runStats.riskyChoicesTaken=(runStats.riskyChoicesTaken||0)+1; def.resolve(player,0,c); closeEvent(); };
+  const decline=document.createElement('div'); decline.className='card';
+  decline.innerHTML=`<div class="icon">🚪</div><div class="name">Decline</div><div class="desc">Walk away safely.</div>`;
+  decline.onclick=()=>{ SFX.uiClick(); def.resolve(player,1,c); closeEvent(); };
+  wrap.appendChild(accept); wrap.appendChild(decline);
   show('screen-event');
 }
 function closeEvent(){
-  // Shrine of Silence's "+2 passive slots" is applied here (once, when the event
-  // that requested it closes); extraPassiveSlots is read by equipPassive()'s
-  // capacity check and shown in the in-game stats screen.
-  if(activeEventDef && activeEventDef.id==="shrine_of_silence"){ player.stats.extraPassiveSlots=(player.stats.extraPassiveSlots||0)+2; logEvent("+2 passive slots granted."); }
-  activeEventDef=null; checkAchievements(); checkSynergies(); hideAll(); setState('playing'); MUSIC.start();
+  settleEventEffects(activeEventDef);
+  activeEventDef=null; hideAll(); setState('playing'); MUSIC.start();
 }
 function updateTempModifiers(dt){
   for(let i=tempModifiers.length-1;i>=0;i--){
@@ -3011,6 +3389,7 @@ function refreshHud(){
   document.getElementById('killVal').textContent=killCount;
   document.getElementById('timerVal').textContent=fmtTime(runTime);
   document.getElementById('phaseVal').textContent=currentPhase().name;
+  document.getElementById('fusionBtnHud').classList.toggle('hidden', !player.fusionsAvailable.length);
   if(player.hp/player.maxHp<0.25) SFX.startHeartbeat(); else SFX.stopHeartbeat();
   const now=runTime; dpsWindow=dpsWindow.filter(x=>now-x.t<3);
   const dps=dpsWindow.reduce((s,x)=>s+x.dmg,0)/3;
@@ -3025,6 +3404,26 @@ function refreshHud(){
     const prow=document.getElementById('passiveRow'); prow.innerHTML="";
     for(const pid of player.passives){ const d=PASSIVES.find(x=>x.id===pid); if(!d) continue; const el=document.createElement('div'); el.className='psv-icon'; el.title=d.name; el.textContent=d.icon; prow.appendChild(el); }
   }
+  refreshAbilityHud();
+}
+function refreshAbilityHud(){
+  const dash=player.abilities.dash, heal=player.abilities.heal;
+  const dashBtn=document.getElementById('dashBtn'), dashCdEl=document.getElementById('dashCd');
+  dashBtn.classList.toggle('ready', dash.charges>0);
+  // Ring shows progress toward the *next* charge (0 once at maxCharges, even if
+  // the current charge count is already enough to dash right now).
+  const dashPct = dash.charges>=dash.maxCharges ? 0 : clamp((dash.cd/dashRegenTime())*100,0,100);
+  dashCdEl.style.background = dashPct<=0 ? 'transparent' : `conic-gradient(rgba(8,9,13,0.72) ${dashPct}%, transparent ${dashPct}%)`;
+  let chargeBadge=document.getElementById('dashCharges');
+  if(dash.maxCharges>1){
+    if(!chargeBadge){ chargeBadge=document.createElement('span'); chargeBadge.id='dashCharges'; chargeBadge.className='ab-charges'; dashBtn.appendChild(chargeBadge); }
+    chargeBadge.textContent=dash.charges;
+  } else if(chargeBadge){ chargeBadge.remove(); }
+  const healBtn=document.getElementById('healBtn'), healCdEl=document.getElementById('healCd');
+  const healReady = heal.cd<=0;
+  healBtn.classList.toggle('ready', healReady);
+  const healPct = healReady ? 0 : (heal.cd/HEAL_ABILITY_COOLDOWN)*100;
+  healCdEl.style.background = healReady ? 'transparent' : `conic-gradient(rgba(8,9,13,0.72) ${healPct}%, transparent ${healPct}%)`;
 }
 let lastWeaponSig=null;
 function glow(size){ return quality==='low'?0:(quality==='medium'?size*0.6:size); }
@@ -3169,8 +3568,9 @@ function render(){
   }
   ctx2d.shadowBlur=0;
   for(const e of enemies){
-    ctx2d.beginPath(); ctx2d.fillStyle=e.hitFlash>0?"#ffffff":e.color; ctx2d.shadowColor=e.glow; ctx2d.shadowBlur=glow(e.boss?26:(e.elite?18:10));
-    ctx2d.arc(e.x,e.y,e.radius,0,7); ctx2d.fill(); ctx2d.shadowBlur=0;
+    ctx2d.fillStyle=e.hitFlash>0?"#ffffff":e.color; ctx2d.shadowColor=e.glow; ctx2d.shadowBlur=glow(e.boss?26:(e.elite?18:10));
+    if(e.boss || !e.shape){ ctx2d.beginPath(); ctx2d.arc(e.x,e.y,e.radius,0,7); ctx2d.fill(); } else drawEnemyShape(ctx2d,e);
+    ctx2d.shadowBlur=0;
     if(e.mutation){ ctx2d.beginPath(); ctx2d.strokeStyle=e.mutationColor; ctx2d.lineWidth=2.5; ctx2d.arc(e.x,e.y,e.radius+2,0,7); ctx2d.stroke(); }
     if(e.elite||e.boss){ const bw=e.radius*2.4; ctx2d.fillStyle="#1a1c24"; ctx2d.fillRect(e.x-bw/2,e.y-e.radius-14,bw,5); ctx2d.fillStyle=e.boss?"#ff4d5e":"#ffb347"; ctx2d.fillRect(e.x-bw/2,e.y-e.radius-14,bw*clamp(e.hp/e.maxHp,0,1),5); }
     // Status-effect icons: previously the only visible feedback for burn/poison/slow/
@@ -3252,7 +3652,13 @@ function render(){
   for(const p of particles){ ctx2d.globalAlpha=clamp(p.life/p.maxLife,0,1); ctx2d.fillStyle=p.color; ctx2d.fillRect(p.x-2,p.y-2,4,4); }
   ctx2d.globalAlpha=1;
   const pc = characterColor(player.character);
-  ctx2d.beginPath(); ctx2d.fillStyle="#fff"; ctx2d.shadowColor=pc; ctx2d.shadowBlur=glow(16); ctx2d.arc(player.x,player.y,player.radius,0,7); ctx2d.fill(); ctx2d.shadowBlur=0;
+  if(player.abilities.dash.active){
+    const dash=player.abilities.dash;
+    ctx2d.save(); ctx2d.globalAlpha=0.35; ctx2d.strokeStyle=pc; ctx2d.lineWidth=player.radius*1.4; ctx2d.lineCap='round';
+    ctx2d.beginPath(); ctx2d.moveTo(player.x-dash.dx*46,player.y-dash.dy*46); ctx2d.lineTo(player.x,player.y); ctx2d.stroke();
+    ctx2d.restore();
+  }
+  ctx2d.beginPath(); ctx2d.fillStyle=player.hitFlash>0?"#ff3b3b":"#fff"; ctx2d.shadowColor=pc; ctx2d.shadowBlur=glow(player.abilities.dash.active?26:16); ctx2d.arc(player.x,player.y,player.radius,0,7); ctx2d.fill(); ctx2d.shadowBlur=0;
   ctx2d.beginPath(); ctx2d.strokeStyle=pc; ctx2d.lineWidth=2; ctx2d.arc(player.x,player.y,player.radius+4,0,7); ctx2d.stroke();
   ctx2d.font="bold 13px 'JetBrains Mono', monospace"; ctx2d.textAlign="center";
   for(const f of floaters){ ctx2d.globalAlpha=clamp(f.life/0.6,0,1); ctx2d.fillStyle=f.color; ctx2d.fillText(f.text,f.x,f.y); }
@@ -3411,6 +3817,8 @@ const SFX=(()=>{ let muted=false, volume=1, heartbeatTimer=null;
     achievement(){ const notes=[523.25,659.25,783.99,1046.5]; notes.forEach((f,i)=>tone({freq:f,dur:0.22,type:'triangle',gain:0.15,delay:i*0.07})); tone({freq:1568,dur:0.4,type:'sine',gain:0.09,delay:0.3}); tone({freq:2093,dur:0.3,type:'sine',gain:0.05,delay:0.34}); noise({dur:0.3,gain:0.06,delay:0.06,filterFreq:5000}); },
     startHeartbeat(){ if(heartbeatTimer) return; heartbeatTimer=setInterval(()=>{ tone({freq:70,dur:0.09,type:'sine',gain:0.09}); },700); },
     stopHeartbeat(){ if(heartbeatTimer){ clearInterval(heartbeatTimer); heartbeatTimer=null; } },
+    dash(){ noise({dur:0.1,gain:0.1,filterFreq:2600}); tone({freq:520,slideTo:180,dur:0.12,type:'sawtooth',gain:0.09}); },
+    fastHeal(){ tone({freq:480,slideTo:760,dur:0.18,type:'sine',gain:0.13}); tone({freq:760,dur:0.15,type:'triangle',gain:0.08,delay:0.05}); },
   };
 })();
 const MUSIC=(()=>{ let musicGain=null,volume=0.35,playing=false,schedulerId=null,nextNoteTime=0,step16=0,intense=false;
@@ -3459,9 +3867,33 @@ function applySettings(){
     const nx=len>0?dx/len:0, ny=len>0?dy/len:0; knob.style.transform=`translate(${nx*travel}px, ${ny*travel}px)`;
     const mag=clamp(len/RADIUS,0,1); if(mag<DEADZONE){ touchVec.x=0; touchVec.y=0; } else { touchVec.x=nx*mag; touchVec.y=ny*mag; } }
   function reset(){ activeId=null; touchVec.x=0; touchVec.y=0; knob.style.transform='translate(0px,0px)'; zone.style.display='none'; }
-  capture.addEventListener('touchstart',e=>{ if(activeId!==null) return; const t=e.changedTouches[0]; activeId=t.identifier; showZoneAt(t.clientX,t.clientY); updateFromPoint(t.clientX,t.clientY); e.preventDefault(); },{passive:false});
-  capture.addEventListener('touchmove',e=>{ if(activeId===null) return; const t=Array.from(e.changedTouches).find(tt=>tt.identifier===activeId); if(!t) return; updateFromPoint(t.clientX,t.clientY); e.preventDefault(); },{passive:false});
-  function onEnd(e){ if(activeId===null) return; const ended=Array.from(e.changedTouches).some(tt=>tt.identifier===activeId); if(ended) reset(); }
+  // Dash swipe: a second finger, independent of whichever touch drives the
+  // joystick, so a quick flick works "even while running" instead of fighting the
+  // joystick's own continuous drag. Tracked per touch identifier so multiple
+  // simultaneous non-joystick touches (unlikely, but cheap to handle) don't clobber
+  // each other.
+  const dashTouches=new Map(); const SWIPE_MIN_DIST=36, SWIPE_MAX_TIME=380;
+  capture.addEventListener('touchstart',e=>{
+    for(const t of e.changedTouches){
+      if(activeId===null){ activeId=t.identifier; showZoneAt(t.clientX,t.clientY); updateFromPoint(t.clientX,t.clientY); }
+      else if(!dashTouches.has(t.identifier)){ dashTouches.set(t.identifier,{x:t.clientX,y:t.clientY,t:performance.now()}); }
+    }
+    e.preventDefault();
+  },{passive:false});
+  capture.addEventListener('touchmove',e=>{
+    for(const t of e.changedTouches){ if(t.identifier===activeId) updateFromPoint(t.clientX,t.clientY); }
+    e.preventDefault();
+  },{passive:false});
+  function onEnd(e){
+    for(const t of e.changedTouches){
+      if(t.identifier===activeId) reset();
+      else if(dashTouches.has(t.identifier)){
+        const start=dashTouches.get(t.identifier); dashTouches.delete(t.identifier);
+        const dx=t.clientX-start.x, dy=t.clientY-start.y, dist=Math.hypot(dx,dy), elapsed=performance.now()-start.t;
+        if(dist>=SWIPE_MIN_DIST && elapsed<=SWIPE_MAX_TIME) tryDash(dx,dy);
+      }
+    }
+  }
   capture.addEventListener('touchend',onEnd,{passive:true}); capture.addEventListener('touchcancel',onEnd,{passive:true});
 })();
 function isFullscreen(){ return !!(document.fullscreenElement||document.webkitFullscreenElement||document.msFullscreenElement); }
@@ -3470,6 +3902,8 @@ function toggleFullscreen(){ try{ if(!isFullscreen()){ const el=document.documen
 function updateFullscreenButtons(){ const fs=isFullscreen(); const toggleBtn=document.getElementById('fullscreenToggleBtn'); if(toggleBtn) toggleBtn.textContent=fs?"EXIT FULLSCREEN":"ENTER FULLSCREEN"; const hudBtn=document.getElementById('fullscreenBtnHud'); if(hudBtn) hudBtn.title=fs?"Exit fullscreen":"Enter fullscreen"; }
 ['fullscreenchange','webkitfullscreenchange','MSFullscreenChange'].forEach(evt=>document.addEventListener(evt,updateFullscreenButtons));
 document.getElementById('fullscreenBtnHud').onclick=()=>{ SFX.uiClick(); toggleFullscreen(); };
+document.getElementById('dashBtn').onclick=()=>tryDash();
+document.getElementById('healBtn').onclick=()=>tryFastHeal();
 document.getElementById('fullscreenToggleBtn').onclick=()=>{ SFX.uiClick(); toggleFullscreen(); };
 if(!fullscreenSupported()){ const toggleBtn=document.getElementById('fullscreenToggleBtn'); if(toggleBtn){ toggleBtn.disabled=true; toggleBtn.textContent="UNAVAILABLE"; } const hudBtn=document.getElementById('fullscreenBtnHud'); if(hudBtn) hudBtn.style.opacity='0.35'; }
 function setSegActive(containerId,value){ document.querySelectorAll('#'+containerId+' .seg-btn').forEach(b=>b.classList.toggle('active',b.dataset.val===value)); }
@@ -3498,7 +3932,7 @@ document.getElementById('settingsBack').onclick=()=>{ if(settingsReturnTo==='pau
    ========================================================================= */
 function hideAll(){ document.querySelectorAll('.screen').forEach(s=>s.classList.add('hidden')); }
 function show(id){ hideAll(); document.getElementById(id).classList.remove('hidden'); }
-function setState(s){ state=s; if(!["playing","levelup","paused","shop","ingame-stats","event"].includes(s)) document.getElementById('hud').classList.add('hidden'); }
+function setState(s){ state=s; if(!["playing","levelup","paused","shop","ingame-stats","event","fusion"].includes(s)) document.getElementById('hud').classList.add('hidden'); }
 function goMenu(){ setState('menu'); SFX.stopHeartbeat(); MUSIC.stop(); refreshSoulBadges(); updateContinueButton(); show('screen-menu'); }
 function updateContinueButton(){
   const btn=document.getElementById('btnContinue'), info=document.getElementById('continueInfo'), newBtn=document.getElementById('btnNewRun');
@@ -3513,10 +3947,13 @@ function continueRun(){
     xp:snap.player.xp, xpNext:snap.player.xpNext, gold:snap.player.gold, crystals:snap.player.crystals||0,
     weapons:Object.assign({},snap.player.weapons), weaponTimers:{}, stats:Object.assign(freshStats(),snap.player.stats),
     passives:snap.player.passives||[], cardsTaken:snap.player.cardsTaken||[], synergiesActive:snap.player.synergiesActive||[],
+    fusionsAvailable:snap.player.fusionsAvailable||[],
     shopPurchases:Object.assign({},snap.player.shopPurchases||{}), hasRevive:!!snap.player.hasRevive, extraWeaponSlots:snap.player.extraWeaponSlots||0,
     disabledWeapons:{}, shield:0, character:snap.player.character||"warrior", momentumStacks:0, evolvedWeapons:{},
-    lifestealHealedThisSec:0, lifestealWindowStart:0 };
+    lifestealHealedThisSec:0, lifestealWindowStart:0, facingX:0, facingY:-1, hitFlash:0, hurtFlash:0,
+    abilities:{ dash:{cd:0,charges:1,maxCharges:1,active:false,t:0,dx:0,dy:1}, heal:{cd:0} } };
   for(const wid of Object.keys(player.weapons)) performEvolution(wid);
+  checkFusions();
   enemies=[]; bullets=[]; orbs=[]; particles=[]; floaters=[]; zones=[]; minions=[]; pendingShots=[]; chainArcs=[]; novaPulses=[];
   runTime=snap.runTime||0; killCount=snap.killCount||0; dpsWindow=[]; lastSpawn=0; eliteTimer=0; keys={};
   spawnedBossIds=new Set(snap.bossesSpawned||[]); warnedBossIds=new Set(snap.bossesSpawned||[]);
@@ -3554,14 +3991,49 @@ function renderTalentTree(activeBranch){
     tabsEl.appendChild(tab);
   });
   const wrap=document.getElementById('metaWrap'); wrap.innerHTML="";
-  for(const line of TALENT_STAT_LINES[activeBranch]){
-    const lvl=talentLevel(activeBranch,line.key); const maxed=lvl>=5; const cost=talentCost(activeBranch,line.key);
-    const el=document.createElement('div'); el.className='meta-item';
-    el.innerHTML=`<div><div class="m-name">${line.label}</div><div class="m-desc">${TALENT_LINE_DESCS[line.key]||`+${line.perLevel} ${line.key} per tier.`}</div><div class="m-level">TIER ${lvl} / 5</div></div>`;
-    const btn=document.createElement('button'); btn.className='buy-btn'; btn.textContent=maxed?"MAXED":`${cost} SOUL`; btn.disabled=maxed||save.soul<cost;
-    btn.onclick=()=>{ if(maxed||save.soul<cost) return; save.soul-=cost; save.talentLevels[activeBranch+"_"+line.key]=lvl+1; persistSave(); refreshSoulBadges(); renderTalentTree(activeBranch); };
-    el.appendChild(btn); wrap.appendChild(el);
-  }
+  const scroll=document.createElement('div'); scroll.className='talent-graph-scroll';
+  const graph=document.createElement('div'); graph.className='talent-graph';
+  const COL_W=145, ROW_H=125, NODE_W=132, NODE_CY=55;
+  const cellPos=(col,row)=>({left:(col-1)*COL_W+10, top:(row-1)*ROW_H+15});
+  const lines=TALENT_STAT_LINES[activeBranch];
+  const svgNS="http://www.w3.org/2000/svg";
+  const svg=document.createElementNS(svgNS,"svg"); svg.setAttribute('class','talent-lines');
+  lines.forEach((line,idx)=>{
+    const layout=TALENT_NODE_LAYOUT[idx], to=cellPos(layout.col,layout.row);
+    const toX=to.left+NODE_W/2, toY=to.top+NODE_CY;
+    layout.requires.forEach(r=>{
+      const fromLayout=TALENT_NODE_LAYOUT[r.idx], from=cellPos(fromLayout.col,fromLayout.row);
+      const fromX=from.left+NODE_W/2, fromY=from.top+NODE_CY;
+      const el=document.createElementNS(svgNS,"line");
+      el.setAttribute('x1',fromX); el.setAttribute('y1',fromY); el.setAttribute('x2',toX); el.setAttribute('y2',toY);
+      if(talentLevel(activeBranch,lines[r.idx].key)>=r.tier) el.setAttribute('class','unlocked');
+      svg.appendChild(el);
+    });
+  });
+  graph.appendChild(svg);
+  // Node cells: locked (prereq unmet, greyed, no buy) / unlocked-with-progress
+  // (tier pips fill in, buy button for the next tier) / maxed (gold glow, all 5
+  // pips filled) — the "closed state"/"highlights"/"progress" the redesign asked for.
+  lines.forEach((line,idx)=>{
+    const layout=TALENT_NODE_LAYOUT[idx], pos=cellPos(layout.col,layout.row);
+    const lvl=talentLevel(activeBranch,line.key), maxed=lvl>=5, cost=talentCost(activeBranch,line.key);
+    const locked=lineLocked(activeBranch,idx);
+    const el=document.createElement('div'); el.className='talent-node'+(locked?' locked':'')+(maxed?' maxed':'');
+    el.style.left=pos.left+'px'; el.style.top=pos.top+'px';
+    const pips=Array.from({length:5},(_,i)=>`<div class="pip${i<lvl?' filled':''}"></div>`).join('');
+    const desc = locked
+      ? `Requires: ${lineRequiresFor(activeBranch,idx).map(r=>`${lines.find(l=>l.key===r.key).label} tier ${r.tier}`).join(', ')}`
+      : (TALENT_LINE_DESCS[line.key]||`+${line.perLevel} ${line.key} per tier.`);
+    el.innerHTML=`${locked?'<div class="tn-lock">🔒</div>':''}<div class="tn-name">${line.label}</div><div class="tn-desc">${desc}</div><div class="tn-pips">${pips}</div>`;
+    if(!locked){
+      const btn=document.createElement('button'); btn.className='buy-btn tn-buy';
+      btn.textContent=maxed?"MAXED":`${cost} SOUL`; btn.disabled=maxed||save.soul<cost;
+      btn.onclick=e=>{ e.stopPropagation(); if(maxed||save.soul<cost) return; save.soul-=cost; save.talentLevels[activeBranch+"_"+line.key]=lvl+1; persistSave(); refreshSoulBadges(); renderTalentTree(activeBranch); };
+      el.appendChild(btn);
+    }
+    graph.appendChild(el);
+  });
+  scroll.appendChild(graph); wrap.appendChild(scroll);
 }
 document.getElementById('btnMeta').onclick=()=>{ setState('meta'); renderTalentTree('warrior'); show('screen-meta'); };
 document.getElementById('metaBack').onclick=goMenu;
@@ -3624,12 +4096,21 @@ document.getElementById('btnVictoryMenu').onclick=()=>{ applyRunStatsIncrement(t
 document.getElementById('statsBtnHud').onclick=()=>{ SFX.uiClick(); openIngameStats(); };
 document.getElementById('shopBtnHud').onclick=()=>{ SFX.uiClick(); openShop(); };
 document.getElementById('shopBack').onclick=()=>{ hideAll(); setState('playing'); MUSIC.start(); };
+document.getElementById('fusionBtnHud').onclick=()=>{ SFX.uiClick(); openFusion(); };
+document.getElementById('fusionBack').onclick=()=>{ hideAll(); setState('playing'); MUSIC.start(); };
 document.getElementById('statsBack').onclick=()=>{ hideAll(); setState('playing'); MUSIC.start(); };
 document.getElementById('btnPauseShop').onclick=()=>{ openShop(); };
 function togglePause(){ if(state==='playing'){ setState('paused'); SFX.stopHeartbeat(); MUSIC.stop(); show('screen-pause'); doAutosave(false); } else if(state==='paused'){ hideAll(); setState('playing'); MUSIC.start(); } }
-window.addEventListener('keydown',e=>{ keys[e.key.toLowerCase()]=true;
-  if(e.key==='Escape' && ["playing","paused","shop","ingame-stats"].includes(state)){ if(state==='shop'||state==='ingame-stats'){ hideAll(); setState('playing'); MUSIC.start(); } else togglePause(); } });
-window.addEventListener('keyup',e=>{ keys[e.key.toLowerCase()]=false; });
+// e.key is layout-dependent (WASD types as "цфыв" on a Cyrillic ЙЦУКЕН layout, so
+// keys['w'] would never fire) — e.code is the physical key position and is the
+// same regardless of active layout, so movement mirrors it into the same
+// keys['w'/'a'/'s'/'d'] flags updatePlayer() already checks.
+const CODE_TO_WASD = {KeyW:'w',KeyA:'a',KeyS:'s',KeyD:'d'};
+window.addEventListener('keydown',e=>{ keys[e.key.toLowerCase()]=true; const wasd=CODE_TO_WASD[e.code]; if(wasd) keys[wasd]=true;
+  if(e.key==='Escape' && ["playing","paused","shop","ingame-stats"].includes(state)){ if(state==='shop'||state==='ingame-stats'){ hideAll(); setState('playing'); MUSIC.start(); } else togglePause(); }
+  if(e.code==='Space' && state==='playing'){ e.preventDefault(); tryDash(); }
+  if(e.key==='Shift' && state==='playing'){ tryFastHeal(); } });
+window.addEventListener('keyup',e=>{ keys[e.key.toLowerCase()]=false; const wasd=CODE_TO_WASD[e.code]; if(wasd) keys[wasd]=false; });
 
 /* =========================================================================
    DEBUG HOOK — not a player-facing feature. Everything above lives in this
@@ -3661,7 +4142,7 @@ window.__ASCENSION_DEBUG__ = {
   gainXp, damagePlayer, dealDamage, killEnemy,
   doAutosave, persistSave, logEvent,
   render,
-  giveWeapon(wid,lvl){ if(!WEAPONS[wid]) return false; player.weapons[wid]=lvl||1; checkAllEvolutions(); checkSynergies(); return true; },
+  giveWeapon(wid,lvl){ if(!WEAPONS[wid]) return false; player.weapons[wid]=lvl||1; checkAllEvolutions(); checkFusions(); checkSynergies(); return true; },
   removeWeapon(wid){ delete player.weapons[wid]; },
   setLevel(lvl){ player.level=Math.max(1,lvl); },
   setGold(g){ player.gold=g; },
