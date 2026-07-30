@@ -63,6 +63,43 @@
   }
   #screen-menu .title, #screen-victory .title{animation:glitchRgb 4.5s infinite;}
   #screen-meta .title, #screen-achievements .title{animation:glitchScan 6s infinite;}
+  /* The menu title's own gag — a Cyrillic "ё" standing in for the "I" in
+     "ASCENSION" ("ASCENSёON") — gets its OWN independent glitch: shorter cycle
+     (2.6s vs the whole title's 4.5s) and a different character entirely.
+     POLISH_PLAN_15 — inverted from the first version: the glitched state
+     (including actually swapping the glyph to the real "I" it stands in for)
+     is now the DOMINANT state, with only brief flickers back to the calm "ё" —
+     was the other way around (~93% calm / ~7% glitch), now roughly ~80%
+     glitched / ~20% calm. The glyph swap itself can't be done by animating
+     `content` on the element's own text (that property only applies to
+     ::before/::after), so the real "ё" and an ::after showing "I" are
+     cross-faded via two separate but same-duration/same-timeline keyframes —
+     titleLetterGlitch fades the real glyph out during the "I" windows,
+     titleLetterOverlay fades the ::after "I" in during exactly those same
+     windows (both same 2.6s, no delay on either, so they can't drift apart). */
+  .title-glitch-letter{position:relative; display:inline-block; animation:titleLetterGlitch 2.6s infinite;}
+  .title-glitch-letter::after{content:'I'; position:absolute; left:0; top:0; width:100%; text-align:center; opacity:0; animation:titleLetterOverlay 2.6s infinite;}
+  @keyframes titleLetterGlitch{
+    0%{opacity:1; color:inherit; text-shadow:none; transform:translateY(0) scaleX(1);}
+    4%{opacity:1; color:var(--accent2); text-shadow:2px 0 var(--crystal), -2px 0 #ff3b3b; transform:translateY(-2px) scaleX(1.12);}
+    8%,45%{opacity:0;}
+    48%{opacity:1; color:var(--crystal); text-shadow:-1px 0 var(--accent2); transform:translateY(1px) scaleX(0.9);}
+    53%,93%{opacity:0;}
+    97%{opacity:1; color:var(--accent2); text-shadow:1px 0 var(--crystal); transform:translateY(-1px) scaleX(1.05);}
+    100%{opacity:1; color:inherit; text-shadow:none; transform:translateY(0) scaleX(1);}
+  }
+  @keyframes titleLetterOverlay{
+    0%,4%{opacity:0;}
+    8%{opacity:1; color:var(--accent2); text-shadow:1px 0 var(--crystal), -1px 0 #ff3b3b; transform:translateY(-1px);}
+    20%{color:var(--crystal); transform:translateY(1px);}
+    35%{color:var(--accent2); transform:translateY(0);}
+    45%{opacity:1;}
+    48%{opacity:0;}
+    53%{opacity:1; transform:translateY(-1px);}
+    70%{color:var(--crystal); transform:translateY(1px);}
+    93%{opacity:1; transform:translateY(0);}
+    97%,100%{opacity:0;}
+  }
   /* Third, distinct style for pause specifically — a "frozen feed" judder (brief
      horizontal tear + brightness snap) rather than color-split or a scan wipe,
      since "paused" reads naturally as a frozen video signal rather than either of
@@ -94,9 +131,17 @@
     font-family:'JetBrains Mono',monospace; font-size:14px; color:var(--soul); border:1px solid var(--line); background:var(--panel);
     padding:7px 12px; border-radius:2px;}
   .soul-badge .lbl{color:var(--dim); font-size:9px; letter-spacing:2px; margin-right:2px;}
-  .artifact-badge{position:absolute; top:calc(22px + var(--safe-top)); right:calc(150px + var(--safe-right)); z-index:2; display:flex; align-items:center; gap:8px;
-    font-family:'JetBrains Mono',monospace; font-size:14px; color:var(--artifact); border:1px solid var(--line); background:var(--panel);
-    padding:7px 12px; border-radius:2px;}
+  /* Menu-only: the old .soul-badge + .artifact-badge were two independently
+     positioned pills (artifact-badge hardcoded 150px to the left of soul-badge
+     to avoid overlap), which needed its own mobile-only repositioning override
+     once they no longer fit side by side on a narrow screen. One flex-wrap
+     panel reusing the in-run HUD's own .res-chip look (same component, same
+     dot+label+value shape players already know from the resource row) reflows
+     naturally instead. */
+  .menu-resources{position:absolute; top:calc(22px + var(--safe-top)); right:calc(26px + var(--safe-right)); z-index:2;
+    display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; max-width:min(280px,44vw);}
+  .menu-resources .res-chip{font-family:'JetBrains Mono',monospace; font-size:12.5px; color:var(--text);}
+  .menu-resources .lbl{color:var(--dim); font-size:9px; letter-spacing:1.5px; margin-right:1px;}
   #hud{position:absolute; inset:0; z-index:5; pointer-events:none; font-family:'Rajdhani',sans-serif;}
   .hud-top{position:absolute; top:0; left:0; right:0; z-index:8; display:flex; justify-content:space-between; align-items:flex-start;
     padding:calc(16px + var(--safe-top)) calc(20px + var(--safe-right)) 16px calc(20px + var(--safe-left));}
@@ -475,8 +520,6 @@
   .back-link{margin-top:20px; z-index:2; font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--dim); cursor:pointer; letter-spacing:1px;}
   .back-link:hover{color:var(--text);}
   .continue-sub{display:block; font-size:10px; color:var(--dim); letter-spacing:1px; margin-top:3px; text-transform:none; font-family:'JetBrains Mono',monospace;}
-  .mute-btn{font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--dim); cursor:pointer; border:1px solid var(--line); background:var(--panel); padding:8px 12px; border-radius:2px; letter-spacing:1px;}
-  .mute-btn:hover{color:var(--text); border-color:var(--accent);}
   .save-indicator{position:absolute; bottom:calc(58px + var(--safe-bottom)); right:calc(20px + var(--safe-right)); font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:2px; color:var(--soul); opacity:0; pointer-events:none;}
   .save-indicator.show{animation: saveFade 1.6s ease forwards;}
   @keyframes saveFade{ 0%{opacity:0; transform:translateY(4px);} 15%{opacity:1; transform:translateY(0);} 78%{opacity:1;} 100%{opacity:0;} }
@@ -558,7 +601,6 @@
     .hp-wrap{width:170px;} .resource-row{gap:6px; font-size:10.5px; max-width:180px;} .timer{font-size:18px;}
     .event-log{display:none;} .xp-track{width:min(420px,60vw);}
     #screen-shop .cards-wrap, #screen-events-shop .cards-wrap{grid-template-columns:repeat(2, 1fr);}
-    .artifact-badge{right:auto; left:calc(26px + var(--safe-left)); top:calc(70px + var(--safe-top));}
   }
 </style>
 </head>
@@ -606,12 +648,13 @@
 
   <div class="screen" id="screen-menu">
     <div class="veil"></div>
-    <div class="mute-btn" id="muteBtnMenu" style="position:absolute; top:calc(22px + var(--safe-top)); left:calc(26px + var(--safe-left)); z-index:2;">🔊 SOUND</div>
-    <div class="artifact-badge"><span class="lbl">ARTIFACTS</span><span id="menuArtifacts">0</span></div>
-    <div class="soul-badge"><span class="lbl">SOUL</span><span id="menuSoul">0</span></div>
+    <div class="menu-resources">
+      <div class="res-chip"><span class="dot" style="background:var(--artifact)"></span><span class="lbl">ARTIFACTS</span><span id="menuArtifacts">0</span></div>
+      <div class="res-chip"><span class="dot" style="background:var(--soul)"></span><span class="lbl">SOUL</span><span id="menuSoul">0</span></div>
+    </div>
     <div class="title-wrap">
       <div class="kicker">he11o wor1_D</div>
-      <div class="title">ASCENSёON</div>
+      <div class="title">ASCENS<span class="title-glitch-letter">ё</span>ON</div>
       <div class="subtitle">build a machine that erases the world. then optimize it to mathematical perfection.</div>
     </div>
     <div class="menu-col">
@@ -4768,9 +4811,6 @@ const MUSIC=(()=>{ let musicGain=null,volume=0.35,playing=false,schedulerId=null
 })();
 window.addEventListener('pointerdown',()=>{ SFX.unlock(); AUDIO_CORE.unlock(); },{once:true});
 window.addEventListener('keydown',()=>{ SFX.unlock(); AUDIO_CORE.unlock(); },{once:true});
-function toggleMute(){ const now=!SFX.isMuted(); SFX.setMuted(now); MUSIC.setVolume(now?0:save.settings.musicVolume); save.settings.muted=now; persistSave(); updateMuteButtons(); }
-function updateMuteButtons(){ const label=SFX.isMuted()?'🔇 SOUND':'🔊 SOUND'; const menuBtn=document.getElementById('muteBtnMenu'); if(menuBtn) menuBtn.textContent=label; }
-
 /* =========================================================================
    PART 16 — SETTINGS / FULLSCREEN / JOYSTICK (unchanged from base prototype)
    ========================================================================= */
@@ -4780,7 +4820,7 @@ function vibrate(ms){ if(hapticsOn && navigator.vibrate){ try{ navigator.vibrate
 function shouldShowJoystick(){ const mode=save.settings.controlMode; return mode==='joystick'||(mode==='auto'&&isTouchDevice); }
 function applySettings(){
   SFX.setMuted(!!save.settings.muted); SFX.setVolume(save.settings.sfxVolume); MUSIC.setVolume(save.settings.muted?0:save.settings.musicVolume);
-  quality=save.settings.quality; enemyDensity=save.settings.enemyDensity||save.settings.quality||'high'; screenShakeOn=!!save.settings.screenShake; hapticsOn=!!save.settings.haptics; updateMuteButtons();
+  quality=save.settings.quality; enemyDensity=save.settings.enemyDensity||save.settings.quality||'high'; screenShakeOn=!!save.settings.screenShake; hapticsOn=!!save.settings.haptics;
   const joyCapture=document.getElementById('joystickCapture');
   if(joyCapture){ const show=shouldShowJoystick(); joyCapture.style.pointerEvents=show?'auto':'none'; if(!show){ touchVec.x=0; touchVec.y=0; const zone=document.getElementById('joystickZone'); if(zone) zone.style.display='none'; } }
 }
@@ -4884,7 +4924,6 @@ document.getElementById('audioVolume').addEventListener('change',()=>persistSave
 document.getElementById('musicVolume').addEventListener('input',e=>{ const v=Number(e.target.value); document.getElementById('musicVolumeVal').textContent=v; save.settings.musicVolume=v/100; if(!save.settings.muted) MUSIC.setVolume(save.settings.musicVolume); });
 document.getElementById('musicVolume').addEventListener('change',()=>persistSave());
 document.getElementById('audioMuted').onclick=()=>{ save.settings.muted=!save.settings.muted; persistSave(); applySettings(); refreshSettingsUI(); };
-document.getElementById('muteBtnMenu').onclick=toggleMute;
 document.getElementById('settingsBack').onclick=()=>{ if(settingsReturnTo==='pause') show('screen-pause'); else goMenu(); };
 
 /* =========================================================================
