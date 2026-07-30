@@ -685,7 +685,7 @@
     </div>
     <div class="title-wrap">
       <div class="kicker">he11o wor1_D</div>
-      <div class="title">ASCENS<span class="title-glitch-letter">ё</span>ON</div>
+      <div class="title">ASCENS<span style="color:var(--accent)">ё</span>ON</div>
       <div class="subtitle">build a machine that erases the world. then optimize it to mathematical perfection.</div>
     </div>
     <div class="menu-col">
@@ -5065,7 +5065,12 @@ function shouldShowJoystick(){ const mode=save.settings.controlMode; return mode
 function applySettings(){
   SFX.setMuted(!!save.settings.muted); SFX.setVolume(save.settings.sfxVolume); MUSIC.setVolume(save.settings.muted?0:save.settings.musicVolume);
   quality=save.settings.quality; enemyDensity=save.settings.enemyDensity||save.settings.quality||'high'; screenShakeOn=!!save.settings.screenShake; hapticsOn=!!save.settings.haptics;
-  debugOverlayOn=!!save.settings.debugOverlay;
+  // ?dev=1 force-enables the debug overlay in-memory only (never touches
+  // save.settings, never persisted) — the dev launcher (run.sh/.tools/devserver.py)
+  // opens the game with this flag so live FPS/entity-count analytics are visible
+  // immediately without digging into Settings every time. Harmless for normal play
+  // since nobody stumbles into a "?dev=1" URL by accident.
+  debugOverlayOn=!!save.settings.debugOverlay || new URLSearchParams(location.search).has('dev');
   document.getElementById('debugOverlay').classList.toggle('hidden', !debugOverlayOn);
   const joyCapture=document.getElementById('joystickCapture');
   if(joyCapture){ const show=shouldShowJoystick(); joyCapture.style.pointerEvents=show?'auto':'none'; if(!show){ touchVec.x=0; touchVec.y=0; const zone=document.getElementById('joystickZone'); if(zone) zone.style.display='none'; } }
