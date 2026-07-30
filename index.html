@@ -3322,10 +3322,22 @@ const HEAL_ABILITY_PCT = 0.12;    // fraction of maxHp restored per use
 // STAT_CAPS.lifesteal below, which only caps the *percentage* stat (45%). dmg*lifesteal
 // scales with the player's own ever-growing DPS, so even a capped percentage against
 // a 100k+ DPS build heals thousands of HP/sec — enough to fully out-heal any wave or
-// boss threat in the game, which is why almost no runs died to anything past the
-// first ~5 minutes (see CLAUDE.md's aliveFraction-flat finding). This cap is a flat
-// number, not scaled to player.maxHp, so stacking HP cards can't inflate it back out.
-const LIFESTEAL_HPS_CAP = 100;
+// boss threat in the game. This cap is a flat number, not scaled to player.maxHp, so
+// stacking HP cards can't inflate it back out (a tankier build is deliberately *not*
+// also the best healer).
+// BALANCE_PLAN_DIFFICULTY — 100 was tuned when this cap was first added (still let
+// aliveFraction sit flat ~32-34% from t=300 to t=2400: after the opening gauntlet +
+// the Dragon fight, almost nobody died for the rest of a 40-minute run). Swept
+// 40/50/60/70/80/90 fresh against the *current* baseline (WAVES.mult/boss-HP-via-
+// playerCP/momentum-cap/XP-curve have all changed since 100 was picked, so the old
+// number wasn't assumed still correct) via `verify-balance.js --quiet`: 60 collapsed
+// winRate to 18.8% (this session's WAVES/boss changes made 100k HP/sec against a
+// ~100-300 HP pool relatively even more dominant than when 60 was rejected the first
+// time around), 80 kept winRate at a healthy-but-tighter 26.8% while aliveFraction
+// actually *declines* over a run now (31.6% -> 22.4%, t=300 to t=2400) instead of
+// staying flat — real, continuing risk for the whole run, not just the opening
+// minutes, which was the explicit ask ("усложнения жизни игроку").
+const LIFESTEAL_HPS_CAP = 80;
 const STAT_CAPS = {
   dmgMult:[0,32], atkSpeedMult:[0.1,6], cdrMult:[0.18,3], critChance:[0,0.8], critMult:[1,4.5],
   damageReduction:[0,0.55], arcaneDmgMult:[0.2,4], reviveChance:[0,0.4], chillCap:[0.1,0.6], burnStacks:[1,4],
@@ -3714,6 +3726,7 @@ function charInfoStatsHtml(){
   const s=player.stats;
   return `
     <div class="stat-row"><span class="k">Level</span><span>${player.level}</span></div>
+    <div class="stat-row"><span class="k">Threat Level</span><span style="color:var(--accent2)">${currentWave().mult.toFixed(2)}x — ${currentPhase().name}</span></div>
     <div class="stat-row"><span class="k">Health</span><span>${Math.round(player.hp)} / ${player.maxHp}</span></div>
     <div class="stat-row"><span class="k">Shield</span><span>${Math.round(player.shield)}</span></div>
     <div class="stat-row"><span class="k">Gold</span><span style="color:var(--gold)">${Math.floor(player.gold)}</span></div>
