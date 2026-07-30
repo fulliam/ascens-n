@@ -901,6 +901,14 @@ const WEAPONS = {
   gravity_hammer:{name:"Gravity Hammer",icon:"🌀",type:"melee",tags:["control","stagger","knockback"],base:{dmg:44,cd:1.3,radius:150},perLevel:{dmg:16,radius:5},maxLevel:8,fusionOnly:true},
   plasma_lance:{name:"Plasma Lance",icon:"☄️",type:"projectile",tags:["physical","fire","burst"],base:{dmg:26,cd:0.5,speed:820,pierce:5,count:1,searchRadius:500,life:1.0},perLevel:{dmg:10,pierce:0.5},maxLevel:8,fusionOnly:true},
   blight_frost:{name:"Blight Frost",icon:"☣️",type:"area",tags:["frost","poison","slow"],base:{dmg:18,cd:1.3,radius:155,lingerLife:3},perLevel:{dmg:7,radius:6},maxLevel:8,fusionOnly:true},
+  // Sakura Barrage / Cluster Charge — Weapon Forge talent fusions (see FUSIONS below),
+  // deliberately picked to read as genuinely NEW things rather than "weapon A + weapon
+  // B, mashed-up name": Sakura Barrage reuses gauss_needle's existing "petal"
+  // PROJECTILE_SHAPES silhouette, now literal rather than incidental. Cluster Charge
+  // gets a bespoke telegraph-then-single-burst branch in weaponFire()'s trap type
+  // (PART 6) instead of the usual lingering damage zone every other trap uses.
+  sakura_barrage:{name:"Sakura Barrage",icon:"🌸",type:"projectile",tags:["bleed","physical","swarm"],base:{dmg:9,cd:0.28,speed:520,pierce:2,count:5,searchRadius:400,life:1.2},perLevel:{dmg:3.2,count:0.4},maxLevel:8,fusionOnly:true},
+  cluster_charge:{name:"Cluster Charge",icon:"💣",type:"trap",tags:["fire","physical","burst"],base:{dmg:70,cd:2.4,radius:150},perLevel:{dmg:24,radius:6},maxLevel:8,fusionOnly:true},
 };
 // Global weapon rework/nerf pass: the player was reported as too strong overall.
 // Rather than hand-tuning 20 separate weapons' dmg/dps fields (error-prone and
@@ -928,12 +936,13 @@ const WEAPON_COLORS = {
   stormpiercer:"#e8c96b", crimson_fang:"#ff7a8a", entropy_bloom:"#c97fdb",
   spectral_lance:"#c9a6ff", bone_pack:"#d495c7", voltaic_spikes:"#ffb050", maelstrom_chain:"#fff066",
   gravity_hammer:"#e0a97a", plasma_lance:"#c98fd6", blight_frost:"#8fe0a0",
+  sakura_barrage:"#ffb3d9", cluster_charge:"#ff7a3d",
 };
 // Per-weapon bullet silhouette, reusing the shape-render branches render() already has for boss
 // attack patterns (spiral/diamond/petal/wave/homing/blade — see PART 12) instead of every player
 // projectile being an identical plain circle. Weapons not listed here keep the default circle,
 // which fits their identity (plasma_rifle is a rapid spray of small energy bolts).
-const PROJECTILE_SHAPES = { bow:"wave", railgun:"spiral", shuriken_storm:"blade", javelin:"homing", hand_cannon:"diamond", gauss_needle:"petal", stormpiercer:"homing", plasma_lance:"spiral" };
+const PROJECTILE_SHAPES = { bow:"wave", railgun:"spiral", shuriken_storm:"blade", javelin:"homing", hand_cannon:"diamond", gauss_needle:"petal", stormpiercer:"homing", plasma_lance:"spiral", sakura_barrage:"petal" };
 // Same idea as PROJECTILE_SHAPES but for round area/aura skills — see drawEnergyRing()'s
 // opts.shape branches (PART 12) for what each name actually draws. Weapons not listed here
 // keep the "dashed" default (still a real, distinct look, just the original one).
@@ -1003,6 +1012,8 @@ const FUSIONS = [
   {id:"gravity_hammer_fusion", from:["chain_hook","warhammer"], minLevel:6, result:"gravity_hammer", name:"Gravity Hammer", desc:"Pull them in. Bring it down."},
   {id:"plasma_lance_fusion", from:["plasma_rifle","railgun"], minLevel:6, result:"plasma_lance", name:"Plasma Lance", desc:"Railgun precision behind a plasma rifle's furious rate of fire."},
   {id:"blight_frost_fusion", from:["frost_field","poison_cloud"], minLevel:6, result:"blight_frost", name:"Blight Frost", desc:"Cold that festers, rot that numbs."},
+  {id:"sakura_barrage_fusion", from:["shuriken_storm","gauss_needle"], minLevel:6, result:"sakura_barrage", name:"Sakura Barrage", desc:"Steel storm and needle swarm bloom into a hail of spinning petals."},
+  {id:"cluster_charge_fusion", from:["hand_cannon","glacier_totem"], minLevel:6, result:"cluster_charge", name:"Cluster Charge", desc:"The cannon's punch packed into the totem's frozen shell — it doesn't stay frozen for long."},
 ];
 
 const CARDS = [
@@ -1532,7 +1543,13 @@ const TALENT_STAT_LINES = {
     {key:"hunterPierceDeep",label:"Deep Shots",perLevel:1,icon:"🕳️"},{key:"hunterCritMult",label:"Killer Instinct",perLevel:0.05,icon:"🔪"}],
   survivor:[{key:"goldMult",label:"Scavenger",perLevel:0.02,icon:"💰"},{key:"soulMult",label:"Soulbound",perLevel:0.02,icon:"🔷"},{key:"regen",label:"Grit",perLevel:0.1,icon:"✚"},{key:"xpMult",label:"Quick Study",perLevel:0.02,icon:"✨"},{key:"reviveChance",label:"Undying",perLevel:0.04,icon:"☥"},
     {key:"survivorLifesteal",label:"Bloodbound",perLevel:0.01,icon:"🩹"},{key:"survivorDmgReduction",label:"Hardened",perLevel:0.02,icon:"🪖"},
-    {key:"survivorPickup",label:"Wide Net",perLevel:0.05,icon:"🕸️"},{key:"survivorXpPull",label:"Gravity Well",perLevel:0.015,icon:"🌠"}],
+    {key:"survivorPickup",label:"Wide Net",perLevel:0.05,icon:"🕸️"},{key:"survivorXpPull",label:"Gravity Well",perLevel:0.015,icon:"🌠"},
+    // Tier 1 unlocks Weapon Fusion for the run (see checkFusions()/applyFusion(), PART 7) — every
+    // further tier lowers each fusion's minLevel requirement by 1 (floored at 2, see
+    // applyTalentStat's "forgeMastery" case), so investing further reaches fusion earlier in a run.
+    // Placed as the one node past the web's existing single-point capstone (survivorXpPull, idx 8)
+    // instead of widening the shape — reads as "the true final unlock beyond mastering the tree."
+    {key:"forgeMastery",label:"Weapon Forge",perLevel:1,icon:"🔥"}],
   engineer:[{key:"turretCdr",label:"Rapid Deployment",perLevel:0.02,icon:"⚙️"},{key:"turretRadius",label:"Blast Radius",perLevel:0.03,icon:"💣"},{key:"turretArmor",label:"Reinforced Chassis",perLevel:0.8,icon:"🏰"},{key:"turretDmg",label:"Overcharged Core",perLevel:0.04,icon:"🔋"},{key:"turretMastery",label:"Master Engineer",perLevel:1,icon:"🗿"},
     {key:"engineerCdrDeep",label:"Efficient Systems",perLevel:0.015,icon:"🔧"},{key:"engineerArmorPlate",label:"Plated Hull",perLevel:0.5,icon:"🚧"}],
   necromancer:[{key:"boneDmg",label:"Grave Might",perLevel:0.05,icon:"💀"},{key:"boneCount",label:"Endless Horde",perLevel:0.04,icon:"🧟"},{key:"boneDuration",label:"Undying Legion",perLevel:0.06,icon:"⏳"},{key:"boneInherit",label:"Shared Malice",perLevel:0.03,icon:"🩸"},{key:"boneRaise",label:"Reanimation",perLevel:0.03,icon:"⚰️"},
@@ -1563,6 +1580,7 @@ const TALENT_LINE_DESCS = {
   engineerCdrDeep:"-1.5% weapon cooldowns per tier.", engineerArmorPlate:"+0.5 flat armor per tier.",
   necroLifesteal:"+1.5% lifesteal per tier.", necroInheritDeep:"+2% of your damage multiplier inherited by summons per tier.",
   survivorPickup:"+5% pickup radius per tier.", survivorXpPull:"+1.5% XP gain per tier.",
+  forgeMastery:"Tier 1 unlocks Weapon Fusion for the rest of the run. Each further tier lowers the weapon level required to fuse by 1 (down to Lv.2).",
 };
 function buildTalentTree(){
   const nodes=[];
@@ -1642,7 +1660,11 @@ const TALENT_NODE_LAYOUTS = {
     {col:3,row:5,requires:[{idx:3,tier:3},{idx:5,tier:3}]},
   ],
   // Two-layer triangular mesh with crossing diagonals converging to a point —
-  // "паутина/сеть". Only branch with 9 nodes (2 new stat lines, see TALENT_STAT_LINES).
+  // "паутина/сеть". 10 nodes (3 new stat lines past the original 7, see
+  // TALENT_STAT_LINES) — the mesh still converges to one point at idx 8
+  // (survivorXpPull); idx 9 (forgeMastery/Weapon Forge) extends one step further
+  // past that point instead of widening the shape, reading as the tree's true
+  // final unlock rather than just another stat node.
   survivor:[
     {col:3,row:1,requires:[]},
     {col:1,row:1,requires:[{idx:0,tier:2}]},
@@ -1653,6 +1675,7 @@ const TALENT_NODE_LAYOUTS = {
     {col:2,row:5,requires:[{idx:3,tier:3},{idx:4,tier:3}]},
     {col:4,row:5,requires:[{idx:4,tier:3},{idx:5,tier:3}]},
     {col:3,row:6,requires:[{idx:6,tier:3},{idx:7,tier:3}]},
+    {col:3,row:7.5,requires:[{idx:8,tier:3}]},
   ],
 };
 function lineRequiresFor(branch,lineIndex){
@@ -1709,6 +1732,9 @@ function applyTalentStat(p, statKey, totalPerLevelSum){
     case "necroInheritDeep": p.stats.summonInheritDmg=(p.stats.summonInheritDmg||0)+v; break;
     case "survivorPickup": p.stats.pickupRadius*=(1+v); break;
     case "survivorXpPull": p.stats.xpMult*=(1+v); break;
+    // v is totalPerLevelSum = perLevel(1)*tier, so it doubles as the tier count directly —
+    // gates checkFusions()/applyFusion() (PART 7) and reduces their effective minLevel.
+    case "forgeMastery": p.stats.forgeUnlocked=v>0; p.stats.fusionLevelReduction=v; break;
   }
 }
 
@@ -2331,7 +2357,21 @@ function weaponFire(wid, lvl, dt){
     const tx = clamp(player.x+Math.cos(ang)*dist,20,WORLD.w-20), ty=clamp(player.y+Math.sin(ang)*dist,20,WORLD.h-20);
     // Bear Trap Array: auto-resetting traps that also root (heavy slow) enemies caught in them.
     const rooting = evo==="bear_trap_array";
-    spawnZone({x:tx,y:ty,radius,dmg,life: rooting?9999:6,maxLife: rooting?9999:6,tickCd:0,tag:wid==="tesla_coil"?"lightning":"physical",ownerWeapon:wid,jumps:def.base.jumps||0,root:rooting});
+    // Cluster Charge: a planted bomb, not a lingering zone — reuses the "quake" tag's
+    // render() branch (PART 12, originally the Quaker enemy mutation's ground fissure)
+    // for its dashed warning-ring + radiating cracks telegraph and solid-flash
+    // detonation, rather than the flat filled-circle every other trap gets. armT
+    // matches that branch's hardcoded 0.9s baseline so the ring grows from 0 cleanly;
+    // life extends slightly past it for a short, punchy active-damage window instead
+    // of the usual 6s every other trap ticks for. tag:"quake" (not "physical") means
+    // it skips the on-hit slow every other physical trap applies — an accepted trade
+    // for the telegraph, a bomb blast doesn't need to snare survivors anyway.
+    if(wid==="cluster_charge"){
+      const crackAngles=Array.from({length:6},(_,i)=>(i/6)*Math.PI*2+rand(-0.2,0.2));
+      spawnZone({x:tx,y:ty,radius,dmg,life:1.9,maxLife:1.9,armT:0.9,tickCd:0,tag:"quake",ownerWeapon:wid,crackAngles});
+    } else {
+      spawnZone({x:tx,y:ty,radius,dmg,life: rooting?9999:6,maxLife: rooting?9999:6,tickCd:0,tag:wid==="tesla_coil"?"lightning":"physical",ownerWeapon:wid,jumps:def.base.jumps||0,root:rooting});
+    }
     if(wid==="tesla_coil") SFX.chainZap(); else SFX.novaBurst();
     return;
   }
@@ -2528,10 +2568,14 @@ function performEvolution(wid){
   return true;
 }
 function checkAllEvolutions(){ for(const wid of Object.keys(player.weapons)) performEvolution(wid); }
+// Fusion's minLevel is a floor the "Weapon Forge" talent (survivor branch, forgeMastery
+// stat line — see applyTalentStat/TALENT_STAT_LINES) can lower, tier by tier, down to 2.
+function fusionMinLevel(f){ return Math.max(2, f.minLevel-(player.stats.fusionLevelReduction||0)); }
 function checkFusions(){
+  if(!player.stats.forgeUnlocked) return; // Weapon Forge talent not yet invested this meta-run
   for(const f of FUSIONS){
     if(player.fusionsAvailable.includes(f.id)) continue;
-    if(f.from.every(wid=>(player.weapons[wid]||0)>=f.minLevel)){
+    if(f.from.every(wid=>(player.weapons[wid]||0)>=fusionMinLevel(f))){
       player.fusionsAvailable.push(f.id);
       logEvent(`🧬 Fusion available: ${f.name}!`);
     }
@@ -2544,8 +2588,9 @@ function checkFusions(){
 // weapons are cleaned up too, so a stale evolved-def can't linger under a wid
 // nothing owns anymore.
 function applyFusion(fusionId){
+  if(!player.stats.forgeUnlocked) return false;
   const f = FUSIONS.find(x=>x.id===fusionId); if(!f) return false;
-  if(!f.from.every(wid=>(player.weapons[wid]||0)>=f.minLevel)) return false;
+  if(!f.from.every(wid=>(player.weapons[wid]||0)>=fusionMinLevel(f))) return false;
   const startLevel = Math.max(1, Math.floor(f.from.reduce((s,wid)=>s+(player.weapons[wid]||1),0)/f.from.length/2));
   for(const wid of f.from){ delete player.weapons[wid]; if(player.evolvedWeapons) delete player.evolvedWeapons[wid]; }
   player.weapons[f.result] = startLevel;
@@ -2918,6 +2963,28 @@ function spawnFormation(ids, shape){
   return spawned;
 }
 const FORMATION_SHAPES = ['ring','v','line','pincer','spiral','cross','double_ring','star','wall','helix','diamond','chevron_rows'];
+// Population floor a strong build's clear speed can't outrun: balance-lab.html's Enemy
+// Population chart (built to check exactly this) found the on-screen count crashing to
+// ~0 for extended late-game stretches — wave.mult/interval alone are tuned against
+// *time*, not the player's actual current kill rate, so once DPS growth pulls far enough
+// ahead (measured at a 7-25x median kill-rate-vs-spawn-rate gap by the back half of a
+// run, occasionally 50-100x+ for strong builds) the screen runs empty between waves
+// even though "something should always be happening" was the point. MIRROR IN
+// balance-lab.html's simulateOneRun() population model if this formula changes.
+function spawnPopulationFloor(wave){ return Math.min(dynamicMaxEnemies(), Math.round(clamp(12*wave.mult, 12, 150))); }
+// Two earlier versions tried to PACE the catch-up (a multiplied timer, then a
+// rate-limited "close the deficit within N seconds" stream) — both lost to reality:
+// balance-lab.html's Enemy Population chart showed a strong late-game build's kill
+// rate reaching 600-1000+/enemy-HP-equivalent per second, which no sane spawn RATE
+// can race against without spawning an absurd, unreadable number of enemies per
+// second. Since any gradual ramp loses that race anyway, pacing it buys nothing —
+// this version is an unconditional hard floor instead: every tick, top the on-screen
+// count straight back up to spawnPopulationFloor() if it's under, no ramp. With
+// updateSpawns() running every frame, the count is never visibly below the floor for
+// more than an instant, regardless of how fast the player is clearing waves.
+// Reinforcements still arrive from off-screen via spawnEnemy's normal radius (not
+// popping into view), so a big top-up after a wipe reads as "reinforcements rush
+// in," not enemies materializing in front of the player.
 function updateSpawns(dt){
   const wave = currentWave();
   const spawnMult = tempModifiers.filter(m=>m.key==="spawnRate").reduce((a,m)=>a*m.mult,1);
@@ -2929,6 +2996,9 @@ function updateSpawns(dt){
     for(let i=0;i<burst && enemies.length<dynamicMaxEnemies();i++) spawnEnemy(pick(wave.ids));
     lastSpawn = wave.interval*rand(0.85,1.15);
   }
+  // Population-floor catch-up (see the comment above spawnPopulationFloor).
+  const floor = spawnPopulationFloor(wave);
+  while(enemies.length<floor && enemies.length<dynamicMaxEnemies()) spawnEnemy(pick(wave.ids));
   // Formation bursts: gated behind a slower independent timer so early game (first
   // ~15s) stays calm, then fires progressively more often as wave.mult climbs,
   // floored at 10s so it never becomes a second, uncapped spawn stream.
@@ -3780,7 +3850,9 @@ function renderFusion(){
   const wrap=document.getElementById('fusionWrap'); wrap.innerHTML="";
   if(!player.fusionsAvailable.length){
     const none=document.createElement('div'); none.className='card';
-    none.innerHTML=`<div class="icon">🧬</div><div class="name">No Fusion Ready</div><div class="desc">Level two of a matching weapon pair to Lv.6+ to unlock a fusion.</div>`;
+    none.innerHTML = player.stats.forgeUnlocked
+      ? `<div class="icon">🧬</div><div class="name">No Fusion Ready</div><div class="desc">Level two of a matching weapon pair to Lv.${fusionMinLevel(FUSIONS[0])}+ to unlock a fusion.</div>`
+      : `<div class="icon">🔥</div><div class="name">Forge Not Yet Unlocked</div><div class="desc">Invest in the Weapon Forge talent (Survivor branch) to unlock weapon fusion for your runs.</div>`;
     wrap.appendChild(none); return;
   }
   for(const fid of player.fusionsAvailable){
