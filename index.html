@@ -122,7 +122,7 @@
   .timer .phase{display:block; font-size:10px; letter-spacing:3px; color:var(--accent); text-align:center; margin-top:2px; transition:color .3s, text-shadow .3s;}
   .timer .phase.phase-reveal{color:var(--gold); text-shadow:0 0 10px rgba(255,179,71,0.7); letter-spacing:4px;}
   .hud-bottom{position:absolute; bottom:0; left:0; right:0; padding:14px calc(20px + var(--safe-right)) calc(14px + var(--safe-bottom)) calc(20px + var(--safe-left)); display:flex; flex-direction:column; gap:8px; align-items:center;}
-  .ability-hud{position:absolute; right:calc(20px + var(--safe-right)); bottom:calc(96px + var(--safe-bottom)); z-index:7; display:flex; flex-direction:column; gap:12px; pointer-events:auto;}
+  .ability-hud{position:absolute; right:calc(20px + var(--safe-right)); bottom:calc(96px + var(--safe-bottom)); z-index:7; display:flex; flex-direction:column; gap:26px; pointer-events:auto;}
   .ability-btn{position:relative; width:52px; height:52px; border-radius:50%; background:var(--panel); border:2px solid var(--line); display:flex; align-items:center; justify-content:center; font-size:22px; cursor:pointer; user-select:none; transition:border-color .15s;}
   .ability-btn.ready{border-color:var(--accent); animation:abilityReadyPulse 1.6s ease-in-out infinite;}
   @keyframes abilityReadyPulse{0%,100%{box-shadow:0 0 8px rgba(185,140,255,0.25);} 50%{box-shadow:0 0 16px rgba(185,140,255,0.55);}}
@@ -140,7 +140,21 @@
   .ability-btn .ab-icon{position:relative; z-index:1; filter:drop-shadow(0 1px 2px rgba(0,0,0,0.6)) grayscale(0.75) brightness(0.6); opacity:0.7; transition:filter .25s, opacity .25s;}
   .ability-btn.ready .ab-icon{filter:drop-shadow(0 1px 2px rgba(0,0,0,0.6)); opacity:1;}
   .ui-icon{width:1em; height:1em; display:block; stroke:currentColor; fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round;}
-  .ability-btn .ab-cd{position:absolute; inset:0; border-radius:50%; background:transparent; pointer-events:none;}
+  /* Cooldown as a filling border ring, not a center-covering wedge: conic-gradient
+     sweeps clockwise from var(--line) (nothing elapsed yet, matches the button's
+     own idle border color) to var(--accent) (elapsed/ready) up to --cd-deg (set
+     per-frame in refreshAbilityHud, 0deg right after use -> 360deg once ready),
+     then a radial-gradient mask punches out everything except a ring the same
+     thickness as the button's own border — sits exactly on top of it, replacing
+     its color, so the border itself visibly fills in rather than the icon being
+     dimmed by an overlay (that job now belongs to .ab-icon's filter above).
+     No CSS `transition` here — refreshAbilityHud() sets --cd-deg every frame, so
+     the sweep is already smooth from the update rate; a plain custom property
+     isn't animatable by `transition` without an `@property` registration anyway. */
+  .ability-btn .ab-cd{position:absolute; inset:-2px; border-radius:50%; pointer-events:none;
+    background:conic-gradient(var(--accent) var(--cd-deg,0deg), var(--line) var(--cd-deg,0deg));
+    -webkit-mask:radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 4px));
+    mask:radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 4px));}
   .ability-btn .ab-label{position:absolute; bottom:-15px; left:50%; transform:translateX(-50%); font-family:'JetBrains Mono',monospace; font-size:8px; letter-spacing:1px; color:var(--dim); white-space:nowrap;}
   .ability-btn .ab-charges{position:absolute; bottom:-2px; right:-2px; z-index:1; background:var(--accent); color:#000; font-size:8.5px; font-weight:700; border-radius:8px; padding:0 4px; font-family:'JetBrains Mono',monospace;}
   .xp-track{width:min(560px,70vw); height:10px;}
@@ -4016,7 +4030,7 @@ function refreshAbilityHud(){
   // Ring shows progress toward the *next* charge (0 once at maxCharges, even if
   // the current charge count is already enough to dash right now).
   const dashPct = dash.charges>=dash.maxCharges ? 0 : clamp((dash.cd/dashRegenTime())*100,0,100);
-  dashCdEl.style.background = dashPct<=0 ? 'transparent' : `conic-gradient(rgba(8,9,13,0.72) ${dashPct}%, transparent ${dashPct}%)`;
+  dashCdEl.style.setProperty('--cd-deg', ((100-dashPct)*3.6)+'deg');
   let chargeBadge=document.getElementById('dashCharges');
   if(dash.maxCharges>1){
     if(!chargeBadge){ chargeBadge=document.createElement('span'); chargeBadge.id='dashCharges'; chargeBadge.className='ab-charges'; dashBtn.appendChild(chargeBadge); }
@@ -4026,7 +4040,7 @@ function refreshAbilityHud(){
   const healReady = heal.cd<=0;
   healBtn.classList.toggle('ready', healReady);
   const healPct = healReady ? 0 : (heal.cd/HEAL_ABILITY_COOLDOWN)*100;
-  healCdEl.style.background = healReady ? 'transparent' : `conic-gradient(rgba(8,9,13,0.72) ${healPct}%, transparent ${healPct}%)`;
+  healCdEl.style.setProperty('--cd-deg', ((100-healPct)*3.6)+'deg');
 }
 let lastWeaponSig=null;
 // POLISH_PLAN item 9 — brief scale-pulse whenever gold/kills actually increase,
