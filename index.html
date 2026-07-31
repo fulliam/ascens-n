@@ -6345,9 +6345,33 @@ function render(){
     ctx2d.shadowBlur=0;
   }
   ctx2d.shadowBlur=0;
+  // OPTIMIZATION_PLAN.md P1 direction 3 — cap the number of simultaneously-glowing normal
+  // enemies, not the glow intensity (already handled by quality/maybeAdaptQuality above).
+  // Live-profiled 2026-07-31 (.tools/browser-check.mjs): a ~750-enemy late-game screen held
+  // 13-19fps even at quality:'medium', and the SAME fps held on the post-death screen where
+  // AI/update logic had fully stopped and only render() kept running — the bottleneck is
+  // draw-call count, not simulation cost, so capping intensity alone (direction 1) can't fix
+  // it; only capping how many entities pay for shadowBlur at all does. Bosses/elites are
+  // always rare (at most a handful) and are the entities a player most needs to track, so
+  // they're exempted from the cap entirely — only ordinary trash-mob glow gets capped, and
+  // only once there are enough on screen to matter (common case: well under the cap, this
+  // whole block is one cheap counting pass and glowSet stays null, changing nothing).
+  const MAX_GLOW_ENEMIES = 150;
+  let glowSet = null;
+  {
+    let normalCount = 0;
+    for(const e of enemies){ if(!e.boss && !e.elite && inView(e.x,e.y)) normalCount++; }
+    if(normalCount > MAX_GLOW_ENEMIES){
+      const visibleNormals = [];
+      for(const e of enemies){ if(!e.boss && !e.elite && inView(e.x,e.y)) visibleNormals.push(e); }
+      visibleNormals.sort((a,b)=>dist2(a.x,a.y,player.x,player.y)-dist2(b.x,b.y,player.x,player.y));
+      glowSet = new Set(visibleNormals.slice(0,MAX_GLOW_ENEMIES));
+    }
+  }
   for(const e of enemies){
     if(!inView(e.x,e.y)) continue;
-    ctx2d.fillStyle=e.hitFlash>0?"#ffffff":e.color; ctx2d.shadowColor=e.glow; ctx2d.shadowBlur=glow(e.boss?26:(e.elite?18:10));
+    const canGlow = e.boss || e.elite || !glowSet || glowSet.has(e);
+    ctx2d.fillStyle=e.hitFlash>0?"#ffffff":e.color; ctx2d.shadowColor=e.glow; ctx2d.shadowBlur=canGlow?glow(e.boss?26:(e.elite?18:10)):0;
     if(e.boss || !e.shape){ ctx2d.beginPath(); ctx2d.arc(e.x,e.y,e.radius,0,7); ctx2d.fill(); } else drawEnemyShape(ctx2d,e);
     ctx2d.shadowBlur=0;
     if(e.mutation){ ctx2d.beginPath(); ctx2d.strokeStyle=e.mutationColor; ctx2d.lineWidth=2.5; ctx2d.arc(e.x,e.y,e.radius+2,0,7); ctx2d.stroke(); }
