@@ -49,6 +49,14 @@ declare class JsWorld {
   rebuild_spatial_index(componentId: number): void;
   query_near(x: number, y: number, radius: number, componentId: number): Uint32Array;
   query_near_count(x: number, y: number, radius: number, componentId: number): number;
+  // Batch spawn (all N entities start at the same x/y — fine here since every
+  // position gets overwritten by the first sync_enemy_echo call anyway) and
+  // bulk field write (Phase 3 step 2 — "physics results -> ECS" per the
+  // doc comment on set_component_x/y_values, repurposed here for "JS enemy
+  // positions -> ECS" instead of a physics system).
+  spawn_batch_f32x2(componentId: number, x: number, y: number, count: number): Uint32Array;
+  set_component_x_values(componentId: number, values: Float32Array): void;
+  set_component_y_values(componentId: number, values: Float32Array): void;
 }
 
 // The build script emits `const WASM_B64 = "...";` before inlining this
@@ -81,6 +89,14 @@ interface EngineBridgeApi {
   rebuildSpatialIndex(): void;
   queryNear(x: number, y: number, radius: number): Uint32Array;
   queryNearCount(x: number, y: number, radius: number): number;
+  // Phase 3 step 2 (WASM_ECS_MIGRATION_PLAN.md) — a *parallel, read-only*
+  // mirror of real JS enemy positions, for validating the Rust spatial index
+  // against real gameplay data before anything is allowed to depend on it.
+  // Deliberately does NOT touch real enemies/forEachEnemyNear/dealDamage —
+  // see the comment above initEnemyEcho below for the full design rationale.
+  initEnemyEcho(worldW: number, worldH: number): void;
+  syncEnemyEcho(xs: Float32Array, ys: Float32Array, liveCount: number): void;
+  queryEnemyEchoNearCount(x: number, y: number, radius: number): number;
 }
 
 // No top-level import/export in this file (see header) — tsc treats it as
@@ -136,6 +152,51 @@ function queryNearCount(x: number, y: number, radius: number): number {
   return world.query_near_count(x, y, radius, posComponentId);
 }
 
+// Phase 3 step 2 — validating the Rust spatial index against real enemy
+// positions, without letting anything in the classic game script actually
+// depend on the result yet (that's the whole point of the diff-validation
+// gate the migration plan asks for before any real call site is replaced).
+//
+// Design: rather than spawn/despawn one Rust entity per JS enemy every frame
+// (churny, and entity ids would need a JS<->Rust id-mapping table just to
+// keep them in sync across kills/spawns), spawn a FIXED pool once, sized to
+// MAX_ENEMIES (index.html), and every frame bulk-overwrite its positions via
+// set_component_x/y_values — this is exactly the "physics results -> ECS"
+// bulk-write pattern those two methods were already built for, just fed by
+// JS's enemy array instead of a physics system. Unused pool slots (when
+// enemies.length < pool size, the common case) get parked at a sentinel
+// coordinate far outside the world so they can never spuriously match a
+// proximity query.
+const ENEMY_ECHO_POOL_SIZE = 1600; // matches index.html's MAX_ENEMIES
+const ENEMY_ECHO_SENTINEL = -1e6; // for both x and y — outside any real query radius
+let enemyEchoComponentId = -1;
+let enemyEchoInited = false;
+
+function initEnemyEcho(worldW: number, worldH: number): void {
+  if (!world || enemyEchoInited) return;
+  enemyEchoComponentId = world.register_f32x2('EnemyEcho');
+  world.spawn_batch_f32x2(enemyEchoComponentId, ENEMY_ECHO_SENTINEL, ENEMY_ECHO_SENTINEL, ENEMY_ECHO_POOL_SIZE);
+  world.init_spatial_grid(enemyEchoComponentId, worldW, worldH);
+  enemyEchoInited = true;
+}
+
+function syncEnemyEcho(xs: Float32Array, ys: Float32Array, liveCount: number): void {
+  if (!world || !enemyEchoInited) return;
+  const n = Math.min(liveCount, ENEMY_ECHO_POOL_SIZE, xs.length, ys.length);
+  const fullX = new Float32Array(ENEMY_ECHO_POOL_SIZE).fill(ENEMY_ECHO_SENTINEL);
+  const fullY = new Float32Array(ENEMY_ECHO_POOL_SIZE).fill(ENEMY_ECHO_SENTINEL);
+  fullX.set(xs.subarray(0, n));
+  fullY.set(ys.subarray(0, n));
+  world.set_component_x_values(enemyEchoComponentId, fullX);
+  world.set_component_y_values(enemyEchoComponentId, fullY);
+  world.rebuild_spatial_index(enemyEchoComponentId);
+}
+
+function queryEnemyEchoNearCount(x: number, y: number, radius: number): number {
+  if (!world || !enemyEchoInited) return 0;
+  return world.query_near_count(x, y, radius, enemyEchoComponentId);
+}
+
 async function boot(): Promise<void> {
   try {
     await __engine_wasm_init(base64ToBytes(WASM_B64));
@@ -156,6 +217,9 @@ async function boot(): Promise<void> {
       rebuildSpatialIndex,
       queryNear,
       queryNearCount,
+      initEnemyEcho,
+      syncEnemyEcho,
+      queryEnemyEchoNearCount,
     };
     window.dispatchEvent(new Event('engine-ready'));
   } catch (err) {

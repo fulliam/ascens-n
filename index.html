@@ -2173,6 +2173,50 @@ function queryNearCount(x, y, radius) {
         return 0;
     return world.query_near_count(x, y, radius, posComponentId);
 }
+// Phase 3 step 2 — validating the Rust spatial index against real enemy
+// positions, without letting anything in the classic game script actually
+// depend on the result yet (that's the whole point of the diff-validation
+// gate the migration plan asks for before any real call site is replaced).
+//
+// Design: rather than spawn/despawn one Rust entity per JS enemy every frame
+// (churny, and entity ids would need a JS<->Rust id-mapping table just to
+// keep them in sync across kills/spawns), spawn a FIXED pool once, sized to
+// MAX_ENEMIES (index.html), and every frame bulk-overwrite its positions via
+// set_component_x/y_values — this is exactly the "physics results -> ECS"
+// bulk-write pattern those two methods were already built for, just fed by
+// JS's enemy array instead of a physics system. Unused pool slots (when
+// enemies.length < pool size, the common case) get parked at a sentinel
+// coordinate far outside the world so they can never spuriously match a
+// proximity query.
+const ENEMY_ECHO_POOL_SIZE = 1600; // matches index.html's MAX_ENEMIES
+const ENEMY_ECHO_SENTINEL = -1e6; // for both x and y — outside any real query radius
+let enemyEchoComponentId = -1;
+let enemyEchoInited = false;
+function initEnemyEcho(worldW, worldH) {
+    if (!world || enemyEchoInited)
+        return;
+    enemyEchoComponentId = world.register_f32x2('EnemyEcho');
+    world.spawn_batch_f32x2(enemyEchoComponentId, ENEMY_ECHO_SENTINEL, ENEMY_ECHO_SENTINEL, ENEMY_ECHO_POOL_SIZE);
+    world.init_spatial_grid(enemyEchoComponentId, worldW, worldH);
+    enemyEchoInited = true;
+}
+function syncEnemyEcho(xs, ys, liveCount) {
+    if (!world || !enemyEchoInited)
+        return;
+    const n = Math.min(liveCount, ENEMY_ECHO_POOL_SIZE, xs.length, ys.length);
+    const fullX = new Float32Array(ENEMY_ECHO_POOL_SIZE).fill(ENEMY_ECHO_SENTINEL);
+    const fullY = new Float32Array(ENEMY_ECHO_POOL_SIZE).fill(ENEMY_ECHO_SENTINEL);
+    fullX.set(xs.subarray(0, n));
+    fullY.set(ys.subarray(0, n));
+    world.set_component_x_values(enemyEchoComponentId, fullX);
+    world.set_component_y_values(enemyEchoComponentId, fullY);
+    world.rebuild_spatial_index(enemyEchoComponentId);
+}
+function queryEnemyEchoNearCount(x, y, radius) {
+    if (!world || !enemyEchoInited)
+        return 0;
+    return world.query_near_count(x, y, radius, enemyEchoComponentId);
+}
 async function boot() {
     try {
         await __engine_wasm_init(base64ToBytes(WASM_B64));
@@ -2192,6 +2236,9 @@ async function boot() {
             rebuildSpatialIndex,
             queryNear,
             queryNearCount,
+            initEnemyEcho,
+            syncEnemyEcho,
+            queryEnemyEchoNearCount,
         };
         window.dispatchEvent(new Event('engine-ready'));
     }
@@ -6437,7 +6484,34 @@ window.addEventListener('engine-ready', ()=>{
   // touch real enemies/forEachEnemyNear() — that's the separate, deliberately
   // slower step the migration plan gates behind a diff-validation pass.
   window.EngineBridge.initSpatialGrid(WORLD.w, WORLD.h);
+  // Phase 3 step 2 — a second, parallel spatial grid mirroring REAL enemy
+  // positions (fixed pool sized to MAX_ENEMIES, bulk-synced every debug-overlay
+  // tick — see syncWasmEnemyEcho() below and engine-bridge.ts's initEnemyEcho).
+  // Read-only diagnostic: nothing here ever feeds back into forEachEnemyNear/
+  // dealDamage/killEnemy, this only exists to compare Rust's query answer
+  // against a brute-force JS ground truth for manual validation.
+  window.EngineBridge.initEnemyEcho(WORLD.w, WORLD.h);
 });
+let wasmEchoNearPlayer=0, wasmEchoGroundTruth=0;
+// Only runs while Debug Overlay is open — this is pure diagnostic tooling
+// (Phase 5 "comparison mode" from WASM_ECS_MIGRATION_PLAN.md), not something
+// a normal player's frame budget should ever pay for.
+function syncWasmEnemyEcho(){
+  if(!(window.EngineBridge && window.EngineBridge.isReady() && player)) return;
+  const n=enemies.length;
+  const xs=new Float32Array(n), ys=new Float32Array(n);
+  let live=0;
+  for(const e of enemies){ if(e.dead) continue; xs[live]=e.x; ys[live]=e.y; live++; }
+  window.EngineBridge.syncEnemyEcho(xs,ys,live);
+  wasmEchoNearPlayer=window.EngineBridge.queryEnemyEchoNearCount(player.x,player.y,200);
+  // Ground truth via brute-force exact-distance count (NOT forEachEnemyNear —
+  // that function is deliberately cell-approximate, callers apply their own
+  // distance check afterward, so it isn't a fair 1:1 comparison against
+  // Rust's query_near, which does filter by exact distance internally).
+  let gt=0;
+  for(const e of enemies){ if(e.dead) continue; const dx=e.x-player.x,dy=e.y-player.y; if(dx*dx+dy*dy<=200*200) gt++; }
+  wasmEchoGroundTruth=gt;
+}
 function updateDebugOverlay(rawMs){
   const el=document.getElementById('debugOverlay'); if(!el) return;
   let text=`FPS ${Math.round(debugFpsEma)}  frame ${rawMs.toFixed(1)}ms`;
@@ -6446,7 +6520,11 @@ function updateDebugOverlay(rawMs){
     `particles ${particles.length}  floaters ${floaters.length}\n`+
     `minions ${minions.length}  zones ${zones.length}\n`+
     `grid cells ${spatialGrid.size}`;
-  if(window.EngineBridge && window.EngineBridge.isReady()) text+=`\nWASM ${wasmSmokeEntityCount} entities  tick ${wasmSmokeTickMs.toFixed(2)}ms  near-player(200) ${wasmSmokeNearPlayer}`;
+  if(window.EngineBridge && window.EngineBridge.isReady()){
+    text+=`\nWASM ${wasmSmokeEntityCount} entities  tick ${wasmSmokeTickMs.toFixed(2)}ms  near-player(200) ${wasmSmokeNearPlayer}`;
+    const match=wasmEchoNearPlayer===wasmEchoGroundTruth ? "match" : "MISMATCH";
+    text+=`\nspatial-echo rust=${wasmEchoNearPlayer} js-groundtruth=${wasmEchoGroundTruth} (${match})`;
+  }
   el.textContent=text;
 }
 function loop(now){
@@ -6484,7 +6562,7 @@ function loop(now){
   }
   if(debugOverlayOn){
     debugOverlayTimer-=dt;
-    if(debugOverlayTimer<=0){ debugOverlayTimer=0.25; updateDebugOverlay(rawMs); }
+    if(debugOverlayTimer<=0){ debugOverlayTimer=0.25; syncWasmEnemyEcho(); updateDebugOverlay(rawMs); }
   }
   requestAnimationFrame(loop);
 }
