@@ -42,6 +42,13 @@ declare class JsWorld {
   ): Uint32Array;
   step_physics(posId: number, velId: number, dt: number): void;
   get_f32x2_interleaved(componentId: number): Float32Array;
+  // Spatial broadphase (crate-engine/src/wasm_api.rs — Phase 2 of the migration
+  // plan). Rust-side grid is already written and unit-tested; these three were
+  // simply never exposed through this bridge until now.
+  init_spatial_grid(componentId: number, worldW: number, worldH: number): void;
+  rebuild_spatial_index(componentId: number): void;
+  query_near(x: number, y: number, radius: number, componentId: number): Uint32Array;
+  query_near_count(x: number, y: number, radius: number, componentId: number): number;
 }
 
 // The build script emits `const WASM_B64 = "...";` before inlining this
@@ -66,6 +73,14 @@ interface EngineBridgeApi {
   spawnTestEntity(x: number, y: number, vx: number, vy: number): number;
   tickPhysics(dt: number): void;
   readAllPositions(): Float32Array;
+  // Spatial broadphase, scoped to the Position component this bridge already
+  // tracks (posComponentId is baked in below, never exposed to the caller —
+  // there is only ever one spatial grid this bridge manages, so surfacing a
+  // component id parameter here would just be a chance to pass the wrong one).
+  initSpatialGrid(worldW: number, worldH: number): void;
+  rebuildSpatialIndex(): void;
+  queryNear(x: number, y: number, radius: number): Uint32Array;
+  queryNearCount(x: number, y: number, radius: number): number;
 }
 
 // No top-level import/export in this file (see header) — tsc treats it as
@@ -101,6 +116,26 @@ function entityCount(): number {
   return world ? world.entity_count() : 0;
 }
 
+function initSpatialGrid(worldW: number, worldH: number): void {
+  if (!world) return;
+  world.init_spatial_grid(posComponentId, worldW, worldH);
+}
+
+function rebuildSpatialIndex(): void {
+  if (!world) return;
+  world.rebuild_spatial_index(posComponentId);
+}
+
+function queryNear(x: number, y: number, radius: number): Uint32Array {
+  if (!world) return new Uint32Array(0);
+  return world.query_near(x, y, radius, posComponentId);
+}
+
+function queryNearCount(x: number, y: number, radius: number): number {
+  if (!world) return 0;
+  return world.query_near_count(x, y, radius, posComponentId);
+}
+
 async function boot(): Promise<void> {
   try {
     await __engine_wasm_init(base64ToBytes(WASM_B64));
@@ -117,6 +152,10 @@ async function boot(): Promise<void> {
       spawnTestEntity,
       tickPhysics,
       readAllPositions,
+      initSpatialGrid,
+      rebuildSpatialIndex,
+      queryNear,
+      queryNearCount,
     };
     window.dispatchEvent(new Event('engine-ready'));
   } catch (err) {

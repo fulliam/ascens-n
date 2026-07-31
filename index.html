@@ -2153,6 +2153,26 @@ function readAllPositions() {
 function entityCount() {
     return world ? world.entity_count() : 0;
 }
+function initSpatialGrid(worldW, worldH) {
+    if (!world)
+        return;
+    world.init_spatial_grid(posComponentId, worldW, worldH);
+}
+function rebuildSpatialIndex() {
+    if (!world)
+        return;
+    world.rebuild_spatial_index(posComponentId);
+}
+function queryNear(x, y, radius) {
+    if (!world)
+        return new Uint32Array(0);
+    return world.query_near(x, y, radius, posComponentId);
+}
+function queryNearCount(x, y, radius) {
+    if (!world)
+        return 0;
+    return world.query_near_count(x, y, radius, posComponentId);
+}
 async function boot() {
     try {
         await __engine_wasm_init(base64ToBytes(WASM_B64));
@@ -2168,6 +2188,10 @@ async function boot() {
             spawnTestEntity,
             tickPhysics,
             readAllPositions,
+            initSpatialGrid,
+            rebuildSpatialIndex,
+            queryNear,
+            queryNearCount,
         };
         window.dispatchEvent(new Event('engine-ready'));
     }
@@ -6401,11 +6425,18 @@ let debugFpsEma=60, debugOverlayTimer=0;
 // additive proof that spawn/tick/zero-copy-readback round-trips correctly.
 // Does not touch real gameplay entities/state; only feeds the debug overlay.
 const WASM_SMOKE_ENTITY_COUNT = 50;
-let wasmSmokeEntityCount=0, wasmSmokeTickMs=0;
+let wasmSmokeEntityCount=0, wasmSmokeTickMs=0, wasmSmokeNearPlayer=0;
 window.addEventListener('engine-ready', ()=>{
   for(let i=0;i<WASM_SMOKE_ENTITY_COUNT;i++){
     window.EngineBridge.spawnTestEntity(rand(0,WORLD.w), rand(0,WORLD.h), rand(-50,50), rand(-50,50));
   }
+  // Phase 2 of the ECS migration plan (spatial broadphase) was already written
+  // and tested in Rust but never wired through the bridge until now — this
+  // just proves the round-trip against the smoke-test entities above, same
+  // zero-real-gameplay-impact scope as the rest of this block. Still doesn't
+  // touch real enemies/forEachEnemyNear() — that's the separate, deliberately
+  // slower step the migration plan gates behind a diff-validation pass.
+  window.EngineBridge.initSpatialGrid(WORLD.w, WORLD.h);
 });
 function updateDebugOverlay(rawMs){
   const el=document.getElementById('debugOverlay'); if(!el) return;
@@ -6415,7 +6446,7 @@ function updateDebugOverlay(rawMs){
     `particles ${particles.length}  floaters ${floaters.length}\n`+
     `minions ${minions.length}  zones ${zones.length}\n`+
     `grid cells ${spatialGrid.size}`;
-  if(window.EngineBridge && window.EngineBridge.isReady()) text+=`\nWASM ${wasmSmokeEntityCount} entities  tick ${wasmSmokeTickMs.toFixed(2)}ms`;
+  if(window.EngineBridge && window.EngineBridge.isReady()) text+=`\nWASM ${wasmSmokeEntityCount} entities  tick ${wasmSmokeTickMs.toFixed(2)}ms  near-player(200) ${wasmSmokeNearPlayer}`;
   el.textContent=text;
 }
 function loop(now){
@@ -6441,6 +6472,13 @@ function loop(now){
     const t0=performance.now();
     window.EngineBridge.tickPhysics(dt);
     window.EngineBridge.readAllPositions();
+    window.EngineBridge.rebuildSpatialIndex();
+    // player.x/player.y is real, live data — the smoke-test entities themselves
+    // are still synthetic, so this exercises the Rust query against a
+    // meaningful moving point without touching any real enemy/bullet state.
+    // loop() itself runs from boot() (menu state, before any run exists), so
+    // `player` is still undefined the first many frames — guard, don't assume.
+    if(player) wasmSmokeNearPlayer=window.EngineBridge.queryNearCount(player.x,player.y,200);
     wasmSmokeTickMs=performance.now()-t0;
     wasmSmokeEntityCount=window.EngineBridge.entityCount();
   }
