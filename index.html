@@ -3526,9 +3526,9 @@ async function persistSave(){
   try{ await saveInFlight; } finally{ saveInFlight=null; if(savePending){ savePending=false; persistSave(); } }
 }
 function refreshSoulBadges(){
-  document.getElementById('menuSoul').textContent = Math.floor(save.soul);
-  document.getElementById('menuArtifacts').textContent = Math.floor(save.artifacts);
-  const metaSoulEl = document.getElementById('metaSoul'); if(metaSoulEl) metaSoulEl.textContent = Math.floor(save.soul);
+  document.getElementById('menuSoul').textContent = fmtBig(save.soul);
+  document.getElementById('menuArtifacts').textContent = fmtBig(save.artifacts);
+  const metaSoulEl = document.getElementById('metaSoul'); if(metaSoulEl) metaSoulEl.textContent = fmtBig(save.soul);
   const chip = document.getElementById('achProgressChip');
   if(chip) chip.textContent = `${Object.keys(save.achievements.unlocked).length}/${ACHIEVEMENTS.length}`;
   const armoryChip = document.getElementById('armoryChip');
@@ -4147,7 +4147,7 @@ function dealDamage(enemy, dmg, weaponId){
     dmg = Math.max(0, Math.min(dmg, 999999)); // sanity clamp against NaN/Infinity from broken combos
     enemy.hp -= dmg; enemy.hitFlash=1;
     dpsWindow.push({t:runTime,dmg}); dpsWindowSum+=dmg;
-    spawnFloater(enemy.x,enemy.y-10,Math.round(dmg), crit?"#ffe15c":(isEliteOrBoss?"#ffb347":"#fff"));
+    spawnFloater(enemy.x,enemy.y-10,fmtFlavorBig(dmg), crit?"#ffe15c":(isEliteOrBoss?"#ffb347":"#fff"));
     if(player.stats.lifesteal>0){
       if(runTime-player.lifestealWindowStart>=1){ player.lifestealWindowStart=runTime; player.lifestealHealedThisSec=0; }
       const capThisSec = runTime<LIFESTEAL_HPS_PCT_CAP_START_T ? LIFESTEAL_HPS_CAP : Math.min(LIFESTEAL_HPS_CAP, player.maxHp*LIFESTEAL_HPS_PCT_CAP);
@@ -5326,7 +5326,7 @@ const SHOP_ITEMS = [
 function shopItemCost(item, purchased){ return Math.ceil(item.cost*Math.pow(item.growth||1, purchased)); }
 function renderShop(){
   const wrap=document.getElementById('shopWrap'); wrap.innerHTML="";
-  document.getElementById('shopGoldDisplay').textContent=Math.floor(player.gold);
+  document.getElementById('shopGoldDisplay').textContent=fmtBig(player.gold);
   document.getElementById('shopCrystalDisplay').textContent=Math.floor(player.crystals);
   SHOP_ITEMS.forEach(item=>{
     const locked = item.unlockAchievement && !save.achievements.unlocked[item.unlockAchievement];
@@ -5432,8 +5432,8 @@ function charInfoStatsHtml(){
     <div class="stat-row"><span class="k">Threat Level</span><span style="color:var(--accent2)">${currentWave().mult.toFixed(2)}x — ${currentPhase().name}</span></div>
     <div class="stat-row"><span class="k">Health</span><span>${Math.round(player.hp)} / ${player.maxHp}</span></div>
     <div class="stat-row"><span class="k">Shield</span><span>${Math.round(player.shield)}</span></div>
-    <div class="stat-row"><span class="k">Gold</span><span style="color:var(--gold)">${Math.floor(player.gold)}</span></div>
-    <div class="stat-row"><span class="k">Crystals</span><span style="color:var(--crystal)">${Math.floor(player.crystals)}</span></div>
+    <div class="stat-row"><span class="k">Gold</span><span style="color:var(--gold)">${fmtBig(player.gold)}</span></div>
+    <div class="stat-row"><span class="k">Crystals</span><span style="color:var(--crystal)">${fmtBig(player.crystals)}</span></div>
     <div class="stat-row"><span class="k">Damage Mult</span><span>+${Math.round((s.dmgMult-1)*100)}%</span></div>
     <div class="stat-row"><span class="k">Attack Speed</span><span>+${Math.round((s.atkSpeedMult-1)*100)}%</span></div>
     <div class="stat-row"><span class="k">Move Speed</span><span>${Math.round(s.moveSpeed)}</span></div>
@@ -5905,11 +5905,11 @@ function die(){
   document.getElementById('deathStats').innerHTML=`
     <div class="stat-row"><span class="k">Time Survived</span><span>${fmtTime(runTime)}</span></div>
     <div class="stat-row"><span class="k">Level Reached</span><span>${player.level}</span></div>
-    <div class="stat-row"><span class="k">Kills</span><span>${killCount}</span></div>
-    <div class="stat-row"><span class="k">Gold Collected</span><span>${Math.floor(player.gold)}</span></div>
+    <div class="stat-row"><span class="k">Kills</span><span>${fmtBig(killCount)}</span></div>
+    <div class="stat-row"><span class="k">Gold Collected</span><span>${fmtBig(player.gold)}</span></div>
     <div class="stat-row"><span class="k">Synergies</span><span>${player.synergiesActive.length}</span></div>
     <div class="stat-row"><span class="k">Evolutions</span><span>${runStats.evolutionsThisRun||0}</span></div>`;
-  document.getElementById('soulGain').textContent=`+ ${soulGain} SOUL earned`;
+  document.getElementById('soulGain').textContent=`+ ${fmtBig(soulGain)} SOUL earned`;
   refreshSoulBadges(); show('screen-death');
   glitchScramble(document.getElementById('deathTitle'));
 }
@@ -5920,14 +5920,14 @@ function win(){
   document.getElementById('victoryStats').innerHTML=`
     <div class="stat-row"><span class="k">Time Survived</span><span>${fmtTime(runTime)}</span></div>
     <div class="stat-row"><span class="k">Level Reached</span><span>${player.level}</span></div>
-    <div class="stat-row"><span class="k">Kills</span><span>${killCount}</span></div>
-    <div class="stat-row"><span class="k">Gold Collected</span><span>${Math.floor(player.gold)}</span></div>`;
+    <div class="stat-row"><span class="k">Kills</span><span>${fmtBig(killCount)}</span></div>
+    <div class="stat-row"><span class="k">Gold Collected</span><span>${fmtBig(player.gold)}</span></div>`;
   const soulMult=player.stats.soulMult||1;
   const soulGain=Math.floor((150+player.gold*0.12+player.level*2+Math.floor(runTime/10))*soulMult);
   save.soul+=soulGain; save.lifetime.totalSoul+=soulGain; save.artifacts+=5;
   applyRunStatsIncrement(false);
   checkAchievements(); persistSave();
-  document.getElementById('victorySoulGain').textContent=`+ ${soulGain} SOUL earned (includes victory bonus)`;
+  document.getElementById('victorySoulGain').textContent=`+ ${fmtBig(soulGain)} SOUL earned (includes victory bonus)`;
   refreshSoulBadges(); show('screen-victory');
 }
 
@@ -5980,7 +5980,7 @@ function refreshHud(){
   document.getElementById('xpFill').style.width=clamp(player.xp/player.xpNext*100,0,100)+"%";
   document.getElementById('xpLabel').textContent=Math.floor(player.xp)+" / "+player.xpNext+" XP";
   const goldEl=document.getElementById('goldVal'), goldFloor=Math.floor(player.gold);
-  goldEl.textContent=goldFloor;
+  goldEl.textContent=fmtBig(goldFloor);
   if(lastGoldVal!==null && goldFloor>lastGoldVal) pulseValue(goldEl);
   lastGoldVal=goldFloor;
   document.getElementById('crystalVal').textContent=Math.floor(player.crystals);
@@ -5997,7 +5997,7 @@ function refreshHud(){
   if(lowHp) SFX.startHeartbeat(); else SFX.stopHeartbeat();
   document.querySelector('.hp-wrap').classList.toggle('low-hp', lowHp);
   const dps=dpsWindowSumFor(runTime)/3;
-  document.getElementById('dpsVal').textContent=Math.round(dps)+" dps";
+  document.getElementById('dpsVal').textContent=fmtFlavorBig(dps)+" dps";
   // Disabled-state is folded into the signature (not just weapon/level/evolved) so
   // a *temporary* disable (jam action, non-Infinity duration) expiring on its own
   // mid-run still triggers a re-render — Infinity ones (Shrine of Silence) never
@@ -6772,6 +6772,35 @@ function rand(a,b){ return a+Math.random()*(b-a); }
 function pick(arr){ return arr[(Math.random()*arr.length)|0]; }
 function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
 function fmtTime(s){ const m=Math.floor(s/60),sec=Math.floor(s%60); return String(m).padStart(2,'0')+":"+String(sec).padStart(2,'0'); }
+// Titan Quest-style big-number display — K/M/B/T suffixes, scientific notation past
+// trillions (letter suffixes get unreadable fast beyond that). Purely a presentation
+// helper: never changes the underlying number, only how it's shown. Real gameplay
+// numbers (gold/hp/dmg) are deliberately left untouched everywhere they're COMPARED
+// against something (shop prices, thresholds) — only inflating the display of a value
+// the player also compares against an un-inflated price would read as broken, not epic.
+const BIG_NUM_SUFFIXES=['','K','M','B','T'];
+function fmtBig(n){
+  n=Math.floor(n); if(!isFinite(n)) return n>0?'∞':'-∞';
+  const neg=n<0; n=Math.abs(n);
+  if(n<1000) return (neg?'-':'')+n;
+  let tier=Math.min(BIG_NUM_SUFFIXES.length-1, Math.floor(Math.log10(n)/3));
+  let scaled=n/Math.pow(1000,tier);
+  let digits=scaled<10?2:scaled<100?1:0;
+  // toFixed()'s own rounding can push the displayed value up to "1000" at the current
+  // tier (e.g. 999999 -> 999.999 -> toFixed(0) -> "1000") — checked against the actual
+  // rounded string, not the pre-rounding float, and bumped a tier when that happens.
+  if(+scaled.toFixed(digits)>=1000 && tier<BIG_NUM_SUFFIXES.length-1){ tier++; scaled=n/Math.pow(1000,tier); digits=scaled<10?2:scaled<100?1:0; }
+  if(tier===BIG_NUM_SUFFIXES.length-1 && +scaled.toFixed(digits)>=1000) return (neg?'-':'')+n.toExponential(2).replace('e+','e');
+  return (neg?'-':'')+scaled.toFixed(digits)+BIG_NUM_SUFFIXES[tier];
+}
+// Purely decorative amplification for flavor-only numbers that are never compared
+// against a price/threshold by the player (floating damage text, HUD DPS counter) —
+// makes crits/late-game DPS read as satisfyingly huge (Titan Quest-style) without
+// touching a single real gameplay number or anything the player weighs a purchase
+// against. Currency (gold/soul/artifacts) deliberately does NOT get this treatment,
+// see fmtBig's own comment.
+const FLAVOR_SCALE=250;
+function fmtFlavorBig(n){ return fmtBig(n*FLAVOR_SCALE); }
 function logEvent(text){ const log=document.getElementById('eventLog'); const div=document.createElement('div'); div.textContent="▸ "+text; log.appendChild(div); setTimeout(()=>div.remove(),3200); while(log.children.length>5) log.removeChild(log.firstChild); }
 function updateBossPhase(boss,defs,ctx){
   // Phases are authored high-to-low by hpAbove, each meant to own the range
