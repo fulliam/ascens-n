@@ -6512,6 +6512,40 @@ function syncWasmEnemyEcho(){
   for(const e of enemies){ if(e.dead) continue; const dx=e.x-player.x,dy=e.y-player.y; if(dx*dx+dy*dy<=200*200) gt++; }
   wasmEchoGroundTruth=gt;
 }
+// Phase 3 step 3 (WASM_ECS_MIGRATION_PLAN.md — "which bullet touched which
+// enemy this frame") — mechanical-half validation only, same discipline as
+// step 2: this NEVER feeds back into dealDamage/killEnemy/updateBullets, it
+// only checks whether the already-synced EnemyEcho grid (see
+// syncWasmEnemyEcho above, must run first — this function assumes a fresh
+// rebuild already happened this tick) agrees with JS on broadphase candidate
+// counts when queried from a moving bullet's position instead of the
+// player's fixed one. Deliberately reuses queryEnemyEchoNearCount as-is (no
+// new Rust/bridge surface needed) with the EXACT SAME search radius
+// updateBullets() itself uses for its own forEachEnemyNear broadphase call
+// (b.radius+60) — this is comparing broadphase candidate-set *size*, not the
+// final per-enemy-radius exact-hit resolution (that part stays genuinely
+// stat/content-coupled and is out of scope here, matching the plan's own
+// "isolate the mechanical, content-agnostic half" framing for this step).
+// Capped to the first 50 live player bullets per tick (not all up to
+// MAX_BULLETS=900) — sampling is just as convincing for catching a systemic
+// bug and keeps this diagnostic tick's own cost predictable.
+const WASM_BULLET_ECHO_SAMPLE = 50;
+let wasmBulletEchoChecked=0, wasmBulletEchoMismatches=0;
+function syncWasmBulletCollisionCheck(){
+  if(!(window.EngineBridge && window.EngineBridge.isReady())) return;
+  let checked=0, mismatches=0;
+  for(const b of bullets){
+    if(checked>=WASM_BULLET_ECHO_SAMPLE) break;
+    if(b.dead || b.owner!=="player") continue;
+    const searchR=b.radius+60;
+    const rustCount=window.EngineBridge.queryEnemyEchoNearCount(b.x,b.y,searchR);
+    let jsCount=0;
+    for(const e of enemies){ if(e.dead) continue; const dx=e.x-b.x,dy=e.y-b.y; if(dx*dx+dy*dy<=searchR*searchR) jsCount++; }
+    checked++;
+    if(rustCount!==jsCount) mismatches++;
+  }
+  wasmBulletEchoChecked=checked; wasmBulletEchoMismatches=mismatches;
+}
 function updateDebugOverlay(rawMs){
   const el=document.getElementById('debugOverlay'); if(!el) return;
   let text=`FPS ${Math.round(debugFpsEma)}  frame ${rawMs.toFixed(1)}ms`;
@@ -6524,6 +6558,7 @@ function updateDebugOverlay(rawMs){
     text+=`\nWASM ${wasmSmokeEntityCount} entities  tick ${wasmSmokeTickMs.toFixed(2)}ms  near-player(200) ${wasmSmokeNearPlayer}`;
     const match=wasmEchoNearPlayer===wasmEchoGroundTruth ? "match" : "MISMATCH";
     text+=`\nspatial-echo rust=${wasmEchoNearPlayer} js-groundtruth=${wasmEchoGroundTruth} (${match})`;
+    text+=`\nbullet-collision-echo ${wasmBulletEchoChecked} sampled  mismatches ${wasmBulletEchoMismatches}`;
   }
   el.textContent=text;
 }
@@ -6562,7 +6597,7 @@ function loop(now){
   }
   if(debugOverlayOn){
     debugOverlayTimer-=dt;
-    if(debugOverlayTimer<=0){ debugOverlayTimer=0.25; syncWasmEnemyEcho(); updateDebugOverlay(rawMs); }
+    if(debugOverlayTimer<=0){ debugOverlayTimer=0.25; syncWasmEnemyEcho(); syncWasmBulletCollisionCheck(); updateDebugOverlay(rawMs); }
   }
   requestAnimationFrame(loop);
 }
