@@ -6532,7 +6532,16 @@ function syncWasmEnemyEcho(){
 const WASM_BULLET_ECHO_SAMPLE = 50;
 let wasmBulletEchoChecked=0, wasmBulletEchoMismatches=0;
 function syncWasmBulletCollisionCheck(){
-  if(!(window.EngineBridge && window.EngineBridge.isReady())) return;
+  // Same class of bug as syncWasmEnemyEcho's player guard: loop() runs from
+  // boot() while still on the main menu, before startRun()/newPlayer() ever
+  // assign player/enemies/bullets. Confirmed live via .tools/browser-check.mjs
+  // (?dev=1 forces debugOverlayOn true from the menu) — an unguarded
+  // `for(const b of bullets)` threw "bullets is not iterable" on the very
+  // first debug-overlay tick, which (uncaught inside loop()'s
+  // requestAnimationFrame callback) killed the entire game loop before it
+  // ever scheduled another frame. A normal player toggling Debug Overlay on
+  // from Settings before starting a run would hit this exact freeze.
+  if(!(window.EngineBridge && window.EngineBridge.isReady() && player)) return;
   let checked=0, mismatches=0;
   for(const b of bullets){
     if(checked>=WASM_BULLET_ECHO_SAMPLE) break;
