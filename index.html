@@ -67,52 +67,6 @@
   }
   #screen-menu .title, #screen-victory .title{animation:glitchRgb 4.5s infinite;}
   #screen-meta .title, #screen-achievements .title{animation:glitchScan 6s infinite;}
-  /* The menu title's own gag — a Cyrillic "ё" standing in for the "I" in
-     "ASCENSION" ("ASCENSёON") — gets its OWN independent glitch: shorter cycle
-     (2.6s vs the whole title's 4.5s) and a different character entirely.
-     POLISH_PLAN_15 — inverted from the first version: the glitched state
-     (including actually swapping the glyph to the real "I" it stands in for)
-     is now the DOMINANT state, with only brief flickers back to the calm "ё" —
-     was the other way around (~93% calm / ~7% glitch), now roughly ~80%
-     glitched / ~20% calm. The glyph swap itself can't be done by animating
-     `content` on the element's own text (that property only applies to
-     ::before/::after), so the real "ё" and an ::after showing "I" are
-     cross-faded via two separate but same-duration/same-timeline keyframes —
-     titleLetterGlitch fades the real glyph out during the "I" windows,
-     titleLetterOverlay fades the ::after "I" in during exactly those same
-     windows (both same 2.6s, no delay on either, so they can't drift apart). */
-  /* Rajdhani (the rest of .title) has no Cyrillic glyphs at all — the "ё" was
-     silently falling back to a generic system sans-serif, mismatched in
-     weight/shape from both the surrounding "ASCENSION" letters and the "I"
-     it cross-fades into below, which read as the glitch effect looking
-     broken. Exo 2 is the closest Google Font match to Rajdhani's geometric/
-     technical feel that actually ships Cyrillic — applied here only, so it
-     covers both the real "ё" and the ::after "I" (pseudo-elements inherit
-     font-family from their host by default) without touching the rest of
-     the title. */
-  .title-glitch-letter{position:relative; display:inline-block; font-family:'Exo 2',sans-serif; animation:titleLetterGlitch 2.6s infinite;}
-  .title-glitch-letter::after{content:'I'; position:absolute; left:0; top:0; width:100%; text-align:center; opacity:0; animation:titleLetterOverlay 2.6s infinite;}
-  @keyframes titleLetterGlitch{
-    0%{opacity:1; color:inherit; text-shadow:none; transform:translateY(0) scaleX(1);}
-    4%{opacity:1; color:var(--accent2); text-shadow:2px 0 var(--crystal), -2px 0 #ff3b3b; transform:translateY(-2px) scaleX(1.12);}
-    8%,45%{opacity:0;}
-    48%{opacity:1; color:var(--crystal); text-shadow:-1px 0 var(--accent2); transform:translateY(1px) scaleX(0.9);}
-    53%,93%{opacity:0;}
-    97%{opacity:1; color:var(--accent2); text-shadow:1px 0 var(--crystal); transform:translateY(-1px) scaleX(1.05);}
-    100%{opacity:1; color:inherit; text-shadow:none; transform:translateY(0) scaleX(1);}
-  }
-  @keyframes titleLetterOverlay{
-    0%,4%{opacity:0;}
-    8%{opacity:1; color:var(--accent2); text-shadow:1px 0 var(--crystal), -1px 0 #ff3b3b; transform:translateY(-1px);}
-    20%{color:var(--crystal); transform:translateY(1px);}
-    35%{color:var(--accent2); transform:translateY(0);}
-    45%{opacity:1;}
-    48%{opacity:0;}
-    53%{opacity:1; transform:translateY(-1px);}
-    70%{color:var(--crystal); transform:translateY(1px);}
-    93%{opacity:1; transform:translateY(0);}
-    97%,100%{opacity:0;}
-  }
   /* Third, distinct style for pause specifically — a "frozen feed" judder (brief
      horizontal tear + brightness snap) rather than color-split or a scan wipe,
      since "paused" reads naturally as a frozen video signal rather than either of
@@ -4792,8 +4746,19 @@ function updateEnemies(dt){
     e.x=clamp(e.x,e.radius,WORLD.w-e.radius); e.y=clamp(e.y,e.radius,WORLD.h-e.radius);
   }
 }
+// Hard ceiling — unlike bullets/orbs/particles, minions had no population cap at
+// all until this fix. A summon-heavy build (raiseDeadChance stacking off
+// necromancers_pact/restless_dead/lich_lord_build, or a long swarm_hive run) could
+// put 500+ concurrent minions on screen, each spawned at the position of a just-
+// killed enemy (guaranteed on-camera, so viewport culling doesn't help) and each
+// paid its own shadowBlur pass — the diagnosed root cause of a real player-reported
+// save-hang (.tools/docs/bugs/save-hang-analysis.md). Chosen high enough to never
+// bite a normal build (MAX_BULLETS is 900 for comparison) while still bounding the
+// worst case.
+const MAX_MINIONS = 150;
 let minionPool = [];
 function spawnMinion(props){
+  if(minions.length>=MAX_MINIONS) return null;
   const m = minionPool.pop() || {};
   m.dead=false;
   Object.assign(m, props);
@@ -4951,6 +4916,12 @@ const STAT_CAPS = {
   eliteDmgMult:[0,7], soulMult:[0,8], thorns:[0,0.85], bonusPierce:[0,40], bonusProjectiles:[0,15],
   aoeRadiusMult:[0.2,4], rangeMult:[0.2,4], summonDmgMult:[0,8], summonCountMult:[0,4], fireMult:[0,8],
   frostMult:[0,8], lightningMult:[0,8], poisonMult:[0,8], holyMult:[0,8],
+  // Was uncapped entirely (real bug, see .tools/docs/bugs/save-hang-analysis.md and MAX_MINIONS
+  // above spawnMinion()). Current max realistic stack is ~0.36 (necromancers_pact 0.1 +
+  // restless_dead 2x0.08 + lich_lord_build synergy 0.1) — 0.5 sits comfortably above that so no
+  // existing build gets nerfed, it's a safety valve against future additions stacking unbounded,
+  // not a balance nerf. MAX_MINIONS is the real defense against the population-explosion crash.
+  raiseDeadChance:[0,0.5],
 };
 function clampPlayerStats(){
   if(!player) return;
@@ -6439,6 +6410,7 @@ window.addEventListener('engine-ready', ()=>{
 function updateDebugOverlay(rawMs){
   const el=document.getElementById('debugOverlay'); if(!el) return;
   let text=`FPS ${Math.round(debugFpsEma)}  frame ${rawMs.toFixed(1)}ms`;
+  if(quality!==baseQuality) text+=`  quality ${quality} (auto, base ${baseQuality})`;
   if(enemies) text+=`\nenemies ${enemies.length}  bullets ${bullets.length}\n`+
     `particles ${particles.length}  floaters ${floaters.length}\n`+
     `minions ${minions.length}  zones ${zones.length}\n`+
@@ -6449,7 +6421,10 @@ function updateDebugOverlay(rawMs){
 function loop(now){
   const rawMs=now-lastT;
   const dt=Math.min(0.05,rawMs/1000); lastT=now;
-  if(debugOverlayOn && rawMs>0) debugFpsEma += (1000/rawMs-debugFpsEma)*0.1;
+  // Tracked unconditionally now (not just while the overlay is visible) — maybeAdaptQuality()
+  // needs a live reading whether or not the player ever opens Settings > Video > Debug Overlay.
+  if(rawMs>0) debugFpsEma += (1000/rawMs-debugFpsEma)*0.1;
+  maybeAdaptQuality(dt);
   if(state==="playing"){
     runTime+=dt;
     updateSpawns(dt); updatePlayer(dt); updateEnemies(dt); rebuildSpatialGrid();
@@ -6689,11 +6664,38 @@ window.addEventListener('keydown',()=>{ SFX.unlock(); AUDIO_CORE.unlock(); },{on
    ========================================================================= */
 const isTouchDevice=('ontouchstart' in window)||navigator.maxTouchPoints>0||navigator.msMaxTouchPoints>0;
 let quality='high', enemyDensity='high', screenShakeOn=true, hapticsOn=true, debugOverlayOn=false;
+// Adaptive quality (OPTIMIZATION_PLAN.md P1, item 1) — `quality` above is the
+// live/effective value every render-side read site (glow(), QUALITY_PARTICLE_MULT,
+// drawEnergyRing, minion icons, etc.) already consults; `baseQuality` is the
+// user's actual Settings > Video choice. maybeAdaptQuality() can step `quality`
+// down under sustained load and back up when comfortably fast, but never above
+// baseQuality's own tier and never persisted — purely a runtime smart default on
+// top of the existing manual toggle, not a replacement for it.
+const QUALITY_TIERS=['low','medium','high'];
+let baseQuality='high', qualityCheckTimer=4, qualityBadStreak=0, qualityGoodStreak=0;
+function maybeAdaptQuality(dt){
+  qualityCheckTimer-=dt;
+  if(qualityCheckTimer>0) return;
+  qualityCheckTimer=4;
+  const curIdx=QUALITY_TIERS.indexOf(quality), baseIdx=QUALITY_TIERS.indexOf(baseQuality);
+  if(debugFpsEma<48){
+    qualityBadStreak++; qualityGoodStreak=0;
+    // 2 consecutive bad checks (~8s of sustained sub-48fps) before stepping down —
+    // a single lag spike (asset decode, GC pause, tab switch) shouldn't flap this.
+    if(qualityBadStreak>=2 && curIdx>0){ quality=QUALITY_TIERS[curIdx-1]; qualityBadStreak=0; }
+  } else if(debugFpsEma>56){
+    qualityGoodStreak++; qualityBadStreak=0;
+    // 3 consecutive good checks (~12s) before stepping back up — recovering is
+    // deliberately slower than degrading, so it doesn't immediately re-trigger a drop.
+    if(qualityGoodStreak>=3 && curIdx<baseIdx){ quality=QUALITY_TIERS[curIdx+1]; qualityGoodStreak=0; }
+  } else { qualityBadStreak=0; qualityGoodStreak=0; }
+}
 function vibrate(ms){ if(hapticsOn && navigator.vibrate){ try{ navigator.vibrate(ms); }catch(e){} } }
 function shouldShowJoystick(){ const mode=save.settings.controlMode; return mode==='joystick'||(mode==='auto'&&isTouchDevice); }
 function applySettings(){
   SFX.setMuted(!!save.settings.muted); SFX.setVolume(save.settings.sfxVolume); MUSIC.setVolume(save.settings.muted?0:save.settings.musicVolume);
-  quality=save.settings.quality; enemyDensity=save.settings.enemyDensity||save.settings.quality||'high'; screenShakeOn=!!save.settings.screenShake; hapticsOn=!!save.settings.haptics;
+  quality=save.settings.quality; baseQuality=save.settings.quality; qualityBadStreak=0; qualityGoodStreak=0;
+  enemyDensity=save.settings.enemyDensity||save.settings.quality||'high'; screenShakeOn=!!save.settings.screenShake; hapticsOn=!!save.settings.haptics;
   // ?dev=1 force-enables the debug overlay in-memory only (never touches
   // save.settings, never persisted) — the dev launcher (run.sh/.tools/devserver.py)
   // opens the game with this flag so live FPS/entity-count analytics are visible
