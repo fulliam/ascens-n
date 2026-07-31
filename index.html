@@ -6088,6 +6088,37 @@ function maybeTriggerHudTextGlitch(){
   });
 }
 function glow(size){ return quality==='low'?0:(quality==='medium'?size*0.6:size); }
+// COMPUTE_PROFILE_ANALYSIS.md item 2 (OPTIMIZATION_PLAN.md P1 direction 2) — a pre-rendered
+// radial-gradient sprite drawn via drawImage() instead of asking Canvas2D to compute a live
+// shadowBlur pass on every draw call. Cached per (color, radius-bucket) — bucketing to the
+// nearest 4px keeps the cache to a handful of sprites per color actually seen, instead of one
+// per exact float radius ever requested (enemy radii vary continuously with e.g. level scaling).
+// Only wired up for enemies for now (by far the largest population in profiling) — bullets/
+// minions/orbs/beams still use live shadowBlur, a smaller-scoped follow-up if this proves out.
+const glowSpriteCache = new Map();
+function getGlowSprite(color,radius){
+  const bucket = Math.max(4, Math.ceil(radius/4)*4);
+  const key = color+'|'+bucket;
+  let spr = glowSpriteCache.get(key);
+  if(spr) return spr;
+  const size = bucket*2;
+  const c = document.createElement('canvas'); c.width=size; c.height=size;
+  const g = c.getContext('2d');
+  const grad = g.createRadialGradient(bucket,bucket,0,bucket,bucket,bucket);
+  grad.addColorStop(0, color); grad.addColorStop(1, 'transparent');
+  g.fillStyle = grad; g.fillRect(0,0,size,size);
+  spr = {canvas:c, r:bucket};
+  glowSpriteCache.set(key, spr);
+  return spr;
+}
+// Draws the glow halo BEHIND wherever the entity's own shape gets drawn next — caller must
+// draw its solid fill/shape immediately after, not before (the halo would otherwise cover it).
+function drawGlowSprite(x,y,color,rawSize){
+  const size = glow(rawSize);
+  if(size<=0) return;
+  const spr = getGlowSprite(color, size*1.4);
+  ctx2d.drawImage(spr.canvas, x-spr.r, y-spr.r);
+}
 function hexToRgba(hex,a){
   if(!hex || hex[0]!=='#' || hex.length<7) return hex; // best-effort passthrough for non-hex colors (rare)
   const r=parseInt(hex.slice(1,3),16), g=parseInt(hex.slice(3,5),16), b=parseInt(hex.slice(5,7),16);
@@ -6371,19 +6402,24 @@ function render(){
   for(const e of enemies){
     if(!inView(e.x,e.y)) continue;
     const canGlow = e.boss || e.elite || !glowSet || glowSet.has(e);
-    ctx2d.fillStyle=e.hitFlash>0?"#ffffff":e.color; ctx2d.shadowColor=e.glow; ctx2d.shadowBlur=canGlow?glow(e.boss?26:(e.elite?18:10)):0;
+    ctx2d.fillStyle=e.hitFlash>0?"#ffffff":e.color;
+    if(canGlow) drawGlowSprite(e.x,e.y,e.glow,e.boss?26:(e.elite?18:10));
     if(e.boss || !e.shape){ ctx2d.beginPath(); ctx2d.arc(e.x,e.y,e.radius,0,7); ctx2d.fill(); } else drawEnemyShape(ctx2d,e);
-    ctx2d.shadowBlur=0;
     if(e.mutation){ ctx2d.beginPath(); ctx2d.strokeStyle=e.mutationColor; ctx2d.lineWidth=2.5; ctx2d.arc(e.x,e.y,e.radius+2,0,7); ctx2d.stroke(); }
     if(e.elite||e.boss){ const bw=e.radius*2.4; ctx2d.fillStyle="#1a1c24"; ctx2d.fillRect(e.x-bw/2,e.y-e.radius-14,bw,5);
       ctx2d.fillStyle=e.boss?"#ff4d5e":"#ffb347";
-      if(e.boss){ ctx2d.shadowColor="#ff4d5e"; ctx2d.shadowBlur=glow(10); }
-      ctx2d.fillRect(e.x-bw/2,e.y-e.radius-14,bw*clamp(e.hp/e.maxHp,0,1),5); ctx2d.shadowBlur=0; }
+      if(e.boss) drawGlowSprite(e.x,e.y-e.radius-11.5,"#ff4d5e",10);
+      ctx2d.fillRect(e.x-bw/2,e.y-e.radius-14,bw*clamp(e.hp/e.maxHp,0,1),5); }
     // Status-effect icons: previously the only visible feedback for burn/poison/slow/
     // shield/stagger/mark was a one-frame white hit-flash. Each active effect now
     // gets a small billboard icon above the enemy so the player can actually read
     // what's affecting a target at a glance.
-    if(quality!=='low'){
+    // COMPUTE_PROFILE_ANALYSIS.md item 1 — up to 7 individual fillText calls per enemy
+    // (fillText showed as a real, non-trivial contributor in live CPU profiling, not just
+    // shadowBlur), gated the same way canGlow already is: distant/excess trash mobs beyond
+    // the nearest 150 don't need to be individually readable, only what's actually close
+    // enough to matter. Bosses/elites (canGlow always true for them) keep full fidelity.
+    if(quality!=='low' && canGlow){
       let iconX=e.x-((e.burning?1:0)+(e.poisoned?1:0)+(e.slowed?1:0)+(e.shield>0?1:0)+(e._marked?1:0)+(e.mutationIcon?1:0))*7 + e.radius*0.4;
       const iconY=e.y-e.radius-22;
       ctx2d.font="11px sans-serif"; ctx2d.textAlign="center";
