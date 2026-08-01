@@ -2586,6 +2586,21 @@ const CONFIG_DEFAULTS = {
       {tier:5, numeral:"V",   name:"Cataclysm",     unlockT:1520, armorPierce:0.45, enrageMult:0.5},
       {tier:6, numeral:"VI",  name:"Endless Dread", unlockT:1900, armorPierce:0.55, enrageMult:0.65},
     ],
+    // Phase 3 Group C — CP_MULTI_TARGET_FACTOR/CP_CHAIN_JUMP_FACTOR feed
+    // weaponCP() (live-editable, real weapon-power-comparison call sites).
+    // TARGET_CP_RATIO feeds targetCPRatioAt(), which only feeds playerCP()/
+    // enemyPressure() — both explicitly "deliberately NOT surfaced anywhere
+    // in the UI... purely an analytical figure for external tooling" per
+    // their own doc comment below. Zero live-gameplay call sites; only
+    // affects verify-balance.js/balance-lab.html's CP-ratio tooling output.
+    CP_MULTI_TARGET_FACTOR: 2.2, // area/trap/chain AoE hitting several enemies at once
+    CP_CHAIN_JUMP_FACTOR: 0.6,   // extra effective targets per chain jump
+    TARGET_CP_RATIO: [
+      {t:0,    ratio:1.00}, {t:55,   ratio:1.05}, {t:130,  ratio:1.15}, {t:220,  ratio:1.30},
+      {t:310,  ratio:1.40}, {t:340,  ratio:1.45}, {t:460,  ratio:1.55}, {t:600,  ratio:1.65},
+      {t:760,  ratio:1.75}, {t:930,  ratio:1.80}, {t:1120, ratio:1.70}, {t:1320, ratio:1.55},
+      {t:1520, ratio:1.40}, {t:1720, ratio:1.25}, {t:1900, ratio:1.15},
+    ],
   },
   colors: { palette: {}, semantic: {} },
   texts: {},
@@ -2631,6 +2646,9 @@ const CONFIG_SCHEMA = {
   // it's a same-shaped array (right length, each entry an object) — a
   // hand-authored override replaces the whole table, not a single field.
   "balance.DANGER_TIERS": {type:"structured", shape:"array", minLength:1, maxLength:20},
+  "balance.CP_MULTI_TARGET_FACTOR": {type:"number", min:0.5, max:10},
+  "balance.CP_CHAIN_JUMP_FACTOR": {type:"number", min:0, max:5},
+  "balance.TARGET_CP_RATIO": {type:"structured", shape:"array", minLength:1, maxLength:50},
 };
 // STAT_CAPS entries are themselves [lo,hi] BOUNDS, not values to bound — one
 // generic "array" schema type (added to validateAndClamp below) covers all of
@@ -3883,8 +3901,6 @@ function elementalMultForTags(tags, stats){
 // for tuning, not a promise of exact in-game damage-per-second.
 // projectilePerHitMult is shared with the real weaponFire() projectile branch
 // so both stay in sync automatically.
-const CP_MULTI_TARGET_FACTOR = 2.2; // area/trap/chain AoE hitting several enemies at once
-const CP_CHAIN_JUMP_FACTOR = 0.6;   // extra effective targets per chain jump
 // Per-projectile damage multiplier as projectile count rises: count=1 is 100%,
 // count=5 is ~70% each (350 total, not 500) — floored at 40% so extreme
 // bonusProjectiles stacking is heavily diminished, never zeroed.
@@ -3904,8 +3920,8 @@ function weaponCP(def, level, stats, evolved){
       return dmg*count*projectilePerHitMult(count)/cd*critFactor;
     }
     case "beam":{ const dps=(def.base.dps+(def.perLevel.dps||0)*(level-1))*dmgMult; return dps*critFactor; }
-    case "area": case "trap":{ const dmg=(def.base.dmg+(def.perLevel.dmg||0)*(level-1))*dmgMult; const cd=def.base.cd*cdMult; return dmg/cd*critFactor*CP_MULTI_TARGET_FACTOR; }
-    case "chain":{ const dmg=(def.base.dmg+(def.perLevel.dmg||0)*(level-1))*dmgMult; const cd=def.base.cd*cdMult; const jumps=Math.round(def.base.jumps+(def.perLevel.jumps||0)*(level-1)); return dmg*(1+jumps*CP_CHAIN_JUMP_FACTOR)/cd*critFactor; }
+    case "area": case "trap":{ const dmg=(def.base.dmg+(def.perLevel.dmg||0)*(level-1))*dmgMult; const cd=def.base.cd*cdMult; return dmg/cd*critFactor*CONFIG.balance.CP_MULTI_TARGET_FACTOR; }
+    case "chain":{ const dmg=(def.base.dmg+(def.perLevel.dmg||0)*(level-1))*dmgMult; const cd=def.base.cd*cdMult; const jumps=Math.round(def.base.jumps+(def.perLevel.jumps||0)*(level-1)); return dmg*(1+jumps*CONFIG.balance.CP_CHAIN_JUMP_FACTOR)/cd*critFactor; }
     case "summon":{ const maxM=Math.round((def.base.maxMinions+(def.perLevel.maxMinions||0)*(level-1))*(stats.summonCountMult||1)); const dmg=(def.base.minionDmg+(def.perLevel.minionDmg||0)*(level-1))*(stats.summonDmgMult||1); return dmg*maxM/0.7; }
     default: return 0; // aura weapons (holy/thorn) — support, not counted as offense
   }
@@ -3934,15 +3950,14 @@ function enemyPressure(wave){
 // Target Player-CP / Enemy-Pressure ratio at each wave's start time. Starts at
 // parity (no early steamroll), climbs through the power-fantasy window,
 // compresses back down for the final boss and stays tight through Endless.
-const TARGET_CP_RATIO = [
-  {t:0,    ratio:1.00}, {t:55,   ratio:1.05}, {t:130,  ratio:1.15}, {t:220,  ratio:1.30},
-  {t:310,  ratio:1.40}, {t:340,  ratio:1.45}, {t:460,  ratio:1.55}, {t:600,  ratio:1.65},
-  {t:760,  ratio:1.75}, {t:930,  ratio:1.80}, {t:1120, ratio:1.70}, {t:1320, ratio:1.55},
-  {t:1520, ratio:1.40}, {t:1720, ratio:1.25}, {t:1900, ratio:1.15},
-];
+// The keyframe table itself now lives in CONFIG.balance.TARGET_CP_RATIO
+// (Phase 3 Group C) — see its own comment there for why this analytical-only
+// constant is safe to migrate with essentially zero gameplay risk (no live
+// call site outside external tooling).
 function targetCPRatioAt(t){
-  let r = TARGET_CP_RATIO[0].ratio;
-  for(const kf of TARGET_CP_RATIO){ if(t>=kf.t) r=kf.ratio; else break; }
+  const kfs = CONFIG.balance.TARGET_CP_RATIO;
+  let r = kfs[0].ratio;
+  for(const kf of kfs){ if(t>=kf.t) r=kf.ratio; else break; }
   return r;
 }
 // XP curve: replaces the old xpNext = 10*1.16^(level-1) (pure exponential —
