@@ -2192,11 +2192,23 @@ const ENEMY_ECHO_POOL_SIZE = 1600; // matches index.html's MAX_ENEMIES
 const ENEMY_ECHO_SENTINEL = -1e6; // for both x and y — outside any real query radius
 let enemyEchoComponentId = -1;
 let enemyEchoInited = false;
+// query_near returns raw (entity id, generation) pairs, not the pool's
+// insertion-order slot index a JS caller actually wants (to index back into
+// its own parallel "live enemy" list — see index.html's
+// syncEnemyEchoLive/bulletBroadphaseNear). Built once at pool-creation time:
+// the pool's entities are only ever repositioned via set_component_x/y_values
+// afterward, never despawned/respawned, so id->slot/generation stays valid
+// for the pool's entire lifetime — no per-frame rebuild needed.
+let enemyEchoIdToSlot = null;
 function initEnemyEcho(worldW, worldH) {
     if (!world || enemyEchoInited)
         return;
     enemyEchoComponentId = world.register_f32x2('EnemyEcho');
-    world.spawn_batch_f32x2(enemyEchoComponentId, ENEMY_ECHO_SENTINEL, ENEMY_ECHO_SENTINEL, ENEMY_ECHO_POOL_SIZE);
+    const ids = world.spawn_batch_f32x2(enemyEchoComponentId, ENEMY_ECHO_SENTINEL, ENEMY_ECHO_SENTINEL, ENEMY_ECHO_POOL_SIZE);
+    enemyEchoIdToSlot = new Map();
+    for (let i = 0; i < ids.length; i++) {
+        enemyEchoIdToSlot.set(ids[i], { slot: i, gen: world.entity_generation(ids[i]) });
+    }
     world.init_spatial_grid(enemyEchoComponentId, worldW, worldH);
     enemyEchoInited = true;
 }
@@ -2216,6 +2228,18 @@ function queryEnemyEchoNearCount(x, y, radius) {
     if (!world || !enemyEchoInited)
         return 0;
     return world.query_near_count(x, y, radius, enemyEchoComponentId);
+}
+function queryEnemyEchoNear(x, y, radius) {
+    if (!world || !enemyEchoInited || !enemyEchoIdToSlot)
+        return new Uint32Array(0);
+    const raw = world.query_near(x, y, radius, enemyEchoComponentId); // [id0,gen0,id1,gen1,...]
+    const slots = [];
+    for (let i = 0; i + 1 < raw.length; i += 2) {
+        const entry = enemyEchoIdToSlot.get(raw[i]);
+        if (entry && entry.gen === raw[i + 1])
+            slots.push(entry.slot);
+    }
+    return Uint32Array.from(slots);
 }
 async function boot() {
     try {
@@ -2239,6 +2263,7 @@ async function boot() {
             initEnemyEcho,
             syncEnemyEcho,
             queryEnemyEchoNearCount,
+            queryEnemyEchoNear,
         };
         window.dispatchEvent(new Event('engine-ready'));
     }
@@ -6544,14 +6569,51 @@ window.addEventListener('engine-ready', ()=>{
   // touch real enemies/forEachEnemyNear() — that's the separate, deliberately
   // slower step the migration plan gates behind a diff-validation pass.
   window.EngineBridge.initSpatialGrid(WORLD.w, WORLD.h);
-  // Phase 3 step 2 — a second, parallel spatial grid mirroring REAL enemy
-  // positions (fixed pool sized to MAX_ENEMIES, bulk-synced every debug-overlay
-  // tick — see syncWasmEnemyEcho() below and engine-bridge.ts's initEnemyEcho).
-  // Read-only diagnostic: nothing here ever feeds back into forEachEnemyNear/
-  // dealDamage/killEnemy, this only exists to compare Rust's query answer
-  // against a brute-force JS ground truth for manual validation.
+  // Phase 3 step 2/3 — a second, parallel spatial grid mirroring REAL enemy
+  // positions (fixed pool sized to MAX_ENEMIES). Synced every frame
+  // unconditionally by syncEnemyEchoLive() (see PART 14) and consumed for
+  // real by bulletBroadphaseNear() — the bullet-vs-enemy broadphase in
+  // updateBullets() — since the exact-distance recheck already downstream of
+  // that specific call site makes Rust's stricter exact-circle query a safe
+  // drop-in for it. syncWasmEnemyEcho()/syncWasmBulletCollisionCheck() below
+  // remain read-only diagnostics on top (debug-overlay-gated, throttled),
+  // comparing Rust's answer against a JS brute-force ground truth.
   window.EngineBridge.initEnemyEcho(WORLD.w, WORLD.h);
 });
+// Phase 3 step 3, real call-site cut — unlike syncWasmEnemyEcho/
+// syncWasmBulletCollisionCheck below (throttled to every 0.25s, only while
+// Debug Overlay is open, purely diagnostic), this runs every frame
+// unconditionally once the engine is ready: it's the actual data
+// bulletBroadphaseNear() queries against, not a comparison sample. Keeps a
+// parallel JS array (enemyEchoLiveList) in the exact same order the x/y
+// arrays were built in, so a Rust-returned pool slot index can be mapped
+// straight back to the real enemy object with enemyEchoLiveList[slot].
+let enemyEchoLiveList=null;
+function syncEnemyEchoLive(){
+  if(!(window.EngineBridge && window.EngineBridge.isReady())){ enemyEchoLiveList=null; return; }
+  const n=enemies.length;
+  const xs=new Float32Array(n), ys=new Float32Array(n);
+  const list=new Array(n);
+  let live=0;
+  for(const e of enemies){ if(e.dead) continue; xs[live]=e.x; ys[live]=e.y; list[live]=e; live++; }
+  list.length=live;
+  window.EngineBridge.syncEnemyEcho(xs,ys,live);
+  enemyEchoLiveList=list;
+}
+// Drop-in replacement for forEachEnemyNear(), ONLY safe at call sites whose
+// callback already re-checks exact hit distance/radius itself (like
+// updateBullets()'s bullet-vs-enemy broadphase below) — queryEnemyEchoNear
+// does exact-circle filtering internally, which is narrower than
+// forEachEnemyNear's cell-bounding-box approximation that many OTHER call
+// sites (burn/poison spread, AoE zones, etc.) silently rely on without their
+// own recheck. Falls back to the untouched JS grid path whenever the engine
+// isn't ready or the live list hasn't been synced yet this frame, so
+// behavior is byte-identical to before whenever WASM is unavailable.
+function bulletBroadphaseNear(x,y,radius,fn){
+  if(!enemyEchoLiveList){ forEachEnemyNear(x,y,radius,fn); return; }
+  const slots=window.EngineBridge.queryEnemyEchoNear(x,y,radius);
+  for(let i=0;i<slots.length;i++){ const e=enemyEchoLiveList[slots[i]]; if(e && !e.dead) fn(e); }
+}
 let wasmEchoNearPlayer=0, wasmEchoGroundTruth=0;
 // Only runs while Debug Overlay is open — this is pure diagnostic tooling
 // (Phase 5 "comparison mode" from WASM_ECS_MIGRATION_PLAN.md), not something
@@ -6628,6 +6690,7 @@ function updateDebugOverlay(rawMs){
     const match=wasmEchoNearPlayer===wasmEchoGroundTruth ? "match" : "MISMATCH";
     text+=`\nspatial-echo rust=${wasmEchoNearPlayer} js-groundtruth=${wasmEchoGroundTruth} (${match})`;
     text+=`\nbullet-collision-echo ${wasmBulletEchoChecked} sampled  mismatches ${wasmBulletEchoMismatches}`;
+    text+=`\nbullet-broadphase LIVE=${enemyEchoLiveList?"rust":"js-fallback"}`;
   }
   el.textContent=text;
 }
@@ -6640,7 +6703,7 @@ function loop(now){
   maybeAdaptQuality(dt);
   if(state==="playing"){
     runTime+=dt;
-    updateSpawns(dt); updatePlayer(dt); updateEnemies(dt); rebuildSpatialGrid();
+    updateSpawns(dt); updatePlayer(dt); updateEnemies(dt); rebuildSpatialGrid(); syncEnemyEchoLive();
     updateWeapons(dt); updatePendingShots(dt); updateBullets(dt); updateMinions(dt); updateZones(dt); updateOrbs(dt);
     updateTempModifiers(dt);
     pruneDeadEnemies(); // single end-of-frame removal pass (also returns objects to the enemy pool)
@@ -6744,7 +6807,7 @@ function updateBullets(dt){
     if(b.life<=0){ b.dead=true; continue; }
     if(b.owner==="player"){
       let removed=false;
-      forEachEnemyNear(b.x,b.y,b.radius+60,e=>{ if(removed||b.hitset.has(e)) return;
+      bulletBroadphaseNear(b.x,b.y,b.radius+60,e=>{ if(removed||b.hitset.has(e)) return;
         if(dist2(b.x,b.y,e.x,e.y)<(b.radius+e.radius)*(b.radius+e.radius)){
           dealDamage(e,b.dmg,b.weaponId); b.hitset.add(e);
           spawnParticle(e.x,e.y,weaponColor(b.weaponId),1+weaponVisualTier(player.weapons[b.weaponId]||1));

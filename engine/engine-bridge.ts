@@ -57,6 +57,9 @@ declare class JsWorld {
   spawn_batch_f32x2(componentId: number, x: number, y: number, count: number): Uint32Array;
   set_component_x_values(componentId: number, values: Float32Array): void;
   set_component_y_values(componentId: number, values: Float32Array): void;
+  // Needed to translate query_near's [id,generation,...] pairs back to a
+  // stable pool slot index — see queryEnemyEchoNear below for why.
+  entity_generation(entityId: number): number;
 }
 
 // The build script emits `const WASM_B64 = "...";` before inlining this
@@ -97,6 +100,17 @@ interface EngineBridgeApi {
   initEnemyEcho(worldW: number, worldH: number): void;
   syncEnemyEcho(xs: Float32Array, ys: Float32Array, liveCount: number): void;
   queryEnemyEchoNearCount(x: number, y: number, radius: number): number;
+  // Phase 3 step 3, real call-site cut (WASM_ECS_MIGRATION_PLAN.md) — unlike
+  // queryEnemyEchoNearCount above (diagnostic count-only, compared against a
+  // JS brute-force ground truth), this returns the actual candidate slot
+  // indices so a caller can map them back to real enemy objects and act on
+  // them. Only safe to use where the caller already re-checks exact hit
+  // distance/radius downstream (see index.html's bulletBroadphaseNear) —
+  // this performs EXACT-circle filtering internally (see wasm_api.rs), which
+  // is stricter than forEachEnemyNear's cell-bounding-box approximation, so
+  // it must never replace a call site that relies on that looser semantics
+  // without its own distance check.
+  queryEnemyEchoNear(x: number, y: number, radius: number): Uint32Array;
 }
 
 // No top-level import/export in this file (see header) — tsc treats it as
@@ -171,11 +185,23 @@ const ENEMY_ECHO_POOL_SIZE = 1600; // matches index.html's MAX_ENEMIES
 const ENEMY_ECHO_SENTINEL = -1e6; // for both x and y — outside any real query radius
 let enemyEchoComponentId = -1;
 let enemyEchoInited = false;
+// query_near returns raw (entity id, generation) pairs, not the pool's
+// insertion-order slot index a JS caller actually wants (to index back into
+// its own parallel "live enemy" list — see index.html's
+// syncEnemyEchoLive/bulletBroadphaseNear). Built once at pool-creation time:
+// the pool's entities are only ever repositioned via set_component_x/y_values
+// afterward, never despawned/respawned, so id->slot/generation stays valid
+// for the pool's entire lifetime — no per-frame rebuild needed.
+let enemyEchoIdToSlot: Map<number, { slot: number; gen: number }> | null = null;
 
 function initEnemyEcho(worldW: number, worldH: number): void {
   if (!world || enemyEchoInited) return;
   enemyEchoComponentId = world.register_f32x2('EnemyEcho');
-  world.spawn_batch_f32x2(enemyEchoComponentId, ENEMY_ECHO_SENTINEL, ENEMY_ECHO_SENTINEL, ENEMY_ECHO_POOL_SIZE);
+  const ids = world.spawn_batch_f32x2(enemyEchoComponentId, ENEMY_ECHO_SENTINEL, ENEMY_ECHO_SENTINEL, ENEMY_ECHO_POOL_SIZE);
+  enemyEchoIdToSlot = new Map();
+  for (let i = 0; i < ids.length; i++) {
+    enemyEchoIdToSlot.set(ids[i], { slot: i, gen: world.entity_generation(ids[i]) });
+  }
   world.init_spatial_grid(enemyEchoComponentId, worldW, worldH);
   enemyEchoInited = true;
 }
@@ -195,6 +221,17 @@ function syncEnemyEcho(xs: Float32Array, ys: Float32Array, liveCount: number): v
 function queryEnemyEchoNearCount(x: number, y: number, radius: number): number {
   if (!world || !enemyEchoInited) return 0;
   return world.query_near_count(x, y, radius, enemyEchoComponentId);
+}
+
+function queryEnemyEchoNear(x: number, y: number, radius: number): Uint32Array {
+  if (!world || !enemyEchoInited || !enemyEchoIdToSlot) return new Uint32Array(0);
+  const raw = world.query_near(x, y, radius, enemyEchoComponentId); // [id0,gen0,id1,gen1,...]
+  const slots: number[] = [];
+  for (let i = 0; i + 1 < raw.length; i += 2) {
+    const entry = enemyEchoIdToSlot.get(raw[i]);
+    if (entry && entry.gen === raw[i + 1]) slots.push(entry.slot);
+  }
+  return Uint32Array.from(slots);
 }
 
 async function boot(): Promise<void> {
@@ -220,6 +257,7 @@ async function boot(): Promise<void> {
       initEnemyEcho,
       syncEnemyEcho,
       queryEnemyEchoNearCount,
+      queryEnemyEchoNear,
     };
     window.dispatchEvent(new Event('engine-ready'));
   } catch (err) {
