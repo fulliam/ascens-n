@@ -2491,6 +2491,144 @@ boot();
 const GAME_VERSION = "0.37.1";
 
 /* =========================================================================
+   CONFIG — centralized caps/balance/colors/texts. See
+   .tools/docs/engineering/CONFIG_CENTRALIZATION_PLAN.md for the full design.
+   Phase 1 (this block): scaffold only — CONFIG_DEFAULTS starts empty per
+   category, applyConfigOverride()/validateAndClamp() exist but have nothing
+   real to validate yet. Later phases move existing scattered constants in
+   here one category at a time; each is a no-op for gameplay until its own
+   call sites are updated to actually read from CONFIG.* instead of the old
+   top-level const. Defined INSIDE the PART 1-5 slice (not before it) so the
+   LIVE DATA LOADER (balance-lab.html/verify-balance.js) can pick it up the
+   same way it already does WEAPONS/CARDS/ENEMIES — see Phase 7.
+   ========================================================================= */
+const CONFIG_VERSION = 1; // bump on breaking SHAPE changes (renamed/restructured paths), not on every value tweak
+const CONFIG_DEFAULTS = {
+  version: CONFIG_VERSION,
+  caps: {},
+  balance: {},
+  colors: { palette: {}, semantic: {} },
+  texts: {},
+};
+// CONFIG_SCHEMA: dot-path into CONFIG -> {type, min?, max?, maxLen?}. Two jobs:
+// (1) validateAndClamp() below uses it to reject/clamp any override from ANY
+// source (in-game editor, JSON import, future network push — one gate, not
+// three), (2) the Config Editor (Phase 6) uses it to auto-generate form
+// fields with the right input type/bounds instead of hand-laying out every
+// one. Populated incrementally as each category's real constants move in.
+const CONFIG_SCHEMA = {};
+// Deep-clones CONFIG_DEFAULTS so the live, possibly-overridden CONFIG the
+// game actually reads never accidentally shares a nested object with
+// CONFIG_DEFAULTS (mutating one must never be able to mutate the other).
+function cloneConfigDefaults(){
+  return typeof structuredClone==="function" ? structuredClone(CONFIG_DEFAULTS) : JSON.parse(JSON.stringify(CONFIG_DEFAULTS));
+}
+// `let`, not `const` — CONFIG itself is never reassigned in practice (only
+// mutated in place via deepMergeInto), but staying a `let` documents that
+// this is deliberately live, mutable state, not a frozen data table like
+// WEAPONS/CARDS below. Game code that wants live-editable values (Phase 6's
+// whole point) must read CONFIG.x.y fresh every call, never capture it into
+// a local const at startup — see the plan doc's §2 for why this is load-
+// bearing, not a style preference.
+let CONFIG = cloneConfigDefaults();
+function deepMergeInto(target, patch){
+  if(typeof patch!=="object" || patch===null) return;
+  for(const key of Object.keys(patch)){
+    const val = patch[key];
+    if(val && typeof val==="object" && !Array.isArray(val) && target[key] && typeof target[key]==="object" && !Array.isArray(target[key])){
+      deepMergeInto(target[key], val);
+    } else {
+      target[key] = val;
+    }
+  }
+}
+// Walks `patch` against CONFIG_SCHEMA by dot-path, clamping numbers into
+// [min,max], dropping fields whose type doesn't match, and dropping any leaf
+// path with no schema entry at all (an unknown key is more likely a typo or
+// a hostile import than a field this build knows what to do with). Never
+// throws — a malformed override degrades to "some fields silently ignored,"
+// not a crash, same spirit as clampPlayerStats() already does for player
+// stats elsewhere in this file.
+function validateAndClamp(patch, prefix){
+  const out = {};
+  for(const key of Object.keys(patch||{})){
+    const path = prefix ? prefix+"."+key : key;
+    const val = patch[key];
+    const schema = CONFIG_SCHEMA[path];
+    if(schema){
+      if(schema.type==="number" && typeof val==="number" && isFinite(val)){
+        out[key] = Math.min(schema.max??Infinity, Math.max(schema.min??-Infinity, val));
+      } else if(schema.type==="hexcolor" && typeof val==="string" && /^#[0-9a-fA-F]{3,8}$/.test(val)){
+        out[key] = val;
+      } else if(schema.type==="text" && typeof val==="string"){
+        out[key] = val.slice(0, schema.maxLen||500);
+      } else if(schema.type==="boolean" && typeof val==="boolean"){
+        out[key] = val;
+      }
+      // else: wrong type for a known path — dropped
+    } else if(val && typeof val==="object" && !Array.isArray(val)){
+      // No leaf schema at this exact path — recurse in case it's a namespace
+      // (e.g. "colors") rather than a leaf value.
+      const nested = validateAndClamp(val, path);
+      if(Object.keys(nested).length) out[key] = nested;
+    }
+    // else: unknown leaf path, no schema — dropped
+  }
+  return out;
+}
+// Populated by later phases: Phase 4 pushes CONFIG.colors.semantic.* onto
+// matching CSS custom properties, Phase 5 re-renders any open screen's text
+// nodes. Empty until those phases land — nothing to do yet, but every future
+// override path (editor apply, JSON import, network push) already calls
+// this, so those phases only need to fill THIS function in, not find and
+// wire every call site of applyConfigOverride again.
+function onConfigApplied(){
+}
+// The one and only path anything uses to change CONFIG after boot. Returns
+// what was actually applied (post-clamp/post-drop) so a caller (e.g. the
+// future Config Editor) can show the user what was rejected, if anything.
+function applyConfigOverride(partial){
+  const clamped = validateAndClamp(partial);
+  deepMergeInto(CONFIG, clamped);
+  onConfigApplied();
+  return clamped;
+}
+const CONFIG_OVERRIDE_STORAGE_KEY = "ascension_config_override_v1";
+function loadConfigOverrideFromStorage(){
+  try {
+    const raw = localStorage.getItem(CONFIG_OVERRIDE_STORAGE_KEY);
+    if(raw) applyConfigOverride(JSON.parse(raw));
+  } catch(e) { /* corrupted/unavailable storage — CONFIG stays at defaults, never throws */ }
+}
+// Diffs `current` against `defaults` recursively — used to persist/export
+// only what actually changed (a readable patch), not a full dump of every
+// default value alongside it.
+function diffFromDefaults(current, defaults){
+  const out = {};
+  for(const key of Object.keys(current)){
+    const cur = current[key], def = defaults ? defaults[key] : undefined;
+    if(cur && typeof cur==="object" && !Array.isArray(cur)){
+      const nested = diffFromDefaults(cur, def||{});
+      if(Object.keys(nested).length) out[key] = nested;
+    } else if(cur !== def){
+      out[key] = cur;
+    }
+  }
+  return out;
+}
+function persistConfigOverride(){
+  try {
+    const diff = diffFromDefaults(CONFIG, CONFIG_DEFAULTS);
+    if(Object.keys(diff).length) localStorage.setItem(CONFIG_OVERRIDE_STORAGE_KEY, JSON.stringify(diff));
+    else localStorage.removeItem(CONFIG_OVERRIDE_STORAGE_KEY);
+  } catch(e) { /* localStorage unavailable/full — override just won't survive reload this session */ }
+}
+// Resolve CONFIG (defaults + any persisted override) before any later PART's
+// data tables evaluate — nothing below this line should ever see CONFIG in
+// a partially-initialized state.
+loadConfigOverrideFromStorage();
+
+/* =========================================================================
    PART 1 — BUILD LAYER DATA (weapons, evolutions, cards, passives, synergies, characters)
    ========================================================================= */
 
