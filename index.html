@@ -11,6 +11,16 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;700&family=Exo+2:wght@700&display=swap" rel="stylesheet">
 <style>
+  /* These literal hex values are the pre-JS-execution paint fallback ONLY —
+     CSS can't reference the classic script's CONFIG object, and these vars
+     are needed before any script runs. The real, live source of truth is
+     CONFIG.colors (see CONFIG_CENTRALIZATION_PLAN.md Phase 4): onConfigApplied()
+     overwrites every one of these via document.documentElement.style.setProperty()
+     as soon as the script runs (inline style wins over this stylesheet rule),
+     resolving through CONFIG.colors.semantic["css.xp"] etc -> CONFIG.colors.palette.
+     Keep these values in sync with CONFIG_DEFAULTS.colors' css.* entries by
+     hand if either ever changes — same "keep in sync" discipline this
+     project already applies to other JS<->non-JS constant pairs. */
   :root{
     --void:#08090d; --panel:#12141b; --panel2:#191c26; --line:#2a2e3a; --text:#dfe3ee; --dim:#7b8194;
     --xp:#7cff6b; --gold:#ffb347; --soul:#5ce1e6; --hp:#ff4d5e; --accent:#b98cff; --accent2:#ff6f9c; --crystal:#7ee0ff; --artifact:#ff9ecb;
@@ -2602,7 +2612,173 @@ const CONFIG_DEFAULTS = {
       {t:1520, ratio:1.40}, {t:1720, ratio:1.25}, {t:1900, ratio:1.15},
     ],
   },
-  colors: { palette: {}, semantic: {} },
+  // Phase 4 — palette is a deduped set of raw hex values (55 unique, named by
+  // hex so identical literals used in different places share one entry
+  // automatically, no subjective grouping needed); semantic maps every real
+  // usage site (a CSS custom property, a character/boss/weapon/mutation
+  // color field, etc) to a PALETTE KEY NAME, not a literal hex — resolveColor()
+  // below resolves the indirection at read time, so editing one palette entry
+  // cascades to every semantic user of it (e.g. c_ffb347 backs BOTH --gold
+  // and the survivor talent branch's color today). Scope note: this covers
+  // game-content color fields (character/enemy/boss/weapon/mutation identity
+  // colors) and the small set of themed CSS custom properties they're built
+  // on — NOT the hundreds of one-off hex literals scattered through general
+  // <style> component styling (buttons, cards, animation keyframes, etc.),
+  // which is a much larger, differently-shaped task outside this phase's scope.
+  colors: {
+    palette: {
+      c_08090d: "#08090d",
+      c_12141b: "#12141b",
+      c_191c26: "#191c26",
+      c_2a2e3a: "#2a2e3a",
+      c_dfe3ee: "#dfe3ee",
+      c_7b8194: "#7b8194",
+      c_7cff6b: "#7cff6b",
+      c_ffb347: "#ffb347",
+      c_5ce1e6: "#5ce1e6",
+      c_ff4d5e: "#ff4d5e",
+      c_b98cff: "#b98cff",
+      c_ff6f9c: "#ff6f9c",
+      c_7ee0ff: "#7ee0ff",
+      c_ff9ecb: "#ff9ecb",
+      c_ff5c5c: "#ff5c5c",
+      c_8aff6b: "#8aff6b",
+      c_ff6bcf: "#ff6bcf",
+      c_ff8a4d: "#ff8a4d",
+      c_ff4d4d: "#ff4d4d",
+      c_ffe15c: "#ffe15c",
+      c_8a8f9e: "#8a8f9e",
+      c_ff9d4d: "#ff9d4d",
+      c_8fd8ff: "#8fd8ff",
+      c_5cbf5c: "#5cbf5c",
+      c_c86bff: "#c86bff",
+      c_ff6b3d: "#ff6b3d",
+      c_6b1c22: "#6b1c22",
+      c_7a3d0f: "#7a3d0f",
+      c_4a1c6b: "#4a1c6b",
+      c_ff2d4d: "#ff2d4d",
+      c_3a0a12: "#3a0a12",
+      c_1c4a1c: "#1c4a1c",
+      c_7a5cff: "#7a5cff",
+      c_2a1c5c: "#2a1c5c",
+      c_2a2d37: "#2a2d37",
+      c_6b5c1c: "#6b5c1c",
+      c_1c4a6b: "#1c4a6b",
+      c_ff6e6e: "#ff6e6e",
+      c_6b1c1c: "#6b1c1c",
+      c_c8c8d8: "#c8c8d8",
+      c_ffd479: "#ffd479",
+      c_e0b48a: "#e0b48a",
+      c_ffffff: "#ffffff",
+      c_e8c96b: "#e8c96b",
+      c_ff7a8a: "#ff7a8a",
+      c_c97fdb: "#c97fdb",
+      c_c9a6ff: "#c9a6ff",
+      c_d495c7: "#d495c7",
+      c_ffb050: "#ffb050",
+      c_fff066: "#fff066",
+      c_e0a97a: "#e0a97a",
+      c_c98fd6: "#c98fd6",
+      c_8fe0a0: "#8fe0a0",
+      c_ffb3d9: "#ffb3d9",
+      c_ff7a3d: "#ff7a3d",
+    },
+    semantic: {
+      "css.void": "c_08090d",
+      "css.panel": "c_12141b",
+      "css.panel2": "c_191c26",
+      "css.line": "c_2a2e3a",
+      "css.text": "c_dfe3ee",
+      "css.dim": "c_7b8194",
+      "css.xp": "c_7cff6b",
+      "css.gold": "c_ffb347",
+      "css.soul": "c_5ce1e6",
+      "css.hp": "c_ff4d5e",
+      "css.accent": "c_b98cff",
+      "css.accent2": "c_ff6f9c",
+      "css.crystal": "c_7ee0ff",
+      "css.artifact": "c_ff9ecb",
+      "character.warrior": "c_ff5c5c",
+      "character.mage": "c_b98cff",
+      "character.hunter": "c_8aff6b",
+      "character.engineer": "c_7ee0ff",
+      "character.necromancer": "c_ff6bcf",
+      "talentBranch.survivor": "c_ffb347",
+      "eventCat.eliteArena": "c_ff8a4d",
+      "mutation.frenzied": "c_ff4d4d",
+      "mutation.swift": "c_ffe15c",
+      "mutation.armored": "c_8a8f9e",
+      "mutation.volatile": "c_ff9d4d",
+      "mutation.warded": "c_8fd8ff",
+      "mutation.regenerating": "c_5cbf5c",
+      "mutation.vampiric": "c_c86bff",
+      "mutation.dasher": "c_ff8a4d",
+      "mutation.bruiser": "c_ffb347",
+      "mutation.quaker": "c_ff6b3d",
+      "boss.dragon.color": "c_ff4d5e",
+      "boss.dragon.glow": "c_6b1c22",
+      "boss.wyvern.color": "c_ff9d4d",
+      "boss.wyvern.glow": "c_7a3d0f",
+      "boss.lich.color": "c_c86bff",
+      "boss.lich.glow": "c_4a1c6b",
+      "boss.overlord.color": "c_ff2d4d",
+      "boss.overlord.glow": "c_3a0a12",
+      "boss.ancient_tree.color": "c_5cbf5c",
+      "boss.ancient_tree.glow": "c_1c4a1c",
+      "boss.void_knight.color": "c_7a5cff",
+      "boss.void_knight.glow": "c_2a1c5c",
+      "boss.machine_god.color": "c_8a8f9e",
+      "boss.machine_god.glow": "c_2a2d37",
+      "boss.the_collector.color": "c_ffe15c",
+      "boss.the_collector.glow": "c_6b5c1c",
+      "boss.frost_queen.color": "c_8fd8ff",
+      "boss.frost_queen.glow": "c_1c4a6b",
+      "boss.bloodmoon_alpha.color": "c_ff6e6e",
+      "boss.bloodmoon_alpha.glow": "c_6b1c1c",
+      "weapon.blood_blade": "c_ff4d5e",
+      "weapon.chain_hook": "c_c8c8d8",
+      "weapon.warhammer": "c_ffb347",
+      "weapon.bow": "c_ffd479",
+      "weapon.plasma_rifle": "c_ff6f9c",
+      "weapon.railgun": "c_7ee0ff",
+      "weapon.shuriken_storm": "c_dfe3ee",
+      "weapon.laser_array": "c_ff6f9c",
+      "weapon.prism_beam": "c_b98cff",
+      "weapon.fire_nova": "c_ff9d4d",
+      "weapon.frost_field": "c_8fd8ff",
+      "weapon.poison_cloud": "c_8aff6b",
+      "weapon.necro_staff": "c_c86bff",
+      "weapon.spirit_wolves": "c_e0b48a",
+      "weapon.turret_deployer": "c_8a8f9e",
+      "weapon.spike_trap": "c_ff8a4d",
+      "weapon.tesla_coil": "c_ffe15c",
+      "weapon.holy_aura": "c_ffffff",
+      "weapon.thorn_aura": "c_8aff6b",
+      "weapon.chain_lightning": "c_ffe15c",
+      "weapon.whip": "c_ff8a4d",
+      "weapon.twin_daggers": "c_dfe3ee",
+      "weapon.javelin": "c_c8c8d8",
+      "weapon.hand_cannon": "c_ffb347",
+      "weapon.gauss_needle": "c_7ee0ff",
+      "weapon.arc_lance": "c_ffe15c",
+      "weapon.void_rift": "c_b98cff",
+      "weapon.swarm_hive": "c_e0b48a",
+      "weapon.glacier_totem": "c_8fd8ff",
+      "weapon.storm_chain": "c_ffe15c",
+      "weapon.stormpiercer": "c_e8c96b",
+      "weapon.crimson_fang": "c_ff7a8a",
+      "weapon.entropy_bloom": "c_c97fdb",
+      "weapon.spectral_lance": "c_c9a6ff",
+      "weapon.bone_pack": "c_d495c7",
+      "weapon.voltaic_spikes": "c_ffb050",
+      "weapon.maelstrom_chain": "c_fff066",
+      "weapon.gravity_hammer": "c_e0a97a",
+      "weapon.plasma_lance": "c_c98fd6",
+      "weapon.blight_frost": "c_8fe0a0",
+      "weapon.sakura_barrage": "c_ffb3d9",
+      "weapon.cluster_charge": "c_ff7a3d",
+    },
+  },
   texts: {},
 };
 // CONFIG_SCHEMA: dot-path into CONFIG -> {type, min?, max?, maxLen?}. Two jobs:
@@ -2655,6 +2831,15 @@ const CONFIG_SCHEMA = {
 // them, generated from the actual keys instead of hand-listing ~40 lines, so
 // adding a new stat cap later auto-registers its schema for free.
 for(const _statKey of Object.keys(CONFIG_DEFAULTS.caps.STAT_CAPS)) CONFIG_SCHEMA["caps.STAT_CAPS."+_statKey] = {type:"array"};
+// Same auto-registration pattern for Phase 4's colors: palette entries are
+// real hex values, semantic entries are just palette KEY NAMES (a short
+// string, not a color itself — reuses the existing "text" schema type rather
+// than adding a new one for what's functionally identical validation). Not
+// hand-listing ~110 lines for the same reason STAT_CAPS isn't hand-listed
+// above — adding a new palette/semantic entry later auto-registers its
+// schema for free.
+for(const _paletteKey of Object.keys(CONFIG_DEFAULTS.colors.palette)) CONFIG_SCHEMA["colors.palette."+_paletteKey] = {type:"hexcolor"};
+for(const _semanticKey of Object.keys(CONFIG_DEFAULTS.colors.semantic)) CONFIG_SCHEMA["colors.semantic."+_semanticKey] = {type:"text", maxLen:64};
 // Deep-clones CONFIG_DEFAULTS so the live, possibly-overridden CONFIG the
 // game actually reads never accidentally shares a nested object with
 // CONFIG_DEFAULTS (mutating one must never be able to mutate the other).
@@ -2726,13 +2911,35 @@ function validateAndClamp(patch, prefix){
   }
   return out;
 }
-// Populated by later phases: Phase 4 pushes CONFIG.colors.semantic.* onto
-// matching CSS custom properties, Phase 5 re-renders any open screen's text
-// nodes. Empty until those phases land — nothing to do yet, but every future
-// override path (editor apply, JSON import, network push) already calls
-// this, so those phases only need to fill THIS function in, not find and
-// wire every call site of applyConfigOverride again.
+// Resolves a semantic color usage key (e.g. "weapon.bow", "css.xp") through
+// CONFIG.colors.semantic -> CONFIG.colors.palette indirection. Returns a
+// visually-obvious magenta on any miss (unknown key, or the semantic entry
+// points at a palette key that doesn't exist) instead of throwing — a wrong/
+// missing color should be easy to spot on screen, never crash the game.
+function resolveColor(semanticKey){
+  const paletteKey = CONFIG.colors.semantic[semanticKey];
+  const hex = paletteKey!=null ? CONFIG.colors.palette[paletteKey] : undefined;
+  return hex || "#ff00ff";
+}
+// CSS custom properties this file's :root block defines with a literal
+// default (see the <style> block near the top) — kept as an explicit list
+// (not "every css.* semantic key") so a future semantic key that ISN'T a
+// real CSS var doesn't silently try to setProperty something meaningless.
+const CSS_COLOR_VAR_NAMES = ["void","panel","panel2","line","text","dim","xp","gold","soul","hp","accent","accent2","crystal","artifact"];
+// Phase 5 will extend this same function to also re-render any open screen's
+// text nodes from CONFIG.texts — every future override path (editor apply,
+// JSON import, network push) already calls this, so that phase only needs
+// to fill in more of THIS function, not find and wire every call site of
+// applyConfigOverride again.
 function onConfigApplied(){
+  // No-ops outside a real DOM (Node-based extraction: verify-balance.js/
+  // balance-lab.html's LIVE DATA LOADER eval this same PART 1-4 slice in a
+  // sandboxed Function with no `document` at all). Guarded here, not by
+  // wrapping every caller, since this is the one place that touches the DOM
+  // in the whole CONFIG scaffold.
+  if(typeof document==="undefined") return;
+  const root = document.documentElement;
+  for(const name of CSS_COLOR_VAR_NAMES) root.style.setProperty("--"+name, resolveColor("css."+name));
 }
 // The one and only path anything uses to change CONFIG after boot. Returns
 // what was actually applied (post-clamp/post-drop) so a caller (e.g. the
@@ -2777,6 +2984,16 @@ function persistConfigOverride(){
 // data tables evaluate — nothing below this line should ever see CONFIG in
 // a partially-initialized state.
 loadConfigOverrideFromStorage();
+// loadConfigOverrideFromStorage() only calls onConfigApplied() (via
+// applyConfigOverride()) when a stored override actually exists — a fresh
+// user with no override would otherwise never get their CSS custom
+// properties explicitly set from CONFIG at all (harmless today only because
+// the static :root block's hardcoded defaults happen to already match
+// CONFIG_DEFAULTS exactly; not a guarantee this file's :root block and
+// CONFIG_DEFAULTS.colors won't drift apart from each other in the future).
+// Calling it once unconditionally here makes CONFIG the actual source of
+// truth from the very first frame, override or not.
+onConfigApplied();
 
 
 const WEAPONS = {
@@ -2853,18 +3070,12 @@ for(const wid of Object.keys(WEAPONS)){
 }
 // Per-weapon color, used everywhere a weapon's projectile/effect is drawn so each
 // weapon reads as visually distinct instead of every bullet being the same beige.
-const WEAPON_COLORS = {
-  blood_blade:"#ff4d5e", chain_hook:"#c8c8d8", warhammer:"#ffb347", bow:"#ffd479", plasma_rifle:"#ff6f9c",
-  railgun:"#7ee0ff", shuriken_storm:"#dfe3ee", laser_array:"#ff6f9c", prism_beam:"#b98cff", fire_nova:"#ff9d4d",
-  frost_field:"#8fd8ff", poison_cloud:"#8aff6b", necro_staff:"#c86bff", spirit_wolves:"#e0b48a", turret_deployer:"#8a8f9e",
-  spike_trap:"#ff8a4d", tesla_coil:"#ffe15c", holy_aura:"#ffffff", thorn_aura:"#8aff6b", chain_lightning:"#ffe15c",
-  whip:"#ff8a4d", twin_daggers:"#dfe3ee", javelin:"#c8c8d8", hand_cannon:"#ffb347", gauss_needle:"#7ee0ff",
-  arc_lance:"#ffe15c", void_rift:"#b98cff", swarm_hive:"#e0b48a", glacier_totem:"#8fd8ff", storm_chain:"#ffe15c",
-  stormpiercer:"#e8c96b", crimson_fang:"#ff7a8a", entropy_bloom:"#c97fdb",
-  spectral_lance:"#c9a6ff", bone_pack:"#d495c7", voltaic_spikes:"#ffb050", maelstrom_chain:"#fff066",
-  gravity_hammer:"#e0a97a", plasma_lance:"#c98fd6", blight_frost:"#8fe0a0",
-  sakura_barrage:"#ffb3d9", cluster_charge:"#ff7a3d",
-};
+// WEAPON_COLORS (a flat wid->hex map) was the only thing weaponColor() read —
+// removed in favor of resolving straight through CONFIG.colors (semantic keys
+// "weapon.<wid>"). Unlike CHARACTERS/BOSS_ROSTER_RAW/ENEMY_MUTATIONS below,
+// weaponColor() is a plain function called fresh at each use site (not baked
+// into a table evaluated once), so weapon colors ARE genuinely live-editable
+// via CONFIG without a page reload.
 // Per-weapon bullet silhouette, reusing the shape-render branches render() already has for boss
 // attack patterns (spiral/diamond/petal/wave/homing/blade — see PART 12) instead of every player
 // projectile being an identical plain circle. Weapons not listed here keep the default circle,
@@ -2878,7 +3089,7 @@ const RING_SHAPES = { fire_nova:"segmented", frost_field:"hex", poison_cloud:"se
 // thickness, area/aura pulse intensity, etc. so leveling up reads as a growing presence on screen,
 // not just a bigger number in the level-up card.
 function weaponVisualTier(level){ return level>=7?4 : level>=5?3 : level>=3?2 : 1; }
-function weaponColor(wid){ return WEAPON_COLORS[wid] || "#ffd479"; }
+function weaponColor(wid){ return CONFIG.colors.semantic["weapon."+wid] ? resolveColor("weapon."+wid) : "#ffd479"; }
 
 const EVOLUTIONS = {
   crimson_executioner:{from:"blood_blade",catalyst:"blood_chalice",name:"Crimson Executioner",icon:"🩸",desc:"Every hit heals for 8% of damage dealt; executes below 15% HP."},
@@ -3108,15 +3319,19 @@ const SYNERGIES = [
   {id:"lich_lord_build",name:"Lich Lord",requires:{summon:4},desc:"+30% summon damage, +10% chance a killed enemy rises as your minion.",apply:p=>{p.stats.summonDmgMult=(p.stats.summonDmgMult||1)*1.3;p.stats.raiseDeadChance=(p.stats.raiseDeadChance||0)+0.1;}},
 ];
 
+// color: resolveColor("character.X") — baked once at module-eval time, same
+// accepted limitation as Phase 3's Group A (a live CONFIG edit needs a page
+// reload to reach here, not a per-frame re-read) since this array literal
+// only evaluates once.
 const CHARACTERS = [
-  {id:"warrior",name:"Warrior",icon:"🛡",color:"#ff5c5c",playstyle:"Melee bruiser, high HP, sustained brawling.",startWeapon:"warhammer",uniqueBonus:p=>{p.maxHp+=30;p.hp=p.maxHp;p.stats.armor+=1;},uniqueDesc:"+30 max HP, +1 armor at run start."},
-  {id:"mage",name:"Mage",icon:"🔮",color:"#b98cff",playstyle:"Elemental caster, weaves multiple elements together.",startWeapon:"fire_nova",uniqueBonus:p=>{["fireMult","frostMult","lightningMult","poisonMult"].forEach(k=>p.stats[k]=(p.stats[k]||1)*1.15);},uniqueDesc:"+15% to all elemental multipliers at run start."},
+  {id:"warrior",name:"Warrior",icon:"🛡",color:resolveColor("character.warrior"),playstyle:"Melee bruiser, high HP, sustained brawling.",startWeapon:"warhammer",uniqueBonus:p=>{p.maxHp+=30;p.hp=p.maxHp;p.stats.armor+=1;},uniqueDesc:"+30 max HP, +1 armor at run start."},
+  {id:"mage",name:"Mage",icon:"🔮",color:resolveColor("character.mage"),playstyle:"Elemental caster, weaves multiple elements together.",startWeapon:"fire_nova",uniqueBonus:p=>{["fireMult","frostMult","lightningMult","poisonMult"].forEach(k=>p.stats[k]=(p.stats[k]||1)*1.15);},uniqueDesc:"+15% to all elemental multipliers at run start."},
   // Small regen nudge: crit/move-speed don't help against unmitigated wave-pressure
   // chip damage, so a direct survivability boost closes the gap without diluting
   // the glass-cannon identity the way flat armor/maxHp would.
-  {id:"hunter",name:"Hunter",icon:"🏹",color:"#8aff6b",playstyle:"Ranged precision, crit-focused, kites and pierces.",startWeapon:"bow",uniqueBonus:p=>{p.stats.critChance+=0.1;p.stats.moveSpeed*=1.06;p.stats.regen+=0.5;},uniqueDesc:"+10% crit chance, +6% move speed, +0.5 HP regen/s at run start."},
-  {id:"engineer",name:"Engineer",icon:"🗿",color:"#7ee0ff",playstyle:"Turret/trap zoning, controls space rather than chasing.",startWeapon:"turret_deployer",uniqueBonus:p=>{p.stats.cdrMult=(p.stats.cdrMult||1)*0.9;},uniqueDesc:"-10% cooldown on summon/trap weapons at run start."},
-  {id:"necromancer",name:"Necromancer",icon:"💀",color:"#ff6bcf",playstyle:"Minion army, scales with summon count and duration.",startWeapon:"necro_staff",uniqueBonus:p=>{p.stats.summonDmgMult=(p.stats.summonDmgMult||1)*1.2;},uniqueDesc:"+20% minion damage at run start."},
+  {id:"hunter",name:"Hunter",icon:"🏹",color:resolveColor("character.hunter"),playstyle:"Ranged precision, crit-focused, kites and pierces.",startWeapon:"bow",uniqueBonus:p=>{p.stats.critChance+=0.1;p.stats.moveSpeed*=1.06;p.stats.regen+=0.5;},uniqueDesc:"+10% crit chance, +6% move speed, +0.5 HP regen/s at run start."},
+  {id:"engineer",name:"Engineer",icon:"🗿",color:resolveColor("character.engineer"),playstyle:"Turret/trap zoning, controls space rather than chasing.",startWeapon:"turret_deployer",uniqueBonus:p=>{p.stats.cdrMult=(p.stats.cdrMult||1)*0.9;},uniqueDesc:"-10% cooldown on summon/trap weapons at run start."},
+  {id:"necromancer",name:"Necromancer",icon:"💀",color:resolveColor("character.necromancer"),playstyle:"Minion army, scales with summon count and duration.",startWeapon:"necro_staff",uniqueBonus:p=>{p.stats.summonDmgMult=(p.stats.summonDmgMult||1)*1.2;},uniqueDesc:"+20% minion damage at run start."},
 ];
 // Player body/ring color by class — falls back to Mage's violet (the old universal default)
 // for any unrecognized id, same fallback pattern weaponColor() uses.
@@ -3128,7 +3343,7 @@ function characterColor(id){ const c=CHARACTERS.find(x=>x.id===id); return (c&&c
 // rather than falling back to characterColor's default (which is mage's purple,
 // i.e. indistinguishable from having no branch color at all).
 const TALENT_BRANCH_COLOR = { warrior:characterColor('warrior'), mage:characterColor('mage'), hunter:characterColor('hunter'),
-  engineer:characterColor('engineer'), necromancer:characterColor('necromancer'), survivor:"#ffb347" };
+  engineer:characterColor('engineer'), necromancer:characterColor('necromancer'), survivor:resolveColor("talentBranch.survivor") };
 
 /* =========================================================================
    PART 2 — CONTENT LAYER DATA (enemies, bosses, events, talents, achievements)
@@ -3291,23 +3506,26 @@ for(const e of ENEMIES_ELITE) ENEMIES[e.id]=e;
 // the run goes on, giving them their own qualitative progression instead of just
 // bigger wave.mult numbers — mirrors the player picking up cards/passives over time.
 // Elites/bosses keep their own hand-authored specials and never roll these.
+// color: resolveColor("mutation.X") — same module-eval-time bake as
+// CHARACTERS above (Phase 4), needs a page reload for a live CONFIG edit to
+// take effect here.
 const ENEMY_MUTATIONS = [
-  {id:"frenzied",     name:"Frenzied",     icon:"🔥", color:"#ff4d4d", unlockT:0,   apply:e=>{ e.speed*=1.35; e.dmg*=1.2; }},
-  {id:"swift",        name:"Swift",        icon:"💨", color:"#ffe15c", unlockT:0,   apply:e=>{ e.speed*=1.7; }},
-  {id:"armored",      name:"Armored",      icon:"🪨", color:"#8a8f9e", unlockT:300, apply:e=>{ e.mutArmor=0.35; }},
-  {id:"volatile",     name:"Volatile",     icon:"💥", color:"#ff9d4d", unlockT:300, apply:e=>{ e.mutExplode=true; }},
-  {id:"warded",       name:"Warded",       icon:null, color:"#8fd8ff", unlockT:600, apply:e=>{ e.shield=e.maxHp*0.5; }},
-  {id:"regenerating", name:"Regenerating", icon:"💚", color:"#5cbf5c", unlockT:600, apply:e=>{ e.mutRegen=e.maxHp*0.025; }},
-  {id:"vampiric",     name:"Vampiric",     icon:"🩸", color:"#c86bff", unlockT:900, apply:e=>{ e.mutVampiric=true; }},
+  {id:"frenzied",     name:"Frenzied",     icon:"🔥", color:resolveColor("mutation.frenzied"), unlockT:0,   apply:e=>{ e.speed*=1.35; e.dmg*=1.2; }},
+  {id:"swift",        name:"Swift",        icon:"💨", color:resolveColor("mutation.swift"), unlockT:0,   apply:e=>{ e.speed*=1.7; }},
+  {id:"armored",      name:"Armored",      icon:"🪨", color:resolveColor("mutation.armored"), unlockT:300, apply:e=>{ e.mutArmor=0.35; }},
+  {id:"volatile",     name:"Volatile",     icon:"💥", color:resolveColor("mutation.volatile"), unlockT:300, apply:e=>{ e.mutExplode=true; }},
+  {id:"warded",       name:"Warded",       icon:null, color:resolveColor("mutation.warded"), unlockT:600, apply:e=>{ e.shield=e.maxHp*0.5; }},
+  {id:"regenerating", name:"Regenerating", icon:"💚", color:resolveColor("mutation.regenerating"), unlockT:600, apply:e=>{ e.mutRegen=e.maxHp*0.025; }},
+  {id:"vampiric",     name:"Vampiric",     icon:"🩸", color:resolveColor("mutation.vampiric"), unlockT:900, apply:e=>{ e.mutVampiric=true; }},
   // These three add a telegraphed *action*, not just a passive stat modifier — see the
   // generic per-mutation handling near the top of updateEnemies() (PART 8) and the matching
   // render additions in render() (PART 12) for how each one is actually staged and drawn.
   // unlockT:180 (not 420) — this is the one mutation that actually lets a slow/chase-brain
   // enemy catch a kiting player (a telegraphed burst past its normal speed), so it should be
   // available as early as any mutation can occur at all, not held back further.
-  {id:"dasher",  name:"Dasher",  icon:"➡️", color:"#ff8a4d", unlockT:180, apply:e=>{ e.mutDasher=true; e.dashCd=rand(1.5,3); }},
-  {id:"bruiser", name:"Bruiser", icon:"👊", color:"#ffb347", unlockT:420, apply:e=>{ e.mutBruiser=true; }},
-  {id:"quaker",  name:"Quaker",  icon:"🌋", color:"#ff6b3d", unlockT:720, apply:e=>{ e.mutQuaker=true; e.quakeCd=rand(3,5); }},
+  {id:"dasher",  name:"Dasher",  icon:"➡️", color:resolveColor("mutation.dasher"), unlockT:180, apply:e=>{ e.mutDasher=true; e.dashCd=rand(1.5,3); }},
+  {id:"bruiser", name:"Bruiser", icon:"👊", color:resolveColor("mutation.bruiser"), unlockT:420, apply:e=>{ e.mutBruiser=true; }},
+  {id:"quaker",  name:"Quaker",  icon:"🌋", color:resolveColor("mutation.quaker"), unlockT:720, apply:e=>{ e.mutQuaker=true; e.quakeCd=rand(3,5); }},
 ];
 // Chance a given non-elite spawn rolls a mutation, and how many mutation types are
 // unlocked, both ramp up with runTime — 0% before t=180 (opening stays legible),
@@ -3355,17 +3573,20 @@ function currentDangerTier(t){
 // boss survivability doesn't also inflate gold/xp payouts.
 // spawnBoss() takes the max of (this legacy wave.mult-scaled hp) and
 // (playerCP(player)*CONFIG.balance.BOSS_TARGET_FIGHT_SECONDS) — see spawnBoss() for why.
+// color/glow: resolveColor("boss.X.color"/"boss.X.glow") — same module-eval-
+// time bake as CHARACTERS/ENEMY_MUTATIONS above (Phase 4), needs a page
+// reload for a live CONFIG edit to take effect here.
 const BOSS_ROSTER_RAW = {
-  dragon:   { name:"Dragon",         hp:5200,  dmg:34, speed:34, radius:46, color:"#ff4d5e", glow:"#6b1c22" },
-  wyvern:   { name:"Wyvern",         hp:8200,  dmg:38, speed:40, radius:44, color:"#ff9d4d", glow:"#7a3d0f" },
-  lich:     { name:"Lich",           hp:6800,  dmg:28, speed:36, radius:42, color:"#c86bff", glow:"#4a1c6b" },
-  overlord: { name:"Overlord",       hp:16000, dmg:42, speed:40, radius:52, color:"#ff2d4d", glow:"#3a0a12", final:true },
-  ancient_tree:{ name:"Ancient Tree",hp:7200,  dmg:22, speed:0,  radius:50, color:"#5cbf5c", glow:"#1c4a1c" },
-  void_knight: { name:"Void Knight", hp:9000,  dmg:30, speed:70, radius:40, color:"#7a5cff", glow:"#2a1c5c" },
-  machine_god: { name:"Machine God", hp:11000, dmg:26, speed:20, radius:48, color:"#8a8f9e", glow:"#2a2d37" },
-  the_collector:{ name:"The Collector",hp:8500,dmg:20, speed:60, radius:38, color:"#ffe15c", glow:"#6b5c1c" },
-  frost_queen: { name:"Frost Queen", hp:7800,  dmg:24, speed:50, radius:40, color:"#8fd8ff", glow:"#1c4a6b" },
-  bloodmoon_alpha:{ name:"Bloodmoon Alpha",hp:9500,dmg:32,speed:130,radius:36,color:"#ff6e6e",glow:"#6b1c1c" },
+  dragon:   { name:"Dragon",         hp:5200,  dmg:34, speed:34, radius:46, color:resolveColor("boss.dragon.color"), glow:resolveColor("boss.dragon.glow") },
+  wyvern:   { name:"Wyvern",         hp:8200,  dmg:38, speed:40, radius:44, color:resolveColor("boss.wyvern.color"), glow:resolveColor("boss.wyvern.glow") },
+  lich:     { name:"Lich",           hp:6800,  dmg:28, speed:36, radius:42, color:resolveColor("boss.lich.color"), glow:resolveColor("boss.lich.glow") },
+  overlord: { name:"Overlord",       hp:16000, dmg:42, speed:40, radius:52, color:resolveColor("boss.overlord.color"), glow:resolveColor("boss.overlord.glow"), final:true },
+  ancient_tree:{ name:"Ancient Tree",hp:7200,  dmg:22, speed:0,  radius:50, color:resolveColor("boss.ancient_tree.color"), glow:resolveColor("boss.ancient_tree.glow") },
+  void_knight: { name:"Void Knight", hp:9000,  dmg:30, speed:70, radius:40, color:resolveColor("boss.void_knight.color"), glow:resolveColor("boss.void_knight.glow") },
+  machine_god: { name:"Machine God", hp:11000, dmg:26, speed:20, radius:48, color:resolveColor("boss.machine_god.color"), glow:resolveColor("boss.machine_god.glow") },
+  the_collector:{ name:"The Collector",hp:8500,dmg:20, speed:60, radius:38, color:resolveColor("boss.the_collector.color"), glow:resolveColor("boss.the_collector.glow") },
+  frost_queen: { name:"Frost Queen", hp:7800,  dmg:24, speed:50, radius:40, color:resolveColor("boss.frost_queen.color"), glow:resolveColor("boss.frost_queen.glow") },
+  bloodmoon_alpha:{ name:"Bloodmoon Alpha",hp:9500,dmg:32,speed:130,radius:36,color:resolveColor("boss.bloodmoon_alpha.color"),glow:resolveColor("boss.bloodmoon_alpha.glow") },
 };
 const BOSS_ROSTER = {};
 for(const key of Object.keys(BOSS_ROSTER_RAW)){
@@ -6219,7 +6440,11 @@ function renderMerchantCardOffers(){
 // Cat color also used to accent the full-screen event box (kicker text + left
 // border) and the no-choice toast border, so an event's "flavor" reads the same
 // way regardless of which presentation it gets.
-const EVENT_CAT_COLOR = { merchant:"var(--gold)", treasure:"var(--crystal)", elite_arena:"#ff8a4d", mini_boss:"var(--hp)", risk_reward:"var(--accent2)", cursed_shrine:"var(--accent)" };
+// merchant/treasure/mini_boss/risk_reward/cursed_shrine deliberately stay as
+// var(--x) references (already live via CSS custom properties, already
+// covered by onConfigApplied()'s css.* resolution) — only elite_arena had a
+// literal hex with no CSS var backing it.
+const EVENT_CAT_COLOR = { merchant:"var(--gold)", treasure:"var(--crystal)", elite_arena:resolveColor("eventCat.eliteArena"), mini_boss:"var(--hp)", risk_reward:"var(--accent2)", cursed_shrine:"var(--accent)" };
 // Per-category fallback "speaker" for the event screen's nameplate (see
 // eventSpeakerFor()) — every event reads as someone/something presenting it
 // instead of an anonymous system message, without needing a bespoke persona
@@ -8628,6 +8853,14 @@ window.addEventListener('keyup',e=>{ keys[e.key.toLowerCase()]=false; const wasd
    script to drive. Safe to strip for a "clean" build; nothing else reads it.
    ========================================================================= */
 window.__ASCENSION_DEBUG__ = {
+  // CONFIG centralization (see CONFIG_CENTRALIZATION_PLAN.md) — exposed here
+  // so both this session's own live verification and the future Config
+  // Editor (Phase 6) can actually drive the real mutation path
+  // (applyConfigOverride) instead of poking CSS vars directly as a proxy for it.
+  get CONFIG(){ return CONFIG; },
+  get CONFIG_DEFAULTS(){ return CONFIG_DEFAULTS; },
+  get CONFIG_SCHEMA(){ return CONFIG_SCHEMA; },
+  applyConfigOverride, resolveColor, persistConfigOverride,
   get player(){ return player; },
   get enemies(){ return enemies; },
   get bullets(){ return bullets; },
