@@ -2563,6 +2563,29 @@ const CONFIG_DEFAULTS = {
     BOSS_HP_MULT: 4.5,
     BOSS_DMG_MULT: 1.2,
     BOSS_TARGET_FIGHT_SECONDS: 7,
+    // Phase 3 Group B — curves/tiers. xpForLevel()/gainXp()/currentWave()/
+    // currentDangerTier() all read these fresh every call — genuinely
+    // live-editable, no reload needed (unlike Group A's bake-time constants).
+    XP_CURVE_BREAKPOINT_LEVEL: 30,
+    XP_CURVE_LATE_EXPONENT: 2.6,
+    HP_PER_LEVEL: 2,
+    ENDLESS_MULT_PER_MIN: 0.12, // steady continued ramp so "Keep Playing" stays a real challenge
+    ENDLESS_INTERVAL_MULT_PER_MIN: 0.985, // gently tightens spawn interval further, floor enforced below
+    // Each tier is kept as one whole object (armorPierce/enrageMult/unlockT
+    // AND display name/numeral together) rather than splitting display
+    // fields into CONFIG.texts — same judgment call as STAT_CAPS in
+    // CONFIG.caps: re-zipping two parallel arrays back together by index
+    // would cost more in complexity/drift-risk than the categorization
+    // purity is worth. See DANGER_TIERS' own doc comment below for the
+    // full design rationale (kept where it was, right before currentDangerTier()).
+    DANGER_TIERS: [
+      {tier:1, numeral:"I",   name:"Skirmish",      unlockT:0,    armorPierce:0,    enrageMult:0},
+      {tier:2, numeral:"II",  name:"Onslaught",     unlockT:300,  armorPierce:0,    enrageMult:0},
+      {tier:3, numeral:"III", name:"Bloodrush",     unlockT:600,  armorPierce:0.15, enrageMult:0},
+      {tier:4, numeral:"IV",  name:"Warzone",       unlockT:930,  armorPierce:0.30, enrageMult:0.3},
+      {tier:5, numeral:"V",   name:"Cataclysm",     unlockT:1520, armorPierce:0.45, enrageMult:0.5},
+      {tier:6, numeral:"VI",  name:"Endless Dread", unlockT:1900, armorPierce:0.55, enrageMult:0.65},
+    ],
   },
   colors: { palette: {}, semantic: {} },
   texts: {},
@@ -2595,6 +2618,19 @@ const CONFIG_SCHEMA = {
   "balance.BOSS_HP_MULT": {type:"number", min:0.1, max:20},
   "balance.BOSS_DMG_MULT": {type:"number", min:0.1, max:10},
   "balance.BOSS_TARGET_FIGHT_SECONDS": {type:"number", min:1, max:120},
+  "balance.XP_CURVE_BREAKPOINT_LEVEL": {type:"number", min:1, max:200},
+  "balance.XP_CURVE_LATE_EXPONENT": {type:"number", min:0.5, max:10},
+  "balance.HP_PER_LEVEL": {type:"number", min:0, max:100},
+  "balance.ENDLESS_MULT_PER_MIN": {type:"number", min:0, max:5},
+  "balance.ENDLESS_INTERVAL_MULT_PER_MIN": {type:"number", min:0.5, max:1},
+  // DANGER_TIERS is an array of whole tier objects (armorPierce/enrageMult/
+  // unlockT/name/numeral together, see its own definition above for why it's
+  // not split apart) — too structurally different from a flat number/color/
+  // text/[lo,hi]-pair to validate field-by-field through this same generic
+  // machinery without real added value. "structured" accepts it wholesale if
+  // it's a same-shaped array (right length, each entry an object) — a
+  // hand-authored override replaces the whole table, not a single field.
+  "balance.DANGER_TIERS": {type:"structured", shape:"array", minLength:1, maxLength:20},
 };
 // STAT_CAPS entries are themselves [lo,hi] BOUNDS, not values to bound — one
 // generic "array" schema type (added to validateAndClamp below) covers all of
@@ -2650,6 +2686,16 @@ function validateAndClamp(patch, prefix){
         out[key] = val;
       } else if(schema.type==="array" && Array.isArray(val) && val.length===2 && val.every(n=>typeof n==="number" && isFinite(n))){
         out[key] = val.slice();
+      } else if(schema.type==="structured" && schema.shape==="array" && Array.isArray(val)
+                && val.length>=(schema.minLength??0) && val.length<=(schema.maxLength??Infinity)
+                && val.every(item=>item && typeof item==="object" && !Array.isArray(item))){
+        // Deliberately shallow — accepts a same-shaped array of plain objects
+        // as-is, no per-field validation inside each entry. A malformed entry
+        // (missing/wrong-type field) surfaces as a visible in-game bug, not a
+        // crash — an acceptable tradeoff for a whole-table override, same
+        // spirit as "never throws" elsewhere in this function, not a reason
+        // to build a nested schema-of-schemas for one array in the game.
+        out[key] = val.map(item=>({...item}));
       }
       // else: wrong type for a known path — dropped
     } else if(val && typeof val==="object" && !Array.isArray(val)){
@@ -3275,17 +3321,13 @@ function rollMutation(t){
    established as meaningful (ENEMY_MUTATIONS' 300/600/900 unlocks, WAVES'
    930/1520 wave starts, ENDLESS_START_T) rather than inventing new ones —
    one shared rhythm of escalation, not two independently-tuned curves. */
-const DANGER_TIERS = [
-  {tier:1, numeral:"I",   name:"Skirmish",      unlockT:0,    armorPierce:0,    enrageMult:0},
-  {tier:2, numeral:"II",  name:"Onslaught",     unlockT:300,  armorPierce:0,    enrageMult:0},
-  {tier:3, numeral:"III", name:"Bloodrush",     unlockT:600,  armorPierce:0.15, enrageMult:0},
-  {tier:4, numeral:"IV",  name:"Warzone",       unlockT:930,  armorPierce:0.30, enrageMult:0.3},
-  {tier:5, numeral:"V",   name:"Cataclysm",     unlockT:1520, armorPierce:0.45, enrageMult:0.5},
-  {tier:6, numeral:"VI",  name:"Endless Dread", unlockT:1900, armorPierce:0.55, enrageMult:0.65},
-];
+// The actual tier table now lives in CONFIG.balance.DANGER_TIERS (Phase 3
+// Group B, CONFIG_CENTRALIZATION_PLAN.md) — read fresh every call, so an
+// override applies on the very next check, no reload needed.
 function currentDangerTier(t){
-  let d = DANGER_TIERS[0];
-  for(const x of DANGER_TIERS){ if(t>=x.unlockT) d=x; else break; }
+  const tiers = CONFIG.balance.DANGER_TIERS;
+  let d = tiers[0];
+  for(const x of tiers){ if(t>=x.unlockT) d=x; else break; }
   return d;
 }
 
@@ -3773,8 +3815,6 @@ const WAVES = [
 // floor forever. currentWave() below layers a continuing endless scale on top of
 // the final wave once runTime exceeds the last wave's timestamp.
 const ENDLESS_START_T = WAVES[WAVES.length-1].t;
-const ENDLESS_MULT_PER_MIN = 0.12; // steady continued ramp so "Keep Playing" stays a real challenge
-const ENDLESS_INTERVAL_MULT_PER_MIN = 0.985; // gently tightens spawn interval further, floor enforced below
 const PHASES = [
   {t:0,name:"DISCOVERY"},{t:130,name:"BUILD FORMATION"},{t:310,name:"WYVERN'S SHADOW"},{t:340,name:"ESCALATION"},{t:600,name:"DEEPENING THREAT"},
   {t:930,name:"THE VOID STIRS"},{t:1320,name:"MACHINE UPRISING"},{t:1720,name:"BLOODMOON"},{t:1960,name:"THE FINAL STAND"},
@@ -4763,8 +4803,8 @@ function currentWave(){
     // Endless post-Overlord scaling: keep raising density/multiplier over time instead of
     // freezing at the last authored wave's numbers forever (see ENDLESS_* constants above).
     const minutesPast = (runTime-ENDLESS_START_T)/60;
-    const extraMult = minutesPast*ENDLESS_MULT_PER_MIN;
-    const intervalScale = Math.max(0.55, Math.pow(ENDLESS_INTERVAL_MULT_PER_MIN, minutesPast));
+    const extraMult = minutesPast*CONFIG.balance.ENDLESS_MULT_PER_MIN;
+    const intervalScale = Math.max(0.55, Math.pow(CONFIG.balance.ENDLESS_INTERVAL_MULT_PER_MIN, minutesPast));
     return Object.assign({}, w, { mult: w.mult+extraMult, interval: w.interval*intervalScale });
   }
   return w;
