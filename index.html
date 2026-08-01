@@ -2677,6 +2677,16 @@ const CARDS = [
   {id:"thorns",cat:"defensive",name:"Thorns",tags:["reflect"],stackable:true,maxStacks:3,desc:"Reflect 15% of damage taken.",apply:p=>p.stats.thorns=(p.stats.thorns||0)+0.15},
   {id:"fortify",cat:"defensive",name:"Fortify",tags:["hp"],stackable:true,maxStacks:8,desc:"+20 max HP, heal to full.",apply:p=>{p.maxHp+=20;p.hp=p.maxHp;}},
   {id:"second_wind",cat:"defensive",name:"Second Wind",tags:["regen","risk"],desc:"Heal 20% max HP on level-up.",apply:p=>p.stats.healOnLevelUp=(p.stats.healOnLevelUp||0)+0.2},
+  // Second Skin (hybrid HP+armor, stackable — no auto-heal, same "hybrid cards
+  // don't heal" precedent as Tank Build below) and Tempered Flesh (unlocks a
+  // NEW mechanic — Max HP itself becomes a second, diminishing-returns damage-
+  // reduction source, see damagePlayer()/PART 9 — rather than just being a
+  // bigger flat number) give Max HP investment two distinct new identities:
+  // a stackable defensive stat-stick, and a build-defining conversion mechanic
+  // that makes every OTHER max-HP source (talents/armory/Heart Harvest/level
+  // growth) also pay off as damage reduction, not just a bigger health bar.
+  {id:"second_skin",cat:"defensive",tags:["hp","armor"],name:"Second Skin",stackable:true,maxStacks:6,desc:"+18 max HP, +0.3 armor.",apply:p=>{p.maxHp+=18;p.stats.armor+=0.3;}},
+  {id:"tempered_flesh",cat:"defensive",name:"Tempered Flesh",tags:["hp","defense"],desc:"+25 max HP. Your Max HP now also reduces incoming damage (diminishing returns, up to 30%).",apply:p=>{p.maxHp+=25;p.stats.hpScaledDR=true;}},
   {id:"magnetism",cat:"utility",name:"Magnetism",tags:["pickup"],stackable:true,maxStacks:3,desc:"+30% pickup radius.",apply:p=>p.stats.pickupRadius*=1.3},
   {id:"greed",cat:"utility",name:"Greed",tags:["gold"],stackable:true,maxStacks:3,desc:"+25% gold gained.",apply:p=>p.stats.goldMult*=1.25},
   {id:"fortune",cat:"utility",name:"Fortune",tags:["xp"],stackable:true,maxStacks:3,desc:"+20% XP gained.",apply:p=>p.stats.xpMult*=1.2},
@@ -2790,6 +2800,14 @@ const PASSIVES = [
   {id:"queens_pheromone",slot:"amulet",name:"Queen's Pheromone",icon:"🐝",tags:["summon"],desc:"+15% summon count.",apply:p=>p.stats.summonCountMult=(p.stats.summonCountMult||1)*1.15},
   {id:"permafrost_idol",slot:"artifact",name:"Permafrost Idol",icon:"🧊",tags:["frost"],desc:"+10% to frost/slow effects.",apply:p=>p.stats.frostMult=(p.stats.frostMult||1)*1.1},
   {id:"static_charm",slot:"ring",name:"Static Charm",icon:"⚡",tags:["lightning"],desc:"+15% chance any hit chains an extra jump.",apply:p=>p.stats.chainOnHitChance=(p.stats.chainOnHitChance||0)+0.15},
+  // Every other max-HP source in the game is a one-time pickup (cards/talents/
+  // armory) — this is the one that keeps paying out passively for the rest of
+  // the run, tying survivability growth to the thing the player is already
+  // doing (hunting elites for crystals/passive drops), not a separate ask.
+  // maxHpPerEliteKill is read in killEnemy() (PART 7) — deliberately uncapped,
+  // same "no ceiling on any number, let soft-caps elsewhere do the limiting"
+  // principle as the ascendant_* cards (PART 1).
+  {id:"heart_harvest",slot:"relic",name:"Heart Harvest",icon:"❤️‍🔥",tags:["hp"],desc:"+3 max HP permanently on every elite or boss kill.",apply:p=>p.stats.maxHpPerEliteKill=(p.stats.maxHpPerEliteKill||0)+3},
 ];
 
 const SYNERGIES = [
@@ -3021,6 +3039,40 @@ function rollMutation(t){
   return pick(pool);
 }
 
+/* ---- Danger Tiers ----------------------------------------------------------
+   Enemy mutations (above) already give qualitative escalation per-enemy
+   (new behaviors unlocking over time), but enemy DAMAGE itself only ever
+   scaled quantitatively (wave.mult/ENEMY_DMG_SCALE_CAP — a smooth curve with
+   no visible steps). DANGER_TIERS gives that curve named, felt thresholds:
+   each tier past II adds a genuinely new defensive counter-pressure, not
+   just a bigger number, mirroring how player power gets new mechanics (not
+   just bigger multipliers) as a run goes on.
+     - armorPierce: fraction of the player's effective armor ignored before
+       mitigation — stops flat-armor stacking from trivializing lategame
+       (same "armor isn't a full answer forever" idea Brotato-likes lean on).
+     - enrageMult: elites/bosses deal more damage the LOWER their own HP is
+       (mirrors the player's own berserkScaling formula, PART 7/BALANCE
+       MODEL — same shape, opposite direction) — punishes leaving a big
+       target alive at a sliver of HP instead of finishing it, which the
+       old flat-dmg model never did.
+   Tier unlock times deliberately echo existing thresholds this file already
+   established as meaningful (ENEMY_MUTATIONS' 300/600/900 unlocks, WAVES'
+   930/1520 wave starts, ENDLESS_START_T) rather than inventing new ones —
+   one shared rhythm of escalation, not two independently-tuned curves. */
+const DANGER_TIERS = [
+  {tier:1, numeral:"I",   name:"Skirmish",      unlockT:0,    armorPierce:0,    enrageMult:0},
+  {tier:2, numeral:"II",  name:"Onslaught",     unlockT:300,  armorPierce:0,    enrageMult:0},
+  {tier:3, numeral:"III", name:"Bloodrush",     unlockT:600,  armorPierce:0.15, enrageMult:0},
+  {tier:4, numeral:"IV",  name:"Warzone",       unlockT:930,  armorPierce:0.30, enrageMult:0.3},
+  {tier:5, numeral:"V",   name:"Cataclysm",     unlockT:1520, armorPierce:0.45, enrageMult:0.5},
+  {tier:6, numeral:"VI",  name:"Endless Dread", unlockT:1900, armorPierce:0.55, enrageMult:0.65},
+];
+function currentDangerTier(t){
+  let d = DANGER_TIERS[0];
+  for(const x of DANGER_TIERS){ if(t>=x.unlockT) d=x; else break; }
+  return d;
+}
+
 // Boss HP needs to hold up against real player DPS (which can reach 150k+) long
 // enough for their attack patterns to actually play out, not die in one hit.
 // Reward economy is intentionally decoupled from this (see rawHp below) so buffing
@@ -3200,7 +3252,13 @@ const TALENT_STAT_LINES = {
     // player reported never once seeing the fusion screen because of how deep that was.
     // Moved to a shallow, early, parallel branch off the root instead (see its
     // TALENT_NODE_LAYOUTS entry) so fusion is reachable without mastering the branch.
-    {key:"forgeMastery",label:"Weapon Forge",perLevel:1,icon:"🔥"}],
+    {key:"forgeMastery",label:"Weapon Forge",perLevel:1,icon:"🔥"},
+    // Only "warrior" had ANY max-HP talent line before this — mage/hunter/engineer/
+    // necromancer players had zero talent-tree survivability investment short of
+    // this shared branch's regen line. Lives here (not duplicated 4x per-class)
+    // for the same reason regen/lifesteal/dmgReduction already do — survivor is
+    // the generic branch open to every class (see TALENT_BRANCH_COLOR's comment).
+    {key:"survivorVitality",label:"Resilient Heart",perLevel:15,icon:"💗"}],
   engineer:[{key:"turretCdr",label:"Rapid Deployment",perLevel:0.02,icon:"⚙️"},{key:"turretRadius",label:"Blast Radius",perLevel:0.03,icon:"💣"},{key:"turretArmor",label:"Reinforced Chassis",perLevel:0.8,icon:"🏰"},{key:"turretDmg",label:"Overcharged Core",perLevel:0.04,icon:"🔋"},{key:"turretMastery",label:"Master Engineer",perLevel:1,icon:"🗿"},
     {key:"engineerCdrDeep",label:"Efficient Systems",perLevel:0.015,icon:"🔧"},{key:"engineerArmorPlate",label:"Plated Hull",perLevel:0.5,icon:"🚧"}],
   necromancer:[{key:"boneDmg",label:"Grave Might",perLevel:0.05,icon:"💀"},{key:"boneCount",label:"Endless Horde",perLevel:0.04,icon:"🧟"},{key:"boneDuration",label:"Undying Legion",perLevel:0.06,icon:"⏳"},{key:"boneInherit",label:"Shared Malice",perLevel:0.03,icon:"🩸"},{key:"boneRaise",label:"Reanimation",perLevel:0.03,icon:"⚰️"},
@@ -3232,6 +3290,7 @@ const TALENT_LINE_DESCS = {
   necroLifesteal:"+1.5% lifesteal per tier.", necroInheritDeep:"+2% of your damage multiplier inherited by summons per tier.",
   survivorPickup:"+5% pickup radius per tier.", survivorXpPull:"+1.5% XP gain per tier.",
   forgeMastery:"Tier 1 unlocks Weapon Fusion for the rest of the run. Each further tier lowers the weapon level required to fuse by 1 (down to Lv.2).",
+  survivorVitality:"+15 max HP per tier.",
 };
 function buildTalentTree(){
   const nodes=[];
@@ -3331,6 +3390,10 @@ const TALENT_NODE_LAYOUTS = {
     {col:4,row:5,requires:[{idx:4,tier:3},{idx:5,tier:3}]},
     {col:3,row:6,requires:[{idx:6,tier:3},{idx:7,tier:3}]},
     {col:4,row:2,requires:[{idx:0,tier:2}]},
+    // idx10 (survivorVitality/Resilient Heart) — mirrors idx9's shallow root-
+    // adjacent branch on the opposite side, same depth/reasoning (early-reachable,
+    // not buried behind the whole mesh).
+    {col:2,row:2,requires:[{idx:0,tier:2}]},
   ],
 };
 function lineRequiresFor(branch,lineIndex){
@@ -3390,6 +3453,7 @@ function applyTalentStat(p, statKey, totalPerLevelSum){
     // v is totalPerLevelSum = perLevel(1)*tier, so it doubles as the tier count directly —
     // gates checkFusions()/applyFusion() (PART 7) and reduces their effective minLevel.
     case "forgeMastery": p.stats.forgeUnlocked=v>0; p.stats.fusionLevelReduction=v; break;
+    case "survivorVitality": p.maxHp+=v; break;
   }
 }
 
@@ -3649,6 +3713,14 @@ function xpForLevel(level){
   const atBreakpoint = 6*Math.pow(XP_CURVE_BREAKPOINT_LEVEL,1.05);
   return Math.round(atBreakpoint*Math.pow(level/XP_CURVE_BREAKPOINT_LEVEL, XP_CURVE_LATE_EXPONENT));
 }
+// Automatic, always-on max HP growth per level — the ONE gap the existing max-HP
+// sources (Fortify/Ascendant Vitality/Tank Build cards, Titan's Bulwark/Colossus
+// Heart armory, the survivor talent line) all shared: every single one is opt-in,
+// gated behind a level-up card draw or a Soul/Artifact purchase. A run with bad
+// card luck could go its whole length without ever seeing an HP option. This is
+// deliberately small and flat (not curved/soft-capped like dmgMult) — see
+// gainXp() below for why it's a flat add, not a heal-to-full.
+const HP_PER_LEVEL = 2;
 
 /* =========================================================================
    PART 4 — SAVE / META STATE
@@ -3677,6 +3749,13 @@ let save = JSON.parse(JSON.stringify(DEFAULT_SAVE));
 const ARMORY_ITEMS = [
   {id:"artifact_dmg",name:"Ancient Warblade",icon:"⚔️",desc:"+5% damage per level.",cost:3,maxLevel:5,apply:(p,lvl)=>{p.stats.dmgMult*=(1+0.05*lvl);}},
   {id:"artifact_hp",name:"Titan's Bulwark",icon:"🛡️",desc:"+15 max HP per level.",cost:3,maxLevel:5,apply:(p,lvl)=>{p.maxHp+=15*lvl;}},
+  // Deliberately MULTIPLICATIVE (unlike every other flat-add HP source) and priced
+  // higher than Titan's Bulwark — the payoff scales with however much max HP the
+  // player has already built up from every other source by the time this applies
+  // (talents/Titan's Bulwark run earlier in newPlayer(), see its apply-order
+  // comment), giving late-career investment in the OTHER HP systems a real
+  // multiplier to grow into instead of just another flat add competing with them.
+  {id:"colossus_heart",name:"Colossus Heart",icon:"💗",desc:"+6% max HP per level (multiplicative — scales with your current pool, so it's worth more the more you've already invested in Vitality elsewhere).",cost:10,maxLevel:5,apply:(p,lvl)=>{p.maxHp=Math.round(p.maxHp*(1+0.06*lvl));}},
   {id:"artifact_luck",name:"Fortune's Coin",icon:"🍀",desc:"+5% luck (rare card odds) per level.",cost:4,maxLevel:3,apply:(p,lvl)=>{p.stats.luck=(p.stats.luck||0)+0.05*lvl;}},
   {id:"artifact_gold",name:"Midas Band",icon:"💰",desc:"+8% gold gained per level.",cost:3,maxLevel:4,apply:(p,lvl)=>{p.stats.goldMult*=(1+0.08*lvl);}},
   {id:"artifact_start_gold",name:"Adventurer's Purse",icon:"👛",desc:"Start each run with 40 bonus gold per level.",cost:2,maxLevel:5,apply:(p,lvl)=>{p.gold+=40*lvl;}},
@@ -4443,6 +4522,7 @@ function killEnemy(enemy){
     logEvent("Mini-boss defeated — bounty claimed!");
   }
   if(player.stats.hpPerKill) player.hp=Math.min(player.maxHp,player.hp+player.stats.hpPerKill);
+  if(player.stats.maxHpPerEliteKill && (enemy.elite||enemy.boss)) player.maxHp+=player.stats.maxHpPerEliteKill;
   spawnParticle(enemy.x,enemy.y,enemy.color,10);
   if(enemy.id==="imp" && !enemy.isSplit){ for(let i=0;i<2;i++){ const ang=rand(0,Math.PI*2); spawnEnemy("imp",{x:enemy.x+Math.cos(ang)*14,y:enemy.y+Math.sin(ang)*14},{isSplit:true,hpMult:0.4,radiusMult:0.65}); } }
   if(enemy.special==="explodeOnDeath"){ for(let i=0;i<4;i++){ const ang=(i/4)*Math.PI*2; spawnEnemy("rat_swarm",{x:enemy.x+Math.cos(ang)*30,y:enemy.y+Math.sin(ang)*30}); } logEvent("It explodes into a swarm!"); }
@@ -4540,8 +4620,9 @@ function spawnEnemy(id, forcedPos, overrides={}){
   const hpMult = overrides.hpMult!=null?overrides.hpMult:1;
   const radiusMult = overrides.radiusMult!=null?overrides.radiusMult:1;
   const e = resetEnemyFields(acquireEnemyObject());
+  const baseDmg = def.dmg*Math.min(scale,ENEMY_DMG_SCALE_CAP);
   Object.assign(e, { id, name:def.name, x,y, hp:def.hp*scale*hpMult, maxHp:def.hp*scale*hpMult, speed:def.speed,
-    radius:def.radius*radiusMult, dmg:def.dmg*Math.min(scale,ENEMY_DMG_SCALE_CAP), xp:def.xp, gold:def.gold, brain:def.brain,
+    radius:def.radius*radiusMult, dmg:baseDmg, baseDmg, xp:def.xp, gold:def.gold, brain:def.brain,
     color:def.color, glow:def.glow, shape:def.shape, elite:!!def.elite, boss:false, special:def.special||null,
     isSplit:!!overrides.isSplit, atkCd:0, shootCd:rand(0,1), hitFlash:0,
     chargeCd:rand(1,2.4), chargeState:"idle", chargeDx:0, chargeDy:0, summonCd:rand(2.5,4), swarmPhase:rand(0,Math.PI*2), shield:0,
@@ -4566,8 +4647,9 @@ function spawnBoss(bossDefId, forcedPos){
   let x,y;
   if(forcedPos){x=forcedPos.x;y=forcedPos.y;} else { const ang=rand(0,Math.PI*2); const r=offscreenSpawnRadius(140); x=clamp(player.x+Math.cos(ang)*r,40,WORLD.w-40); y=clamp(player.y+Math.sin(ang)*r,40,WORLD.h-40); }
   const e = resetEnemyFields(acquireEnemyObject());
+  const baseDmg = def.dmg*Math.min(scale,3);
   Object.assign(e, { id:bossDefId, bossDefId, name:def.name, x,y, hp, maxHp:hp, speed:def.speed, radius:def.radius,
-    dmg:def.dmg*Math.min(scale,3), xp:def.rawHp/13, gold:def.rawHp/25, brain:"phaseboss", color:def.color, glow:def.glow,
+    dmg:baseDmg, baseDmg, xp:def.rawHp/13, gold:def.rawHp/25, brain:"phaseboss", color:def.color, glow:def.glow,
     elite:false, boss:true, isSplit:false, atkCd:0, shootCd:0, hitFlash:0, chargeCd:1.5, chargeState:"idle", chargeDx:0,chargeDy:0,
     shield:0, aiTimer:0 });
   enemies.push(e); return e;
@@ -4884,6 +4966,14 @@ function updateEliteSpecial(e,dt){
 function updateEnemies(dt){
   for(const e of enemies){
     if(e.dead) continue; // stays in the array until end-of-frame prune; never act on it again
+    // Danger Tier enrage (see DANGER_TIERS) — recomputed from e.baseDmg each frame
+    // (not compounded onto e.dmg in place) so it tracks the enemy's CURRENT hp
+    // fraction, not whatever it happened to be the frame this last ran. Elite/boss
+    // only — trash mobs enraging would just be noise, not a readable threat signal.
+    if((e.elite||e.boss) && e.baseDmg!=null){
+      const dTier = currentDangerTier(runTime);
+      e.dmg = dTier.enrageMult>0 ? e.baseDmg*(1+dTier.enrageMult*(1-e.hp/e.maxHp)) : e.baseDmg;
+    }
     e.hitFlash=Math.max(0,e.hitFlash-dt*4);
     if(e.slowed){ e.slowT-=dt; if(e.slowT<=0){ e.slowed=false; e.frozenSolid=false; } }
     if(e.burning){ e.burnT-=dt; dealDamage(e, e.burnDps*dt, null); if(e.burnT<=0){ e.burning=false; e.burnStackCount=0; } if(e.dead) continue; }
@@ -5331,9 +5421,18 @@ function tryFastHeal(){
 function damagePlayer(amount){
   if(player.abilities.dash.active) return; // dash i-frames
   let armor = player.stats.armor + (player.hp/player.maxHp<0.3?(player.stats.lastStandArmor||0)*player.stats.armor:0);
+  // Danger Tier armor-pierce (see DANGER_TIERS) — unmitigated by any card/talent,
+  // deliberately: it's the counter-pressure to armor stacking, not another thing
+  // armor itself reduces.
+  armor *= (1-currentDangerTier(runTime).armorPierce);
   let dmg = Math.max(1, amount-armor);
   if(player.stats.bulwarkDR && player.hp/player.maxHp>0.5) dmg *= (1-player.stats.bulwarkDR);
   if(player.stats.damageReduction) dmg *= (1-player.stats.damageReduction);
+  // Tempered Flesh card: Max HP itself becomes a second, passive damage-reduction
+  // source (diminishing returns, capped at 30%) — ties whichever of the new max-HP
+  // systems the player actually invested in back into direct survivability, not
+  // just a bigger number to chip away at.
+  if(player.stats.hpScaledDR) dmg *= (1-Math.min(0.3, Math.max(0,player.maxHp-100)*0.00025));
   if(player._abyssalMarked) dmg *= 1.5; // Abyssal Watcher's mark: guaranteed-crit-equivalent bonus damage to the player
   if(player.shield>0){ const absorbed=Math.min(player.shield,dmg); player.shield-=absorbed; dmg-=absorbed; }
   if(dmg>0){
@@ -5402,6 +5501,11 @@ function updateOrbs(dt){
 function gainXp(v){
   player.xp += v*effXpMult();
   while(player.xp>=player.xpNext){ player.xp-=player.xpNext; player.level++; player.xpNext=xpForLevel(player.level);
+    // Flat add, not heal-to-full: levels come often (especially early), so healing
+    // to full every time would quietly reopen the exact free-healing loophole
+    // LIFESTEAL_HPS_CAP (PART 7) was added to close. +HP_PER_LEVEL current HP
+    // alongside the pool increase is enough to feel like real progress without it.
+    player.maxHp += HP_PER_LEVEL; player.hp = Math.min(player.maxHp, player.hp+HP_PER_LEVEL);
     if(player.stats.healOnLevelUp) player.hp=Math.min(player.maxHp,player.hp+player.maxHp*player.stats.healOnLevelUp);
     openLevelUp(); }
 }
@@ -5665,7 +5769,7 @@ function charInfoStatsHtml(){
   const s=player.stats;
   return `
     <div class="stat-row"><span class="k">Level</span><span>${player.level}</span></div>
-    <div class="stat-row"><span class="k">Threat Level</span><span style="color:var(--accent2)">${currentWave().mult.toFixed(2)}x — ${currentPhase().name}</span></div>
+    <div class="stat-row"><span class="k">Danger Tier</span><span style="color:var(--accent2)" title="Threat ${currentWave().mult.toFixed(2)}x — ${currentPhase().name}">${currentDangerTier(runTime).numeral} — ${currentDangerTier(runTime).name}</span></div>
     <div class="stat-row"><span class="k">Health</span><span>${Math.round(player.hp)} / ${player.maxHp}</span></div>
     <div class="stat-row"><span class="k">Shield</span><span>${Math.round(player.shield)}</span></div>
     <div class="stat-row"><span class="k">Gold</span><span style="color:var(--gold)">${fmtBig(player.gold)}</span></div>
@@ -6602,14 +6706,17 @@ function render(){
     // small 12px label floating above a plain colored circle — a summon now reads as *itself* at
     // a glance, not as an anonymous dot with a tiny badge.
     const mc = m.weaponId==="raised" ? "#c8c8d8" : weaponColor(m.weaponId);
-    ctx2d.shadowColor=mc; ctx2d.shadowBlur=glow(8);
+    // Same glow-sprite swap as bullets above — measured ~0.18ms/minion with
+    // live shadowBlur (150 synthetic minions dropped the same 613-enemy
+    // scene from 53fps to 22fps), the highest per-entity cost of any type
+    // profiled so far (fillText icon + shadowBlur stacked).
+    drawGlowSprite(m.x,m.y,mc,8);
     if(m.icon && quality!=='low'){
       ctx2d.font=(m.radius*2)+"px sans-serif"; ctx2d.textAlign="center";
       ctx2d.fillText(m.icon,m.x,m.y+m.radius*0.35);
     } else {
       ctx2d.beginPath(); ctx2d.fillStyle=mc; ctx2d.arc(m.x,m.y,m.radius,0,7); ctx2d.fill();
     }
-    ctx2d.shadowBlur=0;
   }
   ctx2d.shadowBlur=0;
   // OPTIMIZATION_PLAN.md P1 direction 3 — cap the number of simultaneously-glowing normal
@@ -6683,7 +6790,14 @@ function render(){
   }
   for(const b of bullets){
     if(!inView(b.x,b.y)) continue;
-    ctx2d.fillStyle=b.color; ctx2d.strokeStyle=b.color; ctx2d.shadowColor=b.color; ctx2d.shadowBlur=glow(8);
+    // Live shadowBlur replaced with the same pre-rendered glow-sprite trick
+    // already proven on enemies (getGlowSprite/drawGlowSprite) — measured via
+    // browser-check.mjs: 900 synthetic bullets alone dropped a 613-enemy
+    // scene from 53fps to 12fps with live shadowBlur, the single biggest
+    // untreated render cost found after enemies (bullets can reach the full
+    // MAX_BULLETS=900 at once, unlike minions' MAX_MINIONS=150).
+    ctx2d.fillStyle=b.color; ctx2d.strokeStyle=b.color;
+    drawGlowSprite(b.x,b.y,b.color,8);
     if(b.shape==="spiral"){
       // Elongated comet with a fading tail pointing back along its travel direction —
       // makes a sweeping burst read as a curling streak instead of a plain dot.
