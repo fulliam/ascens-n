@@ -3975,12 +3975,10 @@ function targetCPRatioAt(t){
 // unchecked level growth pushes raw stats past effDmgMult()'s soft-cap
 // asymptote almost immediately and DPS stops climbing for the rest of the
 // run. Shared with balance-lab.html's gainXp() so both stay on this curve.
-const XP_CURVE_BREAKPOINT_LEVEL = 30;
-const XP_CURVE_LATE_EXPONENT = 2.6;
 function xpForLevel(level){
-  if(level<=XP_CURVE_BREAKPOINT_LEVEL) return Math.round(6*Math.pow(level,1.05));
-  const atBreakpoint = 6*Math.pow(XP_CURVE_BREAKPOINT_LEVEL,1.05);
-  return Math.round(atBreakpoint*Math.pow(level/XP_CURVE_BREAKPOINT_LEVEL, XP_CURVE_LATE_EXPONENT));
+  if(level<=CONFIG.balance.XP_CURVE_BREAKPOINT_LEVEL) return Math.round(6*Math.pow(level,1.05));
+  const atBreakpoint = 6*Math.pow(CONFIG.balance.XP_CURVE_BREAKPOINT_LEVEL,1.05);
+  return Math.round(atBreakpoint*Math.pow(level/CONFIG.balance.XP_CURVE_BREAKPOINT_LEVEL, CONFIG.balance.XP_CURVE_LATE_EXPONENT));
 }
 // Automatic, always-on max HP growth per level — the ONE gap the existing max-HP
 // sources (Fortify/Ascendant Vitality/Tank Build cards, Titan's Bulwark/Colossus
@@ -3988,8 +3986,8 @@ function xpForLevel(level){
 // gated behind a level-up card draw or a Soul/Artifact purchase. A run with bad
 // card luck could go its whole length without ever seeing an HP option. This is
 // deliberately small and flat (not curved/soft-capped like dmgMult) — see
-// gainXp() below for why it's a flat add, not a heal-to-full.
-const HP_PER_LEVEL = 2;
+// gainXp() below for why it's a flat add, not a heal-to-full. Value lives in
+// CONFIG.balance.HP_PER_LEVEL (see gainXp()'s call site), not a local const.
 
 /* =========================================================================
    PART 4 — SAVE / META STATE
@@ -5757,7 +5755,7 @@ function gainXp(v){
     // to full every time would quietly reopen the exact free-healing loophole
     // LIFESTEAL_HPS_CAP (PART 7) was added to close. +HP_PER_LEVEL current HP
     // alongside the pool increase is enough to feel like real progress without it.
-    player.maxHp += HP_PER_LEVEL; player.hp = Math.min(player.maxHp, player.hp+HP_PER_LEVEL);
+    player.maxHp += CONFIG.balance.HP_PER_LEVEL; player.hp = Math.min(player.maxHp, player.hp+CONFIG.balance.HP_PER_LEVEL);
     if(player.stats.healOnLevelUp) player.hp=Math.min(player.maxHp,player.hp+player.maxHp*player.stats.healOnLevelUp);
     openLevelUp(); }
 }
