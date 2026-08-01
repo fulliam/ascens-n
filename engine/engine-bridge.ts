@@ -74,6 +74,19 @@ declare class JsWorld {
   swarm_orbit_velocity(
     ex: number, ey: number, espeed: number, swarmPhase: number, px: number, py: number
   ): Float32Array;
+  // Phase 4 groundwork (deterministic RNG) — see engine-bridge.ts's own
+  // rng* wrappers below for why this exists and what it's for. `seed` is a
+  // plain u32 so callers never need BigInt.
+  seed_rng(seed: number): void;
+  rng_next_f32(): number;
+  rng_next_bool(chance: number): boolean;
+  // Path A Milestone 1 (agile-shimmying-metcalfe.md) — pure, no state.
+  damage_multiplier_chain(
+    baseDmg: number, isEliteOrBoss: boolean, eliteDmgMult: number,
+    enemySlowed: boolean, dmgToSlowedMult: number, enemyHpFraction: number,
+    executeBonus: number, berserkScaling: number, playerHpFraction: number,
+    momentumPerKill: number, momentumStacks: number, turretModeActive: boolean
+  ): number;
 }
 
 // The build script emits `const WASM_B64 = "...";` before inlining this
@@ -129,6 +142,36 @@ interface EngineBridgeApi {
   swarmOrbitVelocity(
     ex: number, ey: number, espeed: number, swarmPhase: number, px: number, py: number
   ): Float32Array;
+  // Phase 4 groundwork (WASM_ECS_MIGRATION_PLAN.md) — deterministic RNG
+  // owned by the Rust world, decided ahead of Phase 3 step 5 (damage
+  // resolution) rather than defaulted once that step needed randomness.
+  // NOT wired into any real gameplay call site yet — this only proves the
+  // primitive is reachable and genuinely deterministic; step 5 itself
+  // (crit rolls, on-hit procs) is separate, later work.
+  seedRng(seed: number): void;
+  rngNextF32(): number;
+  rngNextBool(chance: number): boolean;
+  // Path A Milestone 1 (`.claude/plans/agile-shimmying-metcalfe.md`) —
+  // mirrors index.html's dealDamage() multiplier chain (elite/boss,
+  // slowed-target, execute, berserk, momentum cap, turret mode), up to but
+  // not including the crit roll (Milestone 2, needs the RNG above wired
+  // in). Pure — no enemy/player state owned on the Rust side, caller
+  // passes already-`||1`/`||0`-defaulted stat values same as every other
+  // bridge function.
+  damageMultiplierChain(
+    baseDmg: number, isEliteOrBoss: boolean, eliteDmgMult: number,
+    enemySlowed: boolean, dmgToSlowedMult: number, enemyHpFraction: number,
+    executeBonus: number, berserkScaling: number, playerHpFraction: number,
+    momentumPerKill: number, momentumStacks: number, turretModeActive: boolean
+  ): number;
+  // Phase 3 step 1 completion — bulk position integration for the
+  // highest-population entity type (bullets, up to MAX_BULLETS=900),
+  // reusing step_physics as-is. See the implementation block near
+  // initBulletEcho below for full design rationale.
+  initBulletEcho(): void;
+  syncBulletEcho(xs: Float32Array, ys: Float32Array, vxs: Float32Array, vys: Float32Array, liveCount: number): void;
+  tickBulletEcho(dt: number): void;
+  readBulletEchoPositions(): Float32Array;
   // Phase 3 step 3, real call-site cut (WASM_ECS_MIGRATION_PLAN.md) — unlike
   // queryEnemyEchoNearCount above (diagnostic count-only, compared against a
   // JS brute-force ground truth), this returns the actual candidate slot
@@ -274,6 +317,34 @@ function swarmOrbitVelocity(
   return world.swarm_orbit_velocity(ex, ey, espeed, swarmPhase, px, py);
 }
 
+function seedRng(seed: number): void {
+  if (!world) return;
+  world.seed_rng(seed >>> 0);
+}
+
+function rngNextF32(): number {
+  if (!world) return Math.random();
+  return world.rng_next_f32();
+}
+
+function rngNextBool(chance: number): boolean {
+  if (!world) return Math.random() < chance;
+  return world.rng_next_bool(chance);
+}
+
+function damageMultiplierChain(
+  baseDmg: number, isEliteOrBoss: boolean, eliteDmgMult: number,
+  enemySlowed: boolean, dmgToSlowedMult: number, enemyHpFraction: number,
+  executeBonus: number, berserkScaling: number, playerHpFraction: number,
+  momentumPerKill: number, momentumStacks: number, turretModeActive: boolean
+): number {
+  if (!world) return baseDmg; // caller already gates on isReady() before calling this
+  return world.damage_multiplier_chain(
+    baseDmg, isEliteOrBoss, eliteDmgMult, enemySlowed, dmgToSlowedMult, enemyHpFraction,
+    executeBonus, berserkScaling, playerHpFraction, momentumPerKill, momentumStacks, turretModeActive
+  );
+}
+
 function queryEnemyEchoNear(x: number, y: number, radius: number): Uint32Array {
   if (!world || !enemyEchoInited || !enemyEchoIdToSlot) return new Uint32Array(0);
   const raw = world.query_near(x, y, radius, enemyEchoComponentId); // [id0,gen0,id1,gen1,...]
@@ -283,6 +354,60 @@ function queryEnemyEchoNear(x: number, y: number, radius: number): Uint32Array {
     if (entry && entry.gen === raw[i + 1]) slots.push(entry.slot);
   }
   return Uint32Array.from(slots);
+}
+
+// Phase 3 step 1 completion (WASM_ECS_MIGRATION_PLAN.md) — the original
+// step 1 scope named "enemies/bullets/player" as ECS entities; only the
+// smoke-test entities and (via EnemyEcho) enemy positions ever actually
+// happened. Bullets are index.html's highest-population entity type
+// (MAX_BULLETS=900) and, for every bullet except the rare `orbit` ones,
+// their per-frame position update really is exactly the physics smoke
+// test's `x += vx*dt` — no new Rust code needed, `step_physics` (already
+// tested since Phase 3 step 1) does this as-is. Own dedicated Position/
+// Velocity component pair, separate from the smoke test's — so
+// get_f32x2_interleaved() on this pool returns ONLY these entities, in
+// stable spawn order, not mixed with the 50 synthetic smoke-test ones.
+const BULLET_ECHO_POOL_SIZE = 900; // matches index.html's MAX_BULLETS
+let bulletEchoPosId = -1;
+let bulletEchoVelId = -1;
+let bulletEchoInited = false;
+
+function initBulletEcho(): void {
+  if (!world || bulletEchoInited) return;
+  bulletEchoPosId = world.register_f32x2('BulletEchoPos');
+  bulletEchoVelId = world.register_f32x2('BulletEchoVel');
+  world.spawn_batch_pos_vel(bulletEchoPosId, 0, 0, bulletEchoVelId, 0, 0, BULLET_ECHO_POOL_SIZE);
+  bulletEchoInited = true;
+}
+
+// Bulk-writes the first `liveCount` slots' x/y/vx/vy (unused slots are left
+// wherever they were — unlike EnemyEcho there's no spatial query run
+// against this pool, so a stale/zero position for an unused slot can never
+// spuriously affect anything real).
+function syncBulletEcho(xs: Float32Array, ys: Float32Array, vxs: Float32Array, vys: Float32Array, liveCount: number): void {
+  if (!world || !bulletEchoInited) return;
+  const n = Math.min(liveCount, BULLET_ECHO_POOL_SIZE, xs.length, ys.length, vxs.length, vys.length);
+  if (n === 0) return;
+  world.set_component_x_values(bulletEchoPosId, xs.subarray(0, n));
+  world.set_component_y_values(bulletEchoPosId, ys.subarray(0, n));
+  world.set_component_x_values(bulletEchoVelId, vxs.subarray(0, n));
+  world.set_component_y_values(bulletEchoVelId, vys.subarray(0, n));
+}
+
+function tickBulletEcho(dt: number): void {
+  if (!world || !bulletEchoInited) return;
+  world.step_physics(bulletEchoPosId, bulletEchoVelId, dt);
+}
+
+// Interleaved [x0,y0,x1,y1,...] for the WHOLE pool (all BULLET_ECHO_POOL_SIZE
+// slots, not just however many were synced this frame — set_flat_f32_buffer
+// only overwrites as many entities as it's given values for, so unsynced
+// tail slots keep drifting on stale leftover velocity). Harmless: nothing
+// ever spatially queries this pool, so the caller just reads back the first
+// `liveCount` slots it already knows it synced and ignores the rest.
+function readBulletEchoPositions(): Float32Array {
+  if (!world || !bulletEchoInited) return new Float32Array(0);
+  return world.get_f32x2_interleaved(bulletEchoPosId);
 }
 
 async function boot(): Promise<void> {
@@ -312,6 +437,14 @@ async function boot(): Promise<void> {
       chaseSeekVelocity,
       keepDistanceVelocity,
       swarmOrbitVelocity,
+      seedRng,
+      rngNextF32,
+      rngNextBool,
+      damageMultiplierChain,
+      initBulletEcho,
+      syncBulletEcho,
+      tickBulletEcho,
+      readBulletEchoPositions,
     };
     window.dispatchEvent(new Event('engine-ready'));
   } catch (err) {

@@ -2,7 +2,7 @@ use crate::{
     Archetype, ArchetypeRegistry, ColumnView, ComponentInstance, ComponentMask, ComponentRegistry,
     ComponentSchema, ComponentValue, EcsError, EcsResult, Entity, EntityLocation, EntityManager,
     Events, F32x2View, F32x2ViewMut, F32x3View, QueryChunk, QueryResult, QueryRow, QueryRowMut,
-    Resources, Schedule,
+    Resources, Rng, Schedule,
 };
 
 /// The central ECS container
@@ -26,6 +26,15 @@ pub struct World {
     /// Game systems, grouped into the six standard stages. Empty until
     /// Stage 3 of the roadmap registers real systems via `add_system_to`.
     pub schedule: Schedule,
+    /// Deterministic RNG (WASM_ECS_MIGRATION_PLAN.md Phase 4) — every
+    /// ported system that needs randomness (crit rolls, proc chances, ...)
+    /// pulls from here instead of a language-native random source, so a
+    /// fixed seed reproduces an identical run. A real `World`-owned field
+    /// (like `entity_manager`), not routed through the generic `Resources`
+    /// byte-schema system — this needs actual algorithm code, not just
+    /// storage. See `rng` module docs for why SplitMix64 with no external
+    /// crate dependency.
+    pub rng: Rng,
 }
 
 impl World {
@@ -39,6 +48,7 @@ impl World {
             resources: Resources::new(),
             events: Events::new(),
             schedule: Schedule::standard_game_schedule(),
+            rng: Rng::default(),
         }
     }
 

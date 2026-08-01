@@ -915,6 +915,71 @@ impl JsWorld {
         arr
     }
 
+    // ── Deterministic RNG (WASM_ECS_MIGRATION_PLAN.md Phase 4) ─────────────
+    //
+    // Groundwork for Phase 3 step 5 (damage resolution — crit rolls, on-hit
+    // proc chances) and beyond: NOT wired into any real gameplay call site
+    // yet, that's the step-5 work itself, gated behind the same
+    // diagnostic-then-promote discipline every other step here used. This
+    // only proves the primitive exists, is exposed, and is genuinely
+    // deterministic given a fixed seed. `seed` is a plain `u32` (not `u64`)
+    // specifically so JS callers never need `BigInt` — plenty of entropy
+    // for gameplay determinism, and `Rng::new` widens it internally.
+
+    /// Reseeds the world's RNG. Same seed -> same future sequence, always.
+    pub fn seed_rng(&mut self, seed: u32) {
+        self.inner.rng.reseed(seed as u64);
+    }
+
+    /// Uniform float in `[0.0, 1.0)` — same shape as `Math.random()`.
+    pub fn rng_next_f32(&mut self) -> f32 {
+        self.inner.rng.next_f32()
+    }
+
+    /// `true` with probability `chance` (clamped to `[0,1]`) — same shape
+    /// as index.html's ubiquitous `Math.random() < someChance` call sites.
+    pub fn rng_next_bool(&mut self, chance: f32) -> bool {
+        self.inner.rng.next_bool(chance)
+    }
+
+    // ── Damage resolution (Path A, Milestone 1 — see combat.rs) ────────────
+    //
+    // Thin wasm-facing wrapper around the pure `combat::damage_multiplier_chain`
+    // — no `&self`/`&mut self` state touched, kept as a `JsWorld` method only
+    // for wasm-bindgen's impl-block convention (matches every other exported
+    // function here). No RNG yet (Milestone 2).
+    #[allow(clippy::too_many_arguments)]
+    pub fn damage_multiplier_chain(
+        &self,
+        base_dmg: f32,
+        is_elite_or_boss: bool,
+        elite_dmg_mult: f32,
+        enemy_slowed: bool,
+        dmg_to_slowed_mult: f32,
+        enemy_hp_fraction: f32,
+        execute_bonus: f32,
+        berserk_scaling: f32,
+        player_hp_fraction: f32,
+        momentum_per_kill: f32,
+        momentum_stacks: f32,
+        turret_mode_active: bool,
+    ) -> f32 {
+        crate::combat::damage_multiplier_chain(
+            base_dmg,
+            is_elite_or_boss,
+            elite_dmg_mult,
+            enemy_slowed,
+            dmg_to_slowed_mult,
+            enemy_hp_fraction,
+            execute_bonus,
+            berserk_scaling,
+            player_hp_fraction,
+            momentum_per_kill,
+            momentum_stacks,
+            turret_mode_active,
+        )
+    }
+
     // ── Stats ─────────────────────────────────────────────────────────────
 
     pub fn archetype_count(&self) -> u32 {
