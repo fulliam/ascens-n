@@ -2779,7 +2779,57 @@ const CONFIG_DEFAULTS = {
       "weapon.cluster_charge": "c_ff7a3d",
     },
   },
-  texts: {},
+  // Phase 5 — pure UI chrome only: button labels, screen/segment-control
+  // labels, system/status messages. Deliberately excludes desc:/name: fields
+  // inside CARDS/PASSIVES/WEAPONS/ENEMIES/ACHIEVEMENTS/etc — those are game
+  // CONTENT tied to that entry's own numbers/apply: function, not general
+  // interface furniture (see CONFIG_CENTRALIZATION_PLAN.md §1). Also skips
+  // sites that are pure data formatting with no surrounding prose (e.g.
+  // `${x}/${y}` progress chips) — not "text" in the sense this phase cares
+  // about. {token} markers are substituted by t(key, vars) below.
+  texts: {
+    menu: {
+      newRun: "New Run",
+      continueRun: "Continue Run",
+      talentTree: "Talent Tree",
+      statistics: "Statistics",
+      achievements: "Achievements ", // trailing space preserves adjacency to the chip <span> — see setLeadingText()
+      armory: "Armory ", // same
+      settings: "Settings",
+      continueInfo: "Level {level} · {time} survived",
+    },
+    pause: {
+      resume: "Resume",
+      openShop: "Open Shop",
+      settings: "Settings",
+      quitRun: "Quit Run",
+    },
+    death: { runAgain: "Run Again", returnToBase: "Return to Base" },
+    victory: { keepPlaying: "Keep Playing", returnToBase: "Return to Base" },
+    settings_screen: {
+      movementAuto: "Auto", movementJoystick: "Joystick", movementKeyboard: "Keyboard",
+      qualityLow: "Low", qualityMedium: "Medium", qualityHigh: "High",
+      enterFullscreen: "ENTER FULLSCREEN",
+      fullscreenUnavailable: "UNAVAILABLE",
+      resetSave: "RESET SAVE",
+    },
+    common: {
+      maxed: "MAXED",
+      maxedOut: "MAXED OUT",
+      buy: "BUY",
+      locked: "LOCKED",
+      gold: "GOLD",
+      crystals: "CRYSTALS",
+      soul: "SOUL",
+    },
+    messages: {
+      soulGain: "+ {amount} SOUL earned",
+      victorySoulGain: "+ {amount} SOUL earned (includes victory bonus)",
+      achievementsSummary: "{unlocked} / {total} unlocked",
+      armorySummary: "Artifacts: {amount}",
+      collectReward: "Collect {label}",
+    },
+  },
 };
 // CONFIG_SCHEMA: dot-path into CONFIG -> {type, min?, max?, maxLen?}. Two jobs:
 // (1) validateAndClamp() below uses it to reject/clamp any override from ANY
@@ -2840,6 +2890,18 @@ for(const _statKey of Object.keys(CONFIG_DEFAULTS.caps.STAT_CAPS)) CONFIG_SCHEMA
 // schema for free.
 for(const _paletteKey of Object.keys(CONFIG_DEFAULTS.colors.palette)) CONFIG_SCHEMA["colors.palette."+_paletteKey] = {type:"hexcolor"};
 for(const _semanticKey of Object.keys(CONFIG_DEFAULTS.colors.semantic)) CONFIG_SCHEMA["colors.semantic."+_semanticKey] = {type:"text", maxLen:64};
+// Same auto-registration pattern for Phase 5's texts — one level deeper
+// (namespace.key, e.g. "texts.menu.newRun") than palette/semantic's flat
+// maps, so a small recursive walker instead of a single Object.keys() loop.
+// maxLen:200 is generous for a UI-chrome string (longest current entries are
+// short sentences, not paragraphs) while still bounding a hostile import.
+(function registerTextSchema(obj, path){
+  for(const key of Object.keys(obj)){
+    const val = obj[key], fullPath = path+"."+key;
+    if(typeof val==="string") CONFIG_SCHEMA[fullPath] = {type:"text", maxLen:200};
+    else if(val && typeof val==="object") registerTextSchema(val, fullPath);
+  }
+})(CONFIG_DEFAULTS.texts, "texts");
 // Deep-clones CONFIG_DEFAULTS so the live, possibly-overridden CONFIG the
 // game actually reads never accidentally shares a nested object with
 // CONFIG_DEFAULTS (mutating one must never be able to mutate the other).
@@ -2926,11 +2988,62 @@ function resolveColor(semanticKey){
 // (not "every css.* semantic key") so a future semantic key that ISN'T a
 // real CSS var doesn't silently try to setProperty something meaningless.
 const CSS_COLOR_VAR_NAMES = ["void","panel","panel2","line","text","dim","xp","gold","soul","hp","accent","accent2","crystal","artifact"];
-// Phase 5 will extend this same function to also re-render any open screen's
-// text nodes from CONFIG.texts — every future override path (editor apply,
-// JSON import, network push) already calls this, so that phase only needs
-// to fill in more of THIS function, not find and wire every call site of
-// applyConfigOverride again.
+// Resolves a UI-chrome text key (dot-path into CONFIG.texts, e.g.
+// "menu.newRun") with optional {token} substitution — the one path anything
+// reads user-facing chrome strings through, mirroring resolveColor()'s role
+// for colors. Falls back to the literal key on a miss (visually obvious
+// wrong text on screen, same "never throw, make failures visible" spirit as
+// resolveColor()'s magenta fallback) instead of showing an empty string.
+function t(key, vars){
+  let node = CONFIG.texts;
+  for(const p of key.split(".")) node = node && node[p];
+  let s = typeof node==="string" ? node : key;
+  if(vars) for(const k of Object.keys(vars)) s = s.replaceAll("{"+k+"}", String(vars[k]));
+  return s;
+}
+// Some buttons have a trailing child ELEMENT (a live-updated chip/sub-info
+// span, e.g. btnAchievements' achProgressChip, btnContinue's continueInfo)
+// that a naive `el.textContent=` would silently destroy along with the
+// label — this only replaces/creates the button's own LEADING text node,
+// leaving any child elements completely untouched.
+function setLeadingText(el, text){
+  if(!el) return;
+  const node = el.firstChild;
+  if(node && node.nodeType===Node.TEXT_NODE) node.textContent = text;
+  else el.insertBefore(document.createTextNode(text), el.firstChild);
+}
+// Explicit elementId -> CONFIG.texts key map for static button/label text —
+// kept as an explicit list (not a naming convention inferred from the id)
+// for the same reason CSS_COLOR_VAR_NAMES above is explicit: safer than
+// guessing, and self-documents exactly what this phase covers vs. leaves for
+// a future pass (e.g. shop-card/talent-tree template literals are NOT here —
+// see Phase 5's own report for what was deliberately left).
+const STATIC_TEXT_MAP = {
+  btnNewRun: "menu.newRun", btnContinue: "menu.continueRun",
+  btnMeta: "menu.talentTree", btnStats: "menu.statistics",
+  btnAchievements: "menu.achievements", btnArmory: "menu.armory", btnSettings: "menu.settings",
+  btnResume: "pause.resume", btnPauseShop: "pause.openShop",
+  btnPauseSettings: "pause.settings", btnQuitRun: "pause.quitRun",
+  btnAgain: "death.runAgain", btnToMenu: "death.returnToBase",
+  btnKeepPlaying: "victory.keepPlaying", btnVictoryMenu: "victory.returnToBase",
+  fullscreenToggleBtn: "settings_screen.enterFullscreen", btnReset: "settings_screen.resetSave",
+};
+// Segment-control option buttons (Movement/Quality/Density) are selected by
+// [data-val] within a known container id, not one element id each — kept
+// separate from STATIC_TEXT_MAP for that reason. These have no child
+// elements, so a plain textContent= is safe (no setLeadingText needed).
+const SEGMENT_TEXT_MAP = [
+  ["ctrlMode","auto","settings_screen.movementAuto"], ["ctrlMode","joystick","settings_screen.movementJoystick"], ["ctrlMode","keyboard","settings_screen.movementKeyboard"],
+  ["vidQuality","low","settings_screen.qualityLow"], ["vidQuality","medium","settings_screen.qualityMedium"], ["vidQuality","high","settings_screen.qualityHigh"],
+  ["vidDensity","low","settings_screen.qualityLow"], ["vidDensity","medium","settings_screen.qualityMedium"], ["vidDensity","high","settings_screen.qualityHigh"],
+];
+function applyStaticTexts(){
+  for(const id of Object.keys(STATIC_TEXT_MAP)) setLeadingText(document.getElementById(id), t(STATIC_TEXT_MAP[id]));
+  for(const [containerId,val,key] of SEGMENT_TEXT_MAP){
+    const btn = document.querySelector("#"+containerId+' [data-val="'+val+'"]');
+    if(btn) btn.textContent = t(key);
+  }
+}
 function onConfigApplied(){
   // No-ops outside a real DOM (Node-based extraction: verify-balance.js/
   // balance-lab.html's LIVE DATA LOADER eval this same PART 1-4 slice in a
@@ -2940,6 +3053,13 @@ function onConfigApplied(){
   if(typeof document==="undefined") return;
   const root = document.documentElement;
   for(const name of CSS_COLOR_VAR_NAMES) root.style.setProperty("--"+name, resolveColor("css."+name));
+  // Re-applies static labels so a future editor edit updates already-visible
+  // buttons immediately. Dynamic textContent= sites (achievement/log/shop
+  // messages built at the moment they're shown) aren't re-rendered here —
+  // those naturally pick up a CONFIG.texts change next time they're shown,
+  // same "some things need a re-open, not instant" precedent Phases 3-4
+  // already established for module-eval-time-baked values.
+  applyStaticTexts();
 }
 // The one and only path anything uses to change CONFIG after boot. Returns
 // what was actually applied (post-clamp/post-drop) so a caller (e.g. the
@@ -6145,7 +6265,7 @@ function renderShop(){
     if(locked){
       const achName = (ACHIEVEMENTS.find(a=>a.id===item.unlockAchievement)||{}).name || item.unlockAchievement;
       el.innerHTML=`<div class="shop-card-top"><div class="icon">🔒</div><div class="shop-card-text"><div class="name">${item.name}</div><div class="desc">Requires achievement: ${achName}</div></div></div>
-        <div class="shop-card-bottom"><div class="price" style="color:var(--dim)">LOCKED</div><button class="buy-btn" disabled>LOCKED</button></div>`;
+        <div class="shop-card-bottom"><div class="price" style="color:var(--dim)">${t('common.locked')}</div><button class="buy-btn" disabled>${t('common.locked')}</button></div>`;
       wrap.appendChild(el); return;
     }
     const purchased=player.shopPurchases[item.id]||0; const maxed=purchased>=item.max;
@@ -6154,8 +6274,8 @@ function renderShop(){
     const canAfford = wallet>=cost;
     const rarityTag = item.rarity && item.rarity!=="common" ? `<div class="rarity-label">${item.rarity}</div>` : "";
     el.innerHTML=`${rarityTag}<div class="shop-card-top"><div class="icon">${item.icon}</div><div class="shop-card-text"><div class="name">${item.name}</div><div class="desc">${item.desc}</div></div></div>
-      <div class="shop-card-bottom"><div class="price" style="color:${maxed?'var(--dim)':item.curr==='gold'?'var(--gold)':'var(--crystal)'}">${maxed?"MAXED":fmtBig(cost)+" "+(item.curr==="gold"?"GOLD":"CRYSTALS")}</div>
-      <button class="buy-btn" ${(!canAfford||maxed)?'disabled':''}>${maxed?"MAXED OUT":"BUY"}</button></div>`;
+      <div class="shop-card-bottom"><div class="price" style="color:${maxed?'var(--dim)':item.curr==='gold'?'var(--gold)':'var(--crystal)'}">${maxed?t('common.maxed'):fmtBig(cost)+" "+(item.curr==="gold"?t('common.gold'):t('common.crystals'))}</div>
+      <button class="buy-btn" ${(!canAfford||maxed)?'disabled':''}>${maxed?t('common.maxedOut'):t('common.buy')}</button></div>`;
     el.querySelector('.buy-btn').onclick=()=>{
       if(maxed) return; if(item.curr==="gold"){ if(player.gold<cost) return; player.gold-=cost; } else { if(player.crystals<cost) return; player.crystals-=cost; }
       player.shopPurchases[item.id]=purchased+1; item.apply(player); SFX.uiClick(); SFX.shopBuy(); logEvent(`Bought ${item.name}`); renderShop(); refreshHud();
@@ -6423,7 +6543,7 @@ function renderMerchantCardOffers(){
     el.style.setProperty('--event-card-delay',(i*0.08)+'s');
     const rarityTag = c.rarity && c.rarity!=="common" ? `<div class="rarity-label">${c.rarity}</div>` : "";
     el.innerHTML=`${rarityTag}<div class="shop-card-top"><div class="icon">${cardIcon(c.cat)}</div><div class="shop-card-text"><div class="name">${c.name}</div><div class="desc">${c.desc}</div></div></div>
-      <div class="shop-card-bottom"><div class="price">${fmtBig(cost)} GOLD</div><button class="buy-btn" ${player.gold<cost?'disabled':''}>BUY</button></div>`;
+      <div class="shop-card-bottom"><div class="price">${fmtBig(cost)} ${t('common.gold')}</div><button class="buy-btn" ${player.gold<cost?'disabled':''}>${t('common.buy')}</button></div>`;
     el.querySelector('.buy-btn').onclick=()=>{
       if(player.gold<cost) return; player.gold-=cost; c.apply(player); player.cardsTaken.push(c.id);
       if(c.cat==='legendary') runStats.legendaryCardsTaken=(runStats.legendaryCardsTaken||0)+1;
@@ -6724,7 +6844,7 @@ function die(){
     <div class="stat-row"><span class="k">Gold Collected</span><span>${fmtBig(player.gold)}</span></div>
     <div class="stat-row"><span class="k">Synergies</span><span>${player.synergiesActive.length}</span></div>
     <div class="stat-row"><span class="k">Evolutions</span><span>${runStats.evolutionsThisRun||0}</span></div>`;
-  document.getElementById('soulGain').textContent=`+ ${fmtBig(soulGain)} SOUL earned`;
+  document.getElementById('soulGain').textContent=t('messages.soulGain',{amount:fmtBig(soulGain)});
   refreshSoulBadges(); show('screen-death');
   glitchScramble(document.getElementById('deathTitle'));
 }
@@ -6742,7 +6862,7 @@ function win(){
   save.soul+=soulGain; save.lifetime.totalSoul+=soulGain; save.artifacts+=5;
   applyRunStatsIncrement(false);
   checkAchievements(); persistSave();
-  document.getElementById('victorySoulGain').textContent=`+ ${fmtBig(soulGain)} SOUL earned (includes victory bonus)`;
+  document.getElementById('victorySoulGain').textContent=t('messages.victorySoulGain',{amount:fmtBig(soulGain)});
   refreshSoulBadges(); show('screen-victory');
 }
 
@@ -8183,7 +8303,7 @@ document.getElementById('healBtn').onclick=()=>tryFastHeal();
   document.getElementById(id).addEventListener('touchstart',e=>{ e.preventDefault(); e.stopPropagation(); fn(); },{passive:false});
 });
 document.getElementById('fullscreenToggleBtn').onclick=()=>{ SFX.uiClick(); toggleFullscreen(); };
-if(!fullscreenSupported()){ const toggleBtn=document.getElementById('fullscreenToggleBtn'); if(toggleBtn){ toggleBtn.disabled=true; toggleBtn.textContent="UNAVAILABLE"; } const hudBtn=document.getElementById('fullscreenBtnHud'); if(hudBtn) hudBtn.style.opacity='0.35'; }
+if(!fullscreenSupported()){ const toggleBtn=document.getElementById('fullscreenToggleBtn'); if(toggleBtn){ toggleBtn.disabled=true; toggleBtn.textContent=t('settings_screen.fullscreenUnavailable'); } const hudBtn=document.getElementById('fullscreenBtnHud'); if(hudBtn) hudBtn.style.opacity='0.35'; }
 function setSegActive(containerId,value){ document.querySelectorAll('#'+containerId+' .seg-btn').forEach(b=>b.classList.toggle('active',b.dataset.val===value)); }
 function setToggle(id,on){ const el=document.getElementById(id); if(el) el.classList.toggle('on',!!on); }
 function refreshSettingsUI(){ setSegActive('ctrlMode',save.settings.controlMode); setSegActive('vidQuality',save.settings.quality); setSegActive('vidDensity',save.settings.enemyDensity||'high'); setToggle('ctrlHaptics',save.settings.haptics); setToggle('vidShake',save.settings.screenShake); setToggle('vidDebugOverlay',save.settings.debugOverlay); setToggle('audioMuted',save.settings.muted); updateFullscreenButtons();
@@ -8310,7 +8430,7 @@ function goMenu(){ setState('menu'); SFX.stopHeartbeat(); MUSIC.stop(); refreshS
 function updateContinueButton(){
   const btn=document.getElementById('btnContinue'), info=document.getElementById('continueInfo'), newBtn=document.getElementById('btnNewRun');
   if(!btn||!newBtn) return;
-  if(save.activeRun){ btn.classList.remove('hidden'); btn.classList.add('primary'); newBtn.classList.remove('primary'); info.textContent=`Level ${save.activeRun.player.level} · ${fmtTime(save.activeRun.runTime)} survived`; }
+  if(save.activeRun){ btn.classList.remove('hidden'); btn.classList.add('primary'); newBtn.classList.remove('primary'); info.textContent=t('menu.continueInfo',{level:save.activeRun.player.level,time:fmtTime(save.activeRun.runTime)}); }
   else { btn.classList.add('hidden'); btn.classList.remove('primary'); newBtn.classList.add('primary'); }
 }
 function continueRun(){
@@ -8604,7 +8724,7 @@ function renderTalentTree(activeBranch){
     const tooltipHtml=()=>{
       const descText = TALENT_LINE_DESCS[line.key]||`+${line.perLevel} ${line.key} per tier.`;
       const reqText = locked ? `<div class="tt-req">🔒 Requires: ${lineRequiresFor(activeBranch,idx).map(r=>`${lines.find(l=>l.key===r.key).label} tier ${r.tier}`).join(', ')}</div>` : "";
-      const costText = locked ? "" : `<div class="tt-cost">${maxed?"MAXED":`Next tier: ${fmtBig(cost)} SOUL`}</div>`;
+      const costText = locked ? "" : `<div class="tt-cost">${maxed?t('common.maxed'):`Next tier: ${fmtBig(cost)} ${t('common.soul')}`}</div>`;
       return `<div class="tt-name">${line.label}</div><div class="tt-desc">${descText}</div><div class="tt-tier">TIER ${lvl} / 5</div>${costText}${reqText}`;
     };
     el.addEventListener('mouseenter',()=>{ if(!isTouchDevice) openTooltip(el,tooltipHtml()); });
@@ -8696,7 +8816,7 @@ document.getElementById('statsBackMenu').onclick=goMenu;
 
 function renderAchievementsScreen(){
   const unlocked=save.achievements.unlocked;
-  document.getElementById('achSummary').textContent=`${Object.keys(unlocked).length} / ${ACHIEVEMENTS.length} unlocked`;
+  document.getElementById('achSummary').textContent=t('messages.achievementsSummary',{unlocked:Object.keys(unlocked).length,total:ACHIEVEMENTS.length});
   const wrap=document.getElementById('achWrap'); wrap.innerHTML="";
   for(const a of ACHIEVEMENTS){
     const ts=unlocked[a.id]; const el=document.createElement('div'); el.className='ach-card '+(ts?'unlocked':'locked');
@@ -8719,7 +8839,7 @@ function renderAchievementsScreen(){
         wireTooltip(chip,'achreward_'+a.id,tooltipHtml);
         slot.appendChild(chip);
       } else if(!save.collectedRewards[a.reward.cardId]){
-        const btn=document.createElement('button'); btn.className='ach-collect-btn'; btn.textContent=`Collect ${label}`;
+        const btn=document.createElement('button'); btn.className='ach-collect-btn'; btn.textContent=t('messages.collectReward',{label});
         wireTooltip(btn,'achreward_'+a.id,tooltipHtml);
         btn.addEventListener('click',e=>{
           e.stopPropagation();
@@ -8743,13 +8863,13 @@ document.getElementById('btnAchievements').onclick=()=>{ setState('achievements'
 document.getElementById('achBack').onclick=goMenu;
 
 function renderArmoryScreen(){
-  document.getElementById('armorySummary').textContent = `Artifacts: ${fmtBig(save.artifacts)}`;
+  document.getElementById('armorySummary').textContent = t('messages.armorySummary',{amount:fmtBig(save.artifacts)});
   const wrap=document.getElementById('armoryWrap'); wrap.innerHTML="";
   for(const item of ARMORY_ITEMS){
     const lvl=armoryLevel(item.id); const maxed=lvl>=item.maxLevel; const cost=armoryCost(item,lvl);
     const el=document.createElement('div'); el.className='ach-card unlocked';
     el.innerHTML=`<div class="ach-icon">${item.icon}</div><div style="flex:1"><div class="ach-name">${item.name} <span class="ach-chip">${lvl}/${item.maxLevel}</span></div><div class="ach-desc">${item.desc}</div></div>`;
-    const btn=document.createElement('button'); btn.className='buy-btn'; btn.style.marginLeft='10px'; btn.textContent=maxed?"MAXED":`${fmtBig(cost)} 🎗️`;
+    const btn=document.createElement('button'); btn.className='buy-btn'; btn.style.marginLeft='10px'; btn.textContent=maxed?t('common.maxed'):`${fmtBig(cost)} 🎗️`;
     btn.disabled=maxed||save.artifacts<cost;
     btn.onclick=()=>{ if(maxed||save.artifacts<cost) return; save.artifacts-=cost; save.armoryUnlocks[item.id]=lvl+1; persistSave(); refreshSoulBadges(); renderArmoryScreen(); };
     el.appendChild(btn); wrap.appendChild(el);
