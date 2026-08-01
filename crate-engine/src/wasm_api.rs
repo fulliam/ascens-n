@@ -827,6 +827,94 @@ impl JsWorld {
         }
     }
 
+    // ── Chase AI (WASM_ECS_MIGRATION_PLAN.md Phase 3 step 4) ────────────────
+    //
+    // Mirrors index.html's updateEnemies() "chase" brain velocity formula
+    // exactly — rubber-band catch-up (effective speed ramps from the
+    // enemy's own base speed toward the player's CURRENT speed, +8%, over
+    // 30s of failed pursuit) plus predictive intercept (aim 0.35s ahead of
+    // the player's heading instead of their current position). Deliberately
+    // scalar, pure math, no ECS/ChaseTime component — the real "chase"
+    // brain interleaves this with mutation hooks (mutVampiric/mutBruiser),
+    // contact damage, the anti-kiting leash teleport, and AI-tick
+    // throttling, none of which belong in the engine crate yet. JS keeps
+    // owning e.chaseTime's persistence across frames and all of the above;
+    // this only replaces the mechanical "given these inputs, what's the
+    // velocity" formula, one call per enemy, diagnostic-only for now (see
+    // index.html's syncWasmChaseSeekCheck).
+
+    /// Returns `[vx, vy]` as a 2-element Float32Array. `chase_time` is the
+    /// caller-owned seconds-of-failed-pursuit accumulator (JS's
+    /// `e.chaseTime`); `player_vx/vy` feed the predictive-intercept lead.
+    pub fn chase_seek_velocity(
+        &self,
+        ex: f32, ey: f32, espeed: f32, chase_time: f32,
+        px: f32, py: f32, player_vx: f32, player_vy: f32, player_move_speed: f32,
+    ) -> Float32Array {
+        let catch_up = (chase_time / 30.0).min(1.0);
+        let eff_speed = espeed + (espeed.max(player_move_speed * 1.08) - espeed) * catch_up;
+        const LEAD_T: f32 = 0.35;
+        let tx = px + player_vx * LEAD_T;
+        let ty = py + player_vy * LEAD_T;
+        let pdx = tx - ex;
+        let pdy = ty - ey;
+        let pd_raw = (pdx * pdx + pdy * pdy).sqrt();
+        let pd = if pd_raw == 0.0 { 1.0 } else { pd_raw }; // matches JS's `Math.hypot(...)||1`
+        let arr = Float32Array::new_with_length(2);
+        arr.copy_from(&[(pdx / pd) * eff_speed, (pdy / pd) * eff_speed]);
+        arr
+    }
+
+    /// "keep_distance_shoot" brain (ranged-role enemies) — mirrors
+    /// index.html's updateEnemies() formula exactly: move away if closer
+    /// than `desired-20`, toward if farther than `desired+20`, hold still
+    /// in the dead zone between. Stateless — no accumulator like
+    /// `chase_seek_velocity`'s `chase_time`, every call is fully determined
+    /// by its arguments. Returns `[vx, vy]`.
+    pub fn keep_distance_velocity(
+        &self,
+        ex: f32, ey: f32, espeed: f32, desired: f32,
+        px: f32, py: f32,
+    ) -> Float32Array {
+        let dx = px - ex;
+        let dy = py - ey;
+        let d_raw = (dx * dx + dy * dy).sqrt();
+        let d = if d_raw == 0.0 { 1.0 } else { d_raw };
+        let (mut mx, mut my) = (0.0_f32, 0.0_f32);
+        if d < desired - 20.0 {
+            mx = -(dx / d);
+            my = -(dy / d);
+        } else if d > desired + 20.0 {
+            mx = dx / d;
+            my = dy / d;
+        }
+        let arr = Float32Array::new_with_length(2);
+        arr.copy_from(&[mx * espeed, my * espeed]);
+        arr
+    }
+
+    /// "swarm" brain (bat/rat_swarm/etc.) — orbits a slowly-breathing radius
+    /// around the player, mirrors index.html's formula exactly. `swarm_phase`
+    /// is the caller-owned accumulator (JS's `e.swarmPhase`, advanced by
+    /// `dt*3` every frame regardless of this call) — stateless here just
+    /// like `chase_seek_velocity`'s `chase_time`. Returns `[vx, vy]`.
+    pub fn swarm_orbit_velocity(
+        &self,
+        ex: f32, ey: f32, espeed: f32, swarm_phase: f32,
+        px: f32, py: f32,
+    ) -> Float32Array {
+        let orbit_r = 90.0 + (swarm_phase * 0.6).sin() * 40.0;
+        let tx = px + swarm_phase.cos() * orbit_r;
+        let ty = py + swarm_phase.sin() * orbit_r;
+        let ddx = tx - ex;
+        let ddy = ty - ey;
+        let dd_raw = (ddx * ddx + ddy * ddy).sqrt();
+        let dd = if dd_raw == 0.0 { 1.0 } else { dd_raw };
+        let arr = Float32Array::new_with_length(2);
+        arr.copy_from(&[(ddx / dd) * espeed, (ddy / dd) * espeed]);
+        arr
+    }
+
     // ── Stats ─────────────────────────────────────────────────────────────
 
     pub fn archetype_count(&self) -> u32 {

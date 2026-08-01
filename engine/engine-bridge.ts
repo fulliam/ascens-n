@@ -60,6 +60,20 @@ declare class JsWorld {
   // Needed to translate query_near's [id,generation,...] pairs back to a
   // stable pool slot index — see queryEnemyEchoNear below for why.
   entity_generation(entityId: number): number;
+  // Phase 3 step 4 (chase AI) — pure scalar math, no component/entity
+  // state touched. Returns a 2-element Float32Array [vx, vy].
+  chase_seek_velocity(
+    ex: number, ey: number, espeed: number, chaseTime: number,
+    px: number, py: number, playerVx: number, playerVy: number, playerMoveSpeed: number
+  ): Float32Array;
+  // Phase 3 step 4c — same shape, other simple brains. Both stateless
+  // (modulo a caller-owned accumulator, same as chase_time above).
+  keep_distance_velocity(
+    ex: number, ey: number, espeed: number, desired: number, px: number, py: number
+  ): Float32Array;
+  swarm_orbit_velocity(
+    ex: number, ey: number, espeed: number, swarmPhase: number, px: number, py: number
+  ): Float32Array;
 }
 
 // The build script emits `const WASM_B64 = "...";` before inlining this
@@ -100,6 +114,21 @@ interface EngineBridgeApi {
   initEnemyEcho(worldW: number, worldH: number): void;
   syncEnemyEcho(xs: Float32Array, ys: Float32Array, liveCount: number): void;
   queryEnemyEchoNearCount(x: number, y: number, radius: number): number;
+  // Phase 3 step 4 (WASM_ECS_MIGRATION_PLAN.md) — diagnostic-only for now
+  // (see index.html's syncWasmChaseSeekCheck). Mirrors the "chase" brain's
+  // rubber-band-catchup + predictive-intercept velocity formula exactly.
+  // Returns [vx, vy].
+  chaseSeekVelocity(
+    ex: number, ey: number, espeed: number, chaseTime: number,
+    px: number, py: number, playerVx: number, playerVy: number, playerMoveSpeed: number
+  ): Float32Array;
+  // Phase 3 step 4c — same diagnostic-then-real pattern, other simple brains.
+  keepDistanceVelocity(
+    ex: number, ey: number, espeed: number, desired: number, px: number, py: number
+  ): Float32Array;
+  swarmOrbitVelocity(
+    ex: number, ey: number, espeed: number, swarmPhase: number, px: number, py: number
+  ): Float32Array;
   // Phase 3 step 3, real call-site cut (WASM_ECS_MIGRATION_PLAN.md) — unlike
   // queryEnemyEchoNearCount above (diagnostic count-only, compared against a
   // JS brute-force ground truth), this returns the actual candidate slot
@@ -223,6 +252,28 @@ function queryEnemyEchoNearCount(x: number, y: number, radius: number): number {
   return world.query_near_count(x, y, radius, enemyEchoComponentId);
 }
 
+function chaseSeekVelocity(
+  ex: number, ey: number, espeed: number, chaseTime: number,
+  px: number, py: number, playerVx: number, playerVy: number, playerMoveSpeed: number
+): Float32Array {
+  if (!world) return new Float32Array([0, 0]);
+  return world.chase_seek_velocity(ex, ey, espeed, chaseTime, px, py, playerVx, playerVy, playerMoveSpeed);
+}
+
+function keepDistanceVelocity(
+  ex: number, ey: number, espeed: number, desired: number, px: number, py: number
+): Float32Array {
+  if (!world) return new Float32Array([0, 0]);
+  return world.keep_distance_velocity(ex, ey, espeed, desired, px, py);
+}
+
+function swarmOrbitVelocity(
+  ex: number, ey: number, espeed: number, swarmPhase: number, px: number, py: number
+): Float32Array {
+  if (!world) return new Float32Array([0, 0]);
+  return world.swarm_orbit_velocity(ex, ey, espeed, swarmPhase, px, py);
+}
+
 function queryEnemyEchoNear(x: number, y: number, radius: number): Uint32Array {
   if (!world || !enemyEchoInited || !enemyEchoIdToSlot) return new Uint32Array(0);
   const raw = world.query_near(x, y, radius, enemyEchoComponentId); // [id0,gen0,id1,gen1,...]
@@ -258,6 +309,9 @@ async function boot(): Promise<void> {
       syncEnemyEcho,
       queryEnemyEchoNearCount,
       queryEnemyEchoNear,
+      chaseSeekVelocity,
+      keepDistanceVelocity,
+      swarmOrbitVelocity,
     };
     window.dispatchEvent(new Event('engine-ready'));
   } catch (err) {
