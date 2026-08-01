@@ -630,6 +630,17 @@
   .slider-row input[type=range]{-webkit-appearance:none; appearance:none; flex:1; height:4px; background:var(--line); border-radius:2px; outline:none;}
   .slider-row input[type=range]::-webkit-slider-thumb{-webkit-appearance:none; width:16px; height:16px; border-radius:50%; background:var(--accent); cursor:pointer; border:2px solid #14101c;}
   .slider-val{font-family:'JetBrains Mono',monospace; font-size:11.5px; color:var(--accent); width:32px; text-align:right;}
+  /* Config Editor (Phase 6) — a handful of field types .setting-row/.slider-row
+     don't already cover (number/color/select/textarea inputs, a baked-at-eval
+     warning badge). Reuses .setting-row/.s-name/.buy-btn/.settings-tab for
+     everything else, no separate screen-level theme needed. */
+  .cfg-field-row input[type=number], .cfg-field-row input[type=text]{background:var(--panel2); border:1px solid var(--line); color:var(--text); border-radius:3px; padding:5px 8px; font-family:'JetBrains Mono',monospace; font-size:12px;}
+  .cfg-field-row input[type=number]{width:100px;}
+  .cfg-field-row input[type=color]{width:36px; height:28px; padding:0; border:1px solid var(--line); border-radius:3px; background:var(--panel2); cursor:pointer;}
+  .cfg-field-row select{background:var(--panel2); border:1px solid var(--line); color:var(--text); border-radius:3px; padding:5px 8px; font-family:'JetBrains Mono',monospace; font-size:11.5px; max-width:200px;}
+  .cfg-field-row textarea{width:100%; min-height:90px; background:var(--panel2); border:1px solid var(--line); color:var(--text); border-radius:3px; padding:8px; font-family:'JetBrains Mono',monospace; font-size:11px; resize:vertical;}
+  .cfg-baked-note{color:var(--gold); font-size:9.5px; margin-left:6px;}
+  .cfg-swatch{display:inline-block; width:12px; height:12px; border-radius:2px; margin-right:6px; vertical-align:middle; border:1px solid rgba(255,255,255,0.2);}
   .joystick-capture{position:absolute; inset:0; z-index:1; touch-action:none; pointer-events:none;}
   .joystick-zone{position:absolute; width:132px; height:132px; z-index:6; pointer-events:none; touch-action:none; display:none; transform:translate(-50%,-50%);}
   .joystick-base{position:absolute; inset:0; border-radius:50%; background:rgba(18,20,27,0.45); border:1px solid var(--line);}
@@ -744,6 +755,7 @@
       <button class="btn" id="btnAchievements">Achievements <span id="achProgressChip" class="ach-chip"></span></button>
       <button class="btn" id="btnArmory">Armory <span id="armoryChip" class="ach-chip"></span></button>
       <button class="btn" id="btnSettings">Settings</button>
+      <button class="btn hidden" id="btnConfigEditor" style="border-color:var(--accent2); color:var(--accent2);">Config Editor</button>
     </div>
     <div class="version-tag" id="versionTag"></div>
   </div>
@@ -887,6 +899,39 @@
       </div>
     </div>
     <div class="back-link" id="settingsBack">← BACK</div>
+  </div>
+
+  <!-- Config Editor (Phase 6, CONFIG_CENTRALIZATION_PLAN.md §4) — a developer
+       tool, not a player-facing feature. Reachable only when debugOverlayOn's
+       own dev-gate is true (?dev=1 or save.settings.debugOverlay), same
+       condition as the Debug Overlay itself — see wireConfigEditorAccess().
+       Forms are auto-generated from CONFIG_SCHEMA+CONFIG (renderConfigEditor
+       in PART 17), not hand-authored per field: this markup only provides
+       the 4 tab/pane shells + the export/import/reset action row. -->
+  <div class="screen hidden" id="screen-config">
+    <div class="veil"></div>
+    <div class="title-wrap" style="margin-bottom:16px;"><div class="kicker">developer tool — not for normal play</div><div class="title" style="font-size:34px;">CONFIG EDITOR</div></div>
+    <div class="settings-tabs" style="width:min(640px,92vw);">
+      <div class="settings-tab cfg-tab active" data-tab="cfgCaps">Caps</div>
+      <div class="settings-tab cfg-tab" data-tab="cfgBalance">Balance</div>
+      <div class="settings-tab cfg-tab" data-tab="cfgColors">Colors</div>
+      <div class="settings-tab cfg-tab" data-tab="cfgTexts">Texts</div>
+    </div>
+    <div class="settings-wrap">
+      <div class="settings-pane" id="pane-cfgCaps"></div>
+      <div class="settings-pane hidden" id="pane-cfgBalance"></div>
+      <div class="settings-pane hidden" id="pane-cfgColors"></div>
+      <div class="settings-pane hidden" id="pane-cfgTexts"></div>
+    </div>
+    <div style="display:flex; gap:10px; margin-top:14px; flex-wrap:wrap; justify-content:center;">
+      <button class="buy-btn" id="cfgExportBtn">EXPORT CONFIG</button>
+      <button class="buy-btn" id="cfgImportBtn">IMPORT CONFIG</button>
+      <input type="file" id="cfgImportFile" accept=".json" style="display:none;">
+      <button class="buy-btn" id="cfgResetTabBtn">RESET TAB</button>
+      <button class="buy-btn" id="cfgResetAllBtn" style="border-color:var(--hp); color:var(--hp);">RESET ALL</button>
+    </div>
+    <div id="cfgStatusMsg" style="font-size:11px; color:var(--dim); margin-top:8px; text-align:center; max-width:600px;"></div>
+    <div class="back-link" id="configBack">← BACK TO BASE</div>
   </div>
 </div>
 
@@ -3079,12 +3124,30 @@ function loadConfigOverrideFromStorage(){
 }
 // Diffs `current` against `defaults` recursively — used to persist/export
 // only what actually changed (a readable patch), not a full dump of every
-// default value alongside it.
+// default value alongside it. Array-valued leaves (STAT_CAPS.*'s [lo,hi]
+// pairs, DANGER_TIERS, TARGET_CP_RATIO) need a CONTENT comparison, not `!==`
+// — `CONFIG` is always a deep clone of `CONFIG_DEFAULTS` (see
+// cloneConfigDefaults()), so an unchanged array is still a different object
+// reference from its default counterpart and `!==` would call it "changed"
+// unconditionally. Caught by Phase 6's own export test: editing one unrelated
+// number field produced a diff bloated with every array field in CONFIG,
+// defeating the whole point of exporting "only what changed."
+function arraysEqual(a, b){
+  if(!Array.isArray(a) || !Array.isArray(b) || a.length!==b.length) return false;
+  for(let i=0;i<a.length;i++){
+    const x=a[i], y=b[i];
+    if(x && typeof x==="object") { if(JSON.stringify(x)!==JSON.stringify(y)) return false; }
+    else if(x!==y) return false;
+  }
+  return true;
+}
 function diffFromDefaults(current, defaults){
   const out = {};
   for(const key of Object.keys(current)){
     const cur = current[key], def = defaults ? defaults[key] : undefined;
-    if(cur && typeof cur==="object" && !Array.isArray(cur)){
+    if(Array.isArray(cur)){
+      if(!arraysEqual(cur, def)) out[key] = cur;
+    } else if(cur && typeof cur==="object"){
       const nested = diffFromDefaults(cur, def||{});
       if(Object.keys(nested).length) out[key] = nested;
     } else if(cur !== def){
@@ -8196,6 +8259,10 @@ function applySettings(){
   // since nobody stumbles into a "?dev=1" URL by accident.
   debugOverlayOn=!!save.settings.debugOverlay || new URLSearchParams(location.search).has('dev');
   document.getElementById('debugOverlay').classList.toggle('hidden', !debugOverlayOn);
+  // Config Editor (Phase 6) — same dev-only gate as the Debug Overlay above,
+  // deliberately reusing the identical condition rather than a separate flag:
+  // one dev-mode switch, not two that could drift out of sync with each other.
+  const cfgBtn=document.getElementById('btnConfigEditor'); if(cfgBtn) cfgBtn.classList.toggle('hidden', !debugOverlayOn);
   const joyCapture=document.getElementById('joystickCapture');
   if(joyCapture){ const show=shouldShowJoystick(); joyCapture.style.pointerEvents=show?'auto':'none'; if(!show){ touchVec.x=0; touchVec.y=0; const zone=document.getElementById('joystickZone'); if(zone) zone.style.display='none'; } }
 }
@@ -8318,6 +8385,225 @@ document.getElementById('vidDensity').addEventListener('click',e=>{ const b=e.ta
 document.getElementById('ctrlHaptics').onclick=()=>{ save.settings.haptics=!save.settings.haptics; persistSave(); applySettings(); refreshSettingsUI(); vibrate(20); };
 document.getElementById('vidShake').onclick=()=>{ save.settings.screenShake=!save.settings.screenShake; persistSave(); applySettings(); refreshSettingsUI(); };
 document.getElementById('vidDebugOverlay').onclick=()=>{ save.settings.debugOverlay=!save.settings.debugOverlay; persistSave(); applySettings(); refreshSettingsUI(); };
+// ==========================================================================
+// Config Editor (Phase 6, CONFIG_CENTRALIZATION_PLAN.md §4) — auto-generates
+// its 4 tabs' fields by walking CONFIG_SCHEMA+CONFIG rather than hand-laying
+// out ~250 individual rows. Dev-only screen — reachability gated in
+// applySettings() above (same debugOverlayOn condition as the Debug Overlay).
+// ==========================================================================
+// Baked ONCE into WEAPONS/ENEMIES/BOSS_ROSTER at module-eval time (see
+// CONFIG_DEFAULTS.balance's own doc comment) — editing these here changes
+// CONFIG immediately but has no gameplay effect until a reload/new run.
+const CONFIG_BAKED_AT_EVAL_PATHS = new Set([
+  "balance.PLAYER_WEAPON_DMG_MULT", "balance.ENEMY_HP_MULT", "balance.ENEMY_DMG_MULT",
+  "balance.BOSS_HP_MULT", "balance.BOSS_DMG_MULT",
+]);
+function cfgEscAttr(s){ return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+function cfgEscHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function getAtPath(obj, pathParts){ let n=obj; for(const p of pathParts){ if(n==null) return undefined; n=n[p]; } return n; }
+function setAtPath(obj, pathParts, value){
+  let n=obj;
+  for(let i=0;i<pathParts.length-1;i++){ const p=pathParts[i]; if(typeof n[p]!=="object" || n[p]===null) n[p]={}; n=n[p]; }
+  n[pathParts[pathParts.length-1]] = value;
+}
+// The one path any field-edit uses to actually change CONFIG — builds a
+// correctly-NESTED patch from pathParts (never a flat dot-string key, see
+// applyConfigOverride()'s own doc comment for why that distinction matters),
+// then persists immediately so the edit survives a reload, not just this tab.
+function cfgApplyField(pathParts, value){
+  const patch = {}; setAtPath(patch, pathParts, value);
+  applyConfigOverride(patch);
+  persistConfigOverride();
+}
+function cfgShowStatus(msg, isError){
+  const el = document.getElementById('cfgStatusMsg'); if(!el) return;
+  el.textContent = msg; el.style.color = isError ? 'var(--hp)' : 'var(--dim)';
+}
+// ---- field row builders — return an HTML string; event wiring happens in a
+// second pass (wireConfigFieldEvents) via data-cfg-* attributes, not inline
+// handlers, so the same code path works whether a field was just rendered
+// fresh or is being re-wired after a colors-pane refresh. ----
+function cfgRowNumber(dotPath, schema, value){
+  const id = 'cfgf_'+dotPath.replace(/\./g,'_');
+  const baked = CONFIG_BAKED_AT_EVAL_PATHS.has(dotPath) ? '<span class="cfg-baked-note">(applies on next reload/new run)</span>' : '';
+  return `<div class="setting-row cfg-field-row"><div><div class="s-name">${cfgEscHtml(dotPath)}${baked}</div></div>
+    <input type="number" id="${id}" data-cfg-path="${cfgEscAttr(dotPath)}" data-cfg-kind="number" value="${cfgEscAttr(value)}" ${schema.min!=null?`min="${schema.min}"`:''} ${schema.max!=null?`max="${schema.max}"`:''} step="any"></div>`;
+}
+function cfgRowArrayPair(dotPath, value){
+  const id = 'cfgf_'+dotPath.replace(/\./g,'_');
+  const lo = Array.isArray(value)?value[0]:0, hi = Array.isArray(value)?value[1]:0;
+  return `<div class="setting-row cfg-field-row"><div><div class="s-name">${cfgEscHtml(dotPath)} [lo, hi]</div></div>
+    <div style="display:flex;gap:6px;">
+      <input type="number" id="${id}_lo" data-cfg-path="${cfgEscAttr(dotPath)}" data-cfg-kind="array-lo" value="${cfgEscAttr(lo)}" step="any">
+      <input type="number" id="${id}_hi" data-cfg-path="${cfgEscAttr(dotPath)}" data-cfg-kind="array-hi" value="${cfgEscAttr(hi)}" step="any">
+    </div></div>`;
+}
+function cfgRowStructured(dotPath, value){
+  const id = 'cfgf_'+dotPath.replace(/\./g,'_');
+  return `<div class="setting-row cfg-field-row" style="flex-direction:column; align-items:stretch;"><div class="s-name">${cfgEscHtml(dotPath)} <span class="cfg-baked-note" style="color:var(--dim)">(raw JSON — replaces the whole table)</span></div>
+    <textarea id="${id}" data-cfg-path="${cfgEscAttr(dotPath)}" data-cfg-kind="structured">${cfgEscHtml(JSON.stringify(value, null, 2))}</textarea></div>`;
+}
+function cfgRowText(dotPath, schema, value){
+  const id = 'cfgf_'+dotPath.replace(/\./g,'_');
+  const long = (value||'').length > 40;
+  return `<div class="setting-row cfg-field-row" style="${long?'flex-direction:column; align-items:stretch;':''}"><div><div class="s-name">${cfgEscHtml(dotPath)}</div></div>
+    ${long ? `<textarea id="${id}" data-cfg-path="${cfgEscAttr(dotPath)}" data-cfg-kind="text" style="min-height:50px;">${cfgEscHtml(value||'')}</textarea>`
+           : `<input type="text" id="${id}" data-cfg-path="${cfgEscAttr(dotPath)}" data-cfg-kind="text" value="${cfgEscAttr(value||'')}">`}</div>`;
+}
+function cfgRowColor(paletteKey, hex){
+  const id = 'cfgf_palette_'+paletteKey;
+  return `<div class="setting-row cfg-field-row"><div><span class="cfg-swatch" style="background:${cfgEscAttr(hex)}"></span><span class="s-name">${cfgEscHtml(paletteKey)}</span></div>
+    <input type="color" id="${id}" data-cfg-palette-key="${cfgEscAttr(paletteKey)}" value="${cfgEscAttr(hex)}"></div>`;
+}
+function cfgRowSemantic(semanticKey, currentPaletteKey){
+  const id = 'cfgf_semantic_'+semanticKey.replace(/\./g,'_');
+  const opts = Object.keys(CONFIG.colors.palette).sort().map(pk=>{
+    const hex = CONFIG.colors.palette[pk];
+    return `<option value="${cfgEscAttr(pk)}" ${pk===currentPaletteKey?'selected':''}>${cfgEscHtml(pk)} (${cfgEscHtml(hex)})</option>`;
+  }).join('');
+  const swatchHex = CONFIG.colors.palette[currentPaletteKey] || '#ff00ff';
+  return `<div class="setting-row cfg-field-row"><div><span class="cfg-swatch" style="background:${cfgEscAttr(swatchHex)}"></span><span class="s-name">${cfgEscHtml(semanticKey)}</span></div>
+    <select id="${id}" data-cfg-semantic-key="${cfgEscAttr(semanticKey)}">${opts}</select></div>`;
+}
+// Generic pane renderer for Caps/Balance/Texts — all three genuinely nest the
+// way CONFIG_SCHEMA's dot-path implies (unlike Colors' palette/semantic,
+// whose real keys can themselves contain literal dots — see
+// renderConfigColorsPane below for why that needs separate handling).
+function renderConfigPane(namespace, paneIdSuffix){
+  const prefix = namespace + ".";
+  const paths = Object.keys(CONFIG_SCHEMA).filter(p=>p.startsWith(prefix)).sort();
+  const rows = [];
+  for(const path of paths){
+    const schema = CONFIG_SCHEMA[path];
+    const parts = path.split(".");
+    const value = getAtPath(CONFIG, parts);
+    if(schema.type==="number") rows.push(cfgRowNumber(path, schema, value));
+    else if(schema.type==="array") rows.push(cfgRowArrayPair(path, value));
+    else if(schema.type==="structured") rows.push(cfgRowStructured(path, value));
+    else if(schema.type==="text") rows.push(cfgRowText(path, schema, value));
+  }
+  const pane = document.getElementById('pane-cfg'+paneIdSuffix);
+  if(pane){ pane.innerHTML = rows.join(''); wireConfigFieldEvents(pane); }
+}
+// Colors needs its own renderer: CONFIG.colors.semantic's real keys (e.g.
+// "boss.dragon.color") are ONE flat property name that happens to contain
+// dots, not a genuinely nested boss->dragon->color chain — iterating
+// Object.keys() directly (as this does) sidesteps ever needing to re-derive
+// that flat key from a dot-path string, which is what CONFIG_SCHEMA's own
+// registration loop already does the same way (see its comment).
+function renderConfigColorsPane(){
+  const paletteRows = Object.keys(CONFIG.colors.palette).sort().map(pk=>cfgRowColor(pk, CONFIG.colors.palette[pk]));
+  const semanticRows = Object.keys(CONFIG.colors.semantic).sort().map(sk=>cfgRowSemantic(sk, CONFIG.colors.semantic[sk]));
+  const pane = document.getElementById('pane-cfgColors');
+  if(pane){
+    pane.innerHTML = '<div class="s-name" style="margin:4px 0 8px;">Palette (raw hex — editing one cascades to every semantic entry referencing it)</div>' + paletteRows.join('')
+      + '<div class="s-name" style="margin:16px 0 8px;">Semantic (each picks WHICH palette entry it uses, not a color itself)</div>' + semanticRows.join('');
+    wireConfigFieldEvents(pane);
+  }
+}
+function wireConfigFieldEvents(pane){
+  pane.querySelectorAll('[data-cfg-path]').forEach(el=>{
+    const path = el.dataset.cfgPath, kind = el.dataset.cfgKind, parts = path.split(".");
+    if(kind==="number"){
+      el.onchange=()=>{ const v=parseFloat(el.value); if(isFinite(v)){ cfgApplyField(parts, v); cfgShowStatus('Applied '+path+' = '+v); } else cfgShowStatus('Invalid number for '+path, true); };
+    } else if(kind==="array-lo" || kind==="array-hi"){
+      el.onchange=()=>{
+        const base='cfgf_'+path.replace(/\./g,'_');
+        const loEl=document.getElementById(base+'_lo'), hiEl=document.getElementById(base+'_hi');
+        const lo=parseFloat(loEl.value), hi=parseFloat(hiEl.value);
+        if(isFinite(lo) && isFinite(hi)){ cfgApplyField(parts, [lo,hi]); cfgShowStatus('Applied '+path+' = ['+lo+', '+hi+']'); }
+        else cfgShowStatus('Invalid bounds for '+path, true);
+      };
+    } else if(kind==="structured"){
+      el.onchange=()=>{
+        try{ const parsed=JSON.parse(el.value); cfgApplyField(parts, parsed); cfgShowStatus('Applied '+path); }
+        catch(e){ cfgShowStatus('Invalid JSON for '+path+': '+e.message, true); }
+      };
+    } else if(kind==="text"){
+      el.onchange=()=>{ cfgApplyField(parts, el.value); cfgShowStatus('Applied '+path); };
+    }
+  });
+  pane.querySelectorAll('[data-cfg-palette-key]').forEach(el=>{
+    el.onchange=()=>{ const key=el.dataset.cfgPaletteKey; cfgApplyField(["colors","palette",key], el.value); cfgShowStatus('Applied palette.'+key+' — cascading to semantic users.'); renderConfigColorsPane(); };
+  });
+  pane.querySelectorAll('[data-cfg-semantic-key]').forEach(el=>{
+    el.onchange=()=>{ const key=el.dataset.cfgSemanticKey; cfgApplyField(["colors","semantic",key], el.value); cfgShowStatus('Applied semantic.'+key); renderConfigColorsPane(); };
+  });
+}
+function wireConfigTabs(){
+  document.querySelectorAll('#screen-config .cfg-tab').forEach(tab=>{
+    // Deliberately overrides whatever the generic Settings-screen tab wiring
+    // above (which matches ANY .settings-tab globally, including these —
+    // see its own querySelectorAll('.settings-tab')) already assigned:
+    // that handler hides ALL .settings-pane elements page-wide on click,
+    // which would blank out the Settings screen's own panes if it ever ran
+    // after this screen was used. Scoping strictly to #screen-config avoids
+    // that cross-screen collision entirely.
+    tab.onclick=()=>{
+      document.querySelectorAll('#screen-config .cfg-tab').forEach(t=>t.classList.remove('active'));
+      tab.classList.add('active');
+      document.querySelectorAll('#screen-config .settings-pane').forEach(p=>p.classList.add('hidden'));
+      document.getElementById('pane-'+tab.dataset.tab).classList.remove('hidden');
+    };
+  });
+}
+function renderConfigEditor(){
+  renderConfigPane('caps','Caps');
+  renderConfigPane('balance','Balance');
+  renderConfigColorsPane();
+  renderConfigPane('texts','Texts');
+  wireConfigTabs();
+  cfgShowStatus('');
+}
+function cfgExportConfig(){
+  const diff = diffFromDefaults(CONFIG, CONFIG_DEFAULTS);
+  const json = JSON.stringify(diff, null, 2);
+  const blob = new Blob([json], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href=url; a.download='ascension-config-override.json'; document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+  cfgShowStatus('Exported '+Object.keys(diff).length+' changed top-level section(s).');
+}
+function cfgImportConfig(file){
+  const reader = new FileReader();
+  reader.onload = () => {
+    let parsed;
+    try{ parsed = JSON.parse(reader.result); }
+    catch(e){ cfgShowStatus('Import failed — invalid JSON: '+e.message, true); return; }
+    const applied = applyConfigOverride(parsed);
+    persistConfigOverride();
+    renderConfigEditor();
+    cfgShowStatus('Imported — applied '+Object.keys(applied).length+' top-level section(s). Any field with an unrecognized path or wrong type was silently dropped by validation (see CONFIG_SCHEMA).');
+  };
+  reader.onerror = () => cfgShowStatus('Import failed — could not read file.', true);
+  reader.readAsText(file);
+}
+const CFG_TAB_NAMESPACE = { cfgCaps:'caps', cfgBalance:'balance', cfgColors:'colors', cfgTexts:'texts' };
+function cfgResetNamespace(ns){
+  const fresh = cloneConfigDefaults();
+  CONFIG[ns] = fresh[ns];
+  onConfigApplied();
+  persistConfigOverride();
+  renderConfigEditor();
+  cfgShowStatus('Reset '+ns+' to defaults.');
+}
+function cfgResetAll(){
+  CONFIG = cloneConfigDefaults();
+  onConfigApplied();
+  persistConfigOverride();
+  renderConfigEditor();
+  cfgShowStatus('Reset everything to defaults.');
+}
+document.getElementById('cfgExportBtn').onclick = cfgExportConfig;
+document.getElementById('cfgImportBtn').onclick = () => document.getElementById('cfgImportFile').click();
+document.getElementById('cfgImportFile').onchange = (e) => { if(e.target.files[0]) cfgImportConfig(e.target.files[0]); e.target.value=''; };
+document.getElementById('cfgResetTabBtn').onclick = () => {
+  const activeTab = document.querySelector('#screen-config .cfg-tab.active');
+  if(activeTab) cfgResetNamespace(CFG_TAB_NAMESPACE[activeTab.dataset.tab]);
+};
+document.getElementById('cfgResetAllBtn').onclick = () => { if(confirm('Reset ALL config to defaults? This cannot be undone.')) cfgResetAll(); };
+document.getElementById('btnConfigEditor').onclick = () => { setState('config'); renderConfigEditor(); show('screen-config'); };
+document.getElementById('configBack').onclick = goMenu;
 document.getElementById('audioVolume').addEventListener('input',e=>{ const v=Number(e.target.value); document.getElementById('audioVolumeVal').textContent=v; save.settings.sfxVolume=v/100; SFX.setVolume(save.settings.sfxVolume); });
 document.getElementById('audioVolume').addEventListener('change',()=>persistSave());
 document.getElementById('musicVolume').addEventListener('input',e=>{ const v=Number(e.target.value); document.getElementById('musicVolumeVal').textContent=v; save.settings.musicVolume=v/100; if(!save.settings.muted) MUSIC.setVolume(save.settings.musicVolume); });
@@ -8911,8 +9197,12 @@ const CODE_TO_WASD = {KeyW:'w',KeyA:'a',KeyS:'s',KeyD:'d'};
 // pick exactly one), not worth unifying.
 const MENU_NAV_SELECTOR = '.screen:not(.hidden) button:not(:disabled), .screen:not(.hidden) .toggle-switch, '
   +'.screen:not(.hidden) .seg-btn, .screen:not(.hidden) .settings-tab, .screen:not(.hidden) .back-link, '
-  +'.screen:not(.hidden) .card:not(.locked), .screen:not(.hidden) .talent-node:not(.locked), .screen:not(.hidden) input[type=range]';
-const MENU_NAV_STATES = new Set(['menu','charselect','shop','fusion','ingame-stats','paused','dead','victory','meta','stats','achievements','armory','event','settings']);
+  +'.screen:not(.hidden) .card:not(.locked), .screen:not(.hidden) .talent-node:not(.locked), .screen:not(.hidden) input[type=range], '
+  // Config Editor (Phase 6) field types — number/text/color inputs, palette
+  // <select>s, and JSON textareas for the array-of-objects fields.
+  +'.screen:not(.hidden) input[type=number], .screen:not(.hidden) input[type=text], .screen:not(.hidden) input[type=color], '
+  +'.screen:not(.hidden) select, .screen:not(.hidden) textarea';
+const MENU_NAV_STATES = new Set(['menu','charselect','shop','fusion','ingame-stats','paused','dead','victory','meta','stats','achievements','armory','event','settings','config']);
 let menuKbdFocusEl=null;
 function menuNavFocusables(){ return Array.from(document.querySelectorAll(MENU_NAV_SELECTOR)).filter(el=>el.offsetParent!==null); }
 function menuNavSetFocus(el){
