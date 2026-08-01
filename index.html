@@ -7154,7 +7154,17 @@ const SCREEN_TRANSITION_MS = 220;
 function fadeOutScreen(el){
   if(el.classList.contains('hidden')) return;
   el.classList.add('screen-out');
-  setTimeout(()=>{ el.classList.remove('screen-out'); el.classList.add('hidden'); el.style.zIndex=''; }, SCREEN_TRANSITION_MS);
+  // BUGFIX — chained level-ups (pendingLevelUps>0) call hideAll() then
+  // immediately show() the SAME #screen-levelup element again for the next
+  // pending pick, all synchronously. show() cancels the fade visually
+  // (removes screen-out), but this setTimeout was already scheduled and used
+  // to fire blindly 220ms later anyway, force-adding .hidden (display:none)
+  // to a screen that had been legitimately reopened — leaving state stuck at
+  // 'levelup' with an invisible, unclickable card screen (the update loop is
+  // gated on state==="playing", so this reads as "the game just froze").
+  // Guarding on screen-out still being present means a re-show in the
+  // interim (which removes it) correctly cancels this stale hide.
+  setTimeout(()=>{ if(el.classList.contains('screen-out')){ el.classList.remove('screen-out'); el.classList.add('hidden'); el.style.zIndex=''; } }, SCREEN_TRANSITION_MS);
 }
 function hideAll(){ document.querySelectorAll('.screen').forEach(s=>fadeOutScreen(s)); }
 function show(id){
@@ -7741,6 +7751,14 @@ window.addEventListener('keydown',e=>{ keys[e.key.toLowerCase()]=true; const was
   if(e.code==='Space' && state==='playing'){ e.preventDefault(); tryDash(); }
   if(e.key==='Shift' && state==='playing'){ tryFastHeal(); }
   if(state==='levelup'){
+    // BUGFIX — if the player was still holding a movement key from running
+    // right when this screen opened, the OS keeps sending auto-repeat
+    // keydown events for it (e.repeat=true) independent of anything we do —
+    // those used to fall straight into the WASD-as-nav branch below and kept
+    // shifting card focus with zero intent from the player. A genuine new
+    // keypress (e.repeat===false) still navigates normally; only the
+    // held-over repeat events from running are ignored.
+    if(e.repeat) return;
     // Same physical-key fix as movement (CODE_TO_WASD above) — e.key alone made
     // this silently dead on a Cyrillic layout, since a/d/w/s type as ф/в/ц/ы there.
     const wasdCode=CODE_TO_WASD[e.code], k=e.key.toLowerCase();
