@@ -115,10 +115,10 @@
   /* PERFORMANCE_AUDIT — toggleable debug overlay (task #34): FPS/frame-time + live
      entity counts, so future optimization claims can be measured on a real run
      instead of judged by feel. Off by default, opt-in via Settings > Video. */
-  #debugOverlay{position:fixed; top:calc(8px + var(--safe-top)); left:calc(8px + var(--safe-left)); z-index:9999;
-    pointer-events:none; font-family:'JetBrains Mono',monospace; font-size:11px; line-height:1.5;
-    color:#8fffcf; background:rgba(8,10,14,0.72); border:1px solid rgba(143,255,207,0.35); border-radius:6px;
-    padding:6px 9px; white-space:pre; text-shadow:none;}
+  #debugOverlay{position:fixed; bottom:calc(8px + var(--safe-bottom)); right:calc(8px + var(--safe-right)); z-index:9999;
+    pointer-events:none; font-family:'JetBrains Mono',monospace; font-size:9px; line-height:1.4;
+    color:#8fffcf; background:rgba(8,10,14,0.4); border:1px solid rgba(143,255,207,0.2); border-radius:6px;
+    padding:4px 7px; white-space:pre; text-shadow:none;}
   .hud-top{position:absolute; top:0; left:0; right:0; z-index:8; display:flex; justify-content:space-between; align-items:flex-start;
     padding:calc(16px + var(--safe-top)) calc(20px + var(--safe-right)) 16px calc(20px + var(--safe-left));}
   .hp-wrap{width:250px;}
@@ -5683,7 +5683,7 @@ function renderShop(){
     const canAfford = wallet>=cost;
     const rarityTag = item.rarity && item.rarity!=="common" ? `<div class="rarity-label">${item.rarity}</div>` : "";
     el.innerHTML=`${rarityTag}<div class="shop-card-top"><div class="icon">${item.icon}</div><div class="shop-card-text"><div class="name">${item.name}</div><div class="desc">${item.desc}</div></div></div>
-      <div class="shop-card-bottom"><div class="price" style="color:${maxed?'var(--dim)':item.curr==='gold'?'var(--gold)':'var(--crystal)'}">${maxed?"MAXED":cost+" "+(item.curr==="gold"?"GOLD":"CRYSTALS")}</div>
+      <div class="shop-card-bottom"><div class="price" style="color:${maxed?'var(--dim)':item.curr==='gold'?'var(--gold)':'var(--crystal)'}">${maxed?"MAXED":fmtBig(cost)+" "+(item.curr==="gold"?"GOLD":"CRYSTALS")}</div>
       <button class="buy-btn" ${(!canAfford||maxed)?'disabled':''}>${maxed?"MAXED OUT":"BUY"}</button></div>`;
     el.querySelector('.buy-btn').onclick=()=>{
       if(maxed) return; if(item.curr==="gold"){ if(player.gold<cost) return; player.gold-=cost; } else { if(player.crystals<cost) return; player.crystals-=cost; }
@@ -5952,7 +5952,7 @@ function renderMerchantCardOffers(){
     el.style.setProperty('--event-card-delay',(i*0.08)+'s');
     const rarityTag = c.rarity && c.rarity!=="common" ? `<div class="rarity-label">${c.rarity}</div>` : "";
     el.innerHTML=`${rarityTag}<div class="shop-card-top"><div class="icon">${cardIcon(c.cat)}</div><div class="shop-card-text"><div class="name">${c.name}</div><div class="desc">${c.desc}</div></div></div>
-      <div class="shop-card-bottom"><div class="price">${cost} GOLD</div><button class="buy-btn" ${player.gold<cost?'disabled':''}>BUY</button></div>`;
+      <div class="shop-card-bottom"><div class="price">${fmtBig(cost)} GOLD</div><button class="buy-btn" ${player.gold<cost?'disabled':''}>BUY</button></div>`;
     el.querySelector('.buy-btn').onclick=()=>{
       if(player.gold<cost) return; player.gold-=cost; c.apply(player); player.cardsTaken.push(c.id);
       if(c.cat==='legendary') runStats.legendaryCardsTaken=(runStats.legendaryCardsTaken||0)+1;
@@ -8119,7 +8119,7 @@ function renderTalentTree(activeBranch){
     const tooltipHtml=()=>{
       const descText = TALENT_LINE_DESCS[line.key]||`+${line.perLevel} ${line.key} per tier.`;
       const reqText = locked ? `<div class="tt-req">🔒 Requires: ${lineRequiresFor(activeBranch,idx).map(r=>`${lines.find(l=>l.key===r.key).label} tier ${r.tier}`).join(', ')}</div>` : "";
-      const costText = locked ? "" : `<div class="tt-cost">${maxed?"MAXED":`Next tier: ${cost} SOUL`}</div>`;
+      const costText = locked ? "" : `<div class="tt-cost">${maxed?"MAXED":`Next tier: ${fmtBig(cost)} SOUL`}</div>`;
       return `<div class="tt-name">${line.label}</div><div class="tt-desc">${descText}</div><div class="tt-tier">TIER ${lvl} / 5</div>${costText}${reqText}`;
     };
     el.addEventListener('mouseenter',()=>{ if(!isTouchDevice) openTooltip(el,tooltipHtml()); });
@@ -8258,13 +8258,13 @@ document.getElementById('btnAchievements').onclick=()=>{ setState('achievements'
 document.getElementById('achBack').onclick=goMenu;
 
 function renderArmoryScreen(){
-  document.getElementById('armorySummary').textContent = `Artifacts: ${Math.floor(save.artifacts)}`;
+  document.getElementById('armorySummary').textContent = `Artifacts: ${fmtBig(save.artifacts)}`;
   const wrap=document.getElementById('armoryWrap'); wrap.innerHTML="";
   for(const item of ARMORY_ITEMS){
     const lvl=armoryLevel(item.id); const maxed=lvl>=item.maxLevel; const cost=armoryCost(item,lvl);
     const el=document.createElement('div'); el.className='ach-card unlocked';
     el.innerHTML=`<div class="ach-icon">${item.icon}</div><div style="flex:1"><div class="ach-name">${item.name} <span class="ach-chip">${lvl}/${item.maxLevel}</span></div><div class="ach-desc">${item.desc}</div></div>`;
-    const btn=document.createElement('button'); btn.className='buy-btn'; btn.style.marginLeft='10px'; btn.textContent=maxed?"MAXED":`${cost} 🎗️`;
+    const btn=document.createElement('button'); btn.className='buy-btn'; btn.style.marginLeft='10px'; btn.textContent=maxed?"MAXED":`${fmtBig(cost)} 🎗️`;
     btn.disabled=maxed||save.artifacts<cost;
     btn.onclick=()=>{ if(maxed||save.artifacts<cost) return; save.artifacts-=cost; save.armoryUnlocks[item.id]=lvl+1; persistSave(); refreshSoulBadges(); renderArmoryScreen(); };
     el.appendChild(btn); wrap.appendChild(el);
