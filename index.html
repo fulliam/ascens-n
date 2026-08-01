@@ -2490,6 +2490,11 @@ boot();
 // this one is purely informational, the other one gates save migrations.
 const GAME_VERSION = "0.38.0";
 
+
+/* =========================================================================
+   PART 1 — BUILD LAYER DATA (weapons, evolutions, cards, passives, synergies, characters)
+   ========================================================================= */
+
 /* =========================================================================
    CONFIG — centralized caps/balance/colors/texts. See
    .tools/docs/engineering/CONFIG_CENTRALIZATION_PLAN.md for the full design.
@@ -2505,7 +2510,40 @@ const GAME_VERSION = "0.38.0";
 const CONFIG_VERSION = 1; // bump on breaking SHAPE changes (renamed/restructured paths), not on every value tweak
 const CONFIG_DEFAULTS = {
   version: CONFIG_VERSION,
-  caps: {},
+  // Phase 2 — hard ceilings/floors against unbounded game-entity/stat growth.
+  // Deliberately excludes MAX_QUEUE_ITER (pure algorithmic safety bound, not
+  // a gameplay cap) and CAMERA_MAX_ZOOM/CAMERA_MIN_ZOOM (camera/UX bounds) —
+  // see CONFIG_CENTRALIZATION_PLAN.md's taxonomy for why those don't belong here.
+  caps: {
+    MAX_PASSIVE_SLOTS: 6,
+    MAX_PASSIVE_SLOTS_PER_TYPE: 2, // enforce PASSIVE_SLOT_TYPES: at most 2 items of the same slot type equipped at once
+    ENEMY_DMG_SCALE_CAP: 3.2,
+    MAX_WEAPON_SLOTS_BASE: 6,
+    MAX_BULLETS: 900, // hard ceiling — a runaway projectile-count build can't create unbounded bullets
+    MAX_ENEMIES: 1600, // hard ceiling; dynamicMaxEnemies() further scales this down per the (separate) enemy-density setting
+    MAX_MINIONS: 150,
+    LIFESTEAL_HPS_CAP: 80,
+    LIFESTEAL_HPS_PCT_CAP: 0.20,
+    LIFESTEAL_HPS_PCT_CAP_START_T: 600,
+    MAX_ORBS: 220,
+    MAX_PARTICLES: 600, MAX_FLOATERS: 150, // hard ceilings so a huge kill cluster can't create unbounded objects in one frame
+    STAT_CAPS: {
+      dmgMult:[0,32], atkSpeedMult:[0.1,6], cdrMult:[0.18,3], critChance:[0,0.8], critMult:[1,4.5],
+      damageReduction:[0,0.55], arcaneDmgMult:[0.2,4], reviveChance:[0,0.4], chillCap:[0.1,0.6], burnStacks:[1,4],
+      moveSpeed:[40,820], pickupRadius:[20,2000], armor:[0,65], regen:[0,40], goldMult:[0,8], xpMult:[0,8],
+      lifesteal:[0,0.45], chainOnHitChance:[0,0.8], burnOnHitChance:[0,0.8], extraChainChance:[0,0.8],
+      eliteDmgMult:[0,7], soulMult:[0,8], thorns:[0,0.85], bonusPierce:[0,40], bonusProjectiles:[0,15],
+      aoeRadiusMult:[0.2,4], rangeMult:[0.2,4], summonDmgMult:[0,8], summonCountMult:[0,4], fireMult:[0,8],
+      frostMult:[0,8], lightningMult:[0,8], poisonMult:[0,8], holyMult:[0,8],
+      // Was uncapped entirely (real bug, see .tools/docs/archive/bugs/save-hang-analysis.md and
+      // MAX_MINIONS above spawnMinion()). Current max realistic stack is ~0.36 (necromancers_pact
+      // 0.1 + restless_dead 2x0.08 + lich_lord_build synergy 0.1) — 0.5 sits comfortably above that
+      // so no existing build gets nerfed, it's a safety valve against future additions stacking
+      // unbounded, not a balance nerf. MAX_MINIONS is the real defense against the population-
+      // explosion crash.
+      raiseDeadChance:[0,0.5],
+    },
+  },
   balance: {},
   colors: { palette: {}, semantic: {} },
   texts: {},
@@ -2516,7 +2554,26 @@ const CONFIG_DEFAULTS = {
 // three), (2) the Config Editor (Phase 6) uses it to auto-generate form
 // fields with the right input type/bounds instead of hand-laying out every
 // one. Populated incrementally as each category's real constants move in.
-const CONFIG_SCHEMA = {};
+const CONFIG_SCHEMA = {
+  "caps.MAX_PASSIVE_SLOTS": {type:"number", min:1, max:20},
+  "caps.MAX_PASSIVE_SLOTS_PER_TYPE": {type:"number", min:1, max:20},
+  "caps.ENEMY_DMG_SCALE_CAP": {type:"number", min:0.5, max:20},
+  "caps.MAX_WEAPON_SLOTS_BASE": {type:"number", min:1, max:20},
+  "caps.MAX_BULLETS": {type:"number", min:100, max:5000},
+  "caps.MAX_ENEMIES": {type:"number", min:100, max:5000},
+  "caps.MAX_MINIONS": {type:"number", min:10, max:1000},
+  "caps.LIFESTEAL_HPS_CAP": {type:"number", min:0, max:10000},
+  "caps.LIFESTEAL_HPS_PCT_CAP": {type:"number", min:0, max:1},
+  "caps.LIFESTEAL_HPS_PCT_CAP_START_T": {type:"number", min:0, max:10000},
+  "caps.MAX_ORBS": {type:"number", min:10, max:2000},
+  "caps.MAX_PARTICLES": {type:"number", min:10, max:5000},
+  "caps.MAX_FLOATERS": {type:"number", min:10, max:2000},
+};
+// STAT_CAPS entries are themselves [lo,hi] BOUNDS, not values to bound — one
+// generic "array" schema type (added to validateAndClamp below) covers all of
+// them, generated from the actual keys instead of hand-listing ~40 lines, so
+// adding a new stat cap later auto-registers its schema for free.
+for(const _statKey of Object.keys(CONFIG_DEFAULTS.caps.STAT_CAPS)) CONFIG_SCHEMA["caps.STAT_CAPS."+_statKey] = {type:"array"};
 // Deep-clones CONFIG_DEFAULTS so the live, possibly-overridden CONFIG the
 // game actually reads never accidentally shares a nested object with
 // CONFIG_DEFAULTS (mutating one must never be able to mutate the other).
@@ -2564,6 +2621,8 @@ function validateAndClamp(patch, prefix){
         out[key] = val.slice(0, schema.maxLen||500);
       } else if(schema.type==="boolean" && typeof val==="boolean"){
         out[key] = val;
+      } else if(schema.type==="array" && Array.isArray(val) && val.length===2 && val.every(n=>typeof n==="number" && isFinite(n))){
+        out[key] = val.slice();
       }
       // else: wrong type for a known path — dropped
     } else if(val && typeof val==="object" && !Array.isArray(val)){
@@ -2628,9 +2687,6 @@ function persistConfigOverride(){
 // a partially-initialized state.
 loadConfigOverrideFromStorage();
 
-/* =========================================================================
-   PART 1 — BUILD LAYER DATA (weapons, evolutions, cards, passives, synergies, characters)
-   ========================================================================= */
 
 const WEAPONS = {
   blood_blade:{name:"Blood Blade",icon:"🗡",type:"melee",tags:["bleed","lifesteal"],base:{dmg:16,cd:0.8,radius:70,pierce:99},perLevel:{dmg:6,radius:4},maxLevel:8,evolvesInto:"crimson_executioner"},
@@ -2904,8 +2960,6 @@ for(const id of ["ascendant_power","ascendant_velocity","ascendant_vitality"]){
 }
 
 const PASSIVE_SLOT_TYPES = ["artifact","amulet","ring","relic"];
-const MAX_PASSIVE_SLOTS = 6;
-const MAX_PASSIVE_SLOTS_PER_TYPE = 2; // enforce PASSIVE_SLOT_TYPES: at most 2 items of the same slot type equipped at once
 const PASSIVES = [
   {id:"vampire_fang",slot:"amulet",name:"Vampire Fang",icon:"🧛",tags:["lifesteal"],desc:"+4% lifesteal.",apply:p=>p.stats.lifesteal+=0.04},
   {id:"broken_clock",slot:"relic",name:"Broken Clock",icon:"🕰",tags:["cooldown"],desc:"-20% cooldown on all weapons.",apply:p=>p.stats.cdrMult=(p.stats.cdrMult||1)*0.8},
@@ -3087,10 +3141,10 @@ const ENEMIES_NORMAL_RAW = [
 const ENEMY_HP_MULT = 1.3;
 const ENEMY_DMG_MULT = 1.12;
 // Per-hit damage-scale cap (spawnEnemy applies Math.min(wave.mult*WAVE_POWER_MULT,
-// ENEMY_DMG_SCALE_CAP) to dmg) — prevents wave.mult alone from ever one-shotting the
-// player at high mult, while raw HP (uncapped) keeps scaling so late enemies still
-// take proportionally longer to kill instead of purely being a damage sponge.
-const ENEMY_DMG_SCALE_CAP = 3.2;
+// CONFIG.caps.ENEMY_DMG_SCALE_CAP) to dmg) — prevents wave.mult alone from ever
+// one-shotting the player at high mult, while raw HP (uncapped) keeps scaling so
+// late enemies still take proportionally longer to kill instead of purely being a
+// damage sponge. Value itself now lives in CONFIG.caps (see CONFIG_DEFAULTS above).
 // Player base moveSpeed is 230 (freshStats), and every melee/tank enemy's raw speed in
 // ENEMIES_NORMAL_RAW sits well below that (35-165) — meaning the chase brain can never
 // actually close distance on a player who just holds a direction, regardless of weapon
@@ -4063,8 +4117,7 @@ function newPlayer(characterId){
   p.hp = Math.min(p.hp, p.maxHp);
   return p;
 }
-const MAX_WEAPON_SLOTS_BASE = 6;
-function maxWeaponSlots(p){ return MAX_WEAPON_SLOTS_BASE + (p.extraWeaponSlots||0); }
+function maxWeaponSlots(p){ return CONFIG.caps.MAX_WEAPON_SLOTS_BASE + (p.extraWeaponSlots||0); }
 
 function startRun(){
   // Path A Milestone 2 (.claude/plans/agile-shimmying-metcalfe.md) — reseed
@@ -4390,10 +4443,9 @@ function weaponFire(wid, lvl, dt){
   }
 }
 
-const MAX_BULLETS = 900; // hard ceiling — a runaway projectile-count build can't create unbounded bullets
 let bulletPool = [];
 function spawnBullet(props){
-  if(bullets.length>=MAX_BULLETS) return null;
+  if(bullets.length>=CONFIG.caps.MAX_BULLETS) return null;
   const b = bulletPool.pop() || {};
   b.traveled=0; b.returning=false; b.weaponId=undefined; b.pierce=0; b.forceCrit=false; b.detonate=false;
   b.shape=undefined; b.evolved=false; b.homing=undefined; b.orbit=null; b.wobble=undefined; b.dead=false;
@@ -4519,10 +4571,10 @@ function checkSynergies(){
 
 function equipPassive(passiveId){
   const def = PASSIVES.find(x=>x.id===passiveId); if(!def) return false;
-  if(player.passives.length >= MAX_PASSIVE_SLOTS + (player.stats.extraPassiveSlots||0)){ player.gold += 60; logEvent("Passive slots full — converted to 60 gold."); return false; }
-  // Enforce PASSIVE_SLOT_TYPES: at most MAX_PASSIVE_SLOTS_PER_TYPE items of the same slot type.
+  if(player.passives.length >= CONFIG.caps.MAX_PASSIVE_SLOTS + (player.stats.extraPassiveSlots||0)){ player.gold += 60; logEvent("Passive slots full — converted to 60 gold."); return false; }
+  // Enforce PASSIVE_SLOT_TYPES: at most CONFIG.caps.MAX_PASSIVE_SLOTS_PER_TYPE items of the same slot type.
   const sameTypeCount = player.passives.filter(pid=>{ const d=PASSIVES.find(x=>x.id===pid); return d && d.slot===def.slot; }).length;
-  if(sameTypeCount >= MAX_PASSIVE_SLOTS_PER_TYPE){ player.gold += 60; logEvent(`All ${def.slot} slots full — converted to 60 gold.`); return false; }
+  if(sameTypeCount >= CONFIG.caps.MAX_PASSIVE_SLOTS_PER_TYPE){ player.gold += 60; logEvent(`All ${def.slot} slots full — converted to 60 gold.`); return false; }
   player.passives.push(passiveId); def.apply(player);
   runStats.passiveSlotsFilled = player.passives.length;
   logEvent(`Equipped passive: ${def.name}`);
@@ -4604,7 +4656,7 @@ function dealDamage(enemy, dmg, weaponId){
     spawnFloater(enemy.x,enemy.y-10,fmtFlavorBig(dmg), crit?"#ffe15c":(isEliteOrBoss?"#ffb347":"#fff"));
     if(player.stats.lifesteal>0){
       if(runTime-player.lifestealWindowStart>=1){ player.lifestealWindowStart=runTime; player.lifestealHealedThisSec=0; }
-      const capThisSec = runTime<LIFESTEAL_HPS_PCT_CAP_START_T ? LIFESTEAL_HPS_CAP : Math.min(LIFESTEAL_HPS_CAP, player.maxHp*LIFESTEAL_HPS_PCT_CAP);
+      const capThisSec = runTime<CONFIG.caps.LIFESTEAL_HPS_PCT_CAP_START_T ? CONFIG.caps.LIFESTEAL_HPS_CAP : Math.min(CONFIG.caps.LIFESTEAL_HPS_CAP, player.maxHp*CONFIG.caps.LIFESTEAL_HPS_PCT_CAP);
       const budget = Math.max(0, capThisSec-player.lifestealHealedThisSec);
       const healed = Math.min(player.maxHp-player.hp, dmg*player.stats.lifesteal, budget);
       player.hp=Math.min(player.maxHp,player.hp+healed);
@@ -4758,7 +4810,7 @@ function spawnEnemy(id, forcedPos, overrides={}){
   const hpMult = overrides.hpMult!=null?overrides.hpMult:1;
   const radiusMult = overrides.radiusMult!=null?overrides.radiusMult:1;
   const e = resetEnemyFields(acquireEnemyObject());
-  const baseDmg = def.dmg*Math.min(scale,ENEMY_DMG_SCALE_CAP);
+  const baseDmg = def.dmg*Math.min(scale,CONFIG.caps.ENEMY_DMG_SCALE_CAP);
   Object.assign(e, { id, name:def.name, x,y, hp:def.hp*scale*hpMult, maxHp:def.hp*scale*hpMult, speed:def.speed,
     radius:def.radius*radiusMult, dmg:baseDmg, baseDmg, xp:def.xp, gold:def.gold, brain:def.brain,
     color:def.color, glow:def.glow, shape:def.shape, elite:!!def.elite, boss:false, special:def.special||null,
@@ -4792,11 +4844,12 @@ function spawnBoss(bossDefId, forcedPos){
     shield:0, aiTimer:0 });
   enemies.push(e); return e;
 }
-const MAX_ENEMIES = 1600; // hard ceiling; dynamicMaxEnemies() further scales this down per the (now separate) enemy-density setting
 // enemyDensity is a separate setting from graphics `quality` (Settings > Video >
 // Enemy Density) — lowering particle/glow detail for performance shouldn't also
 // thin out difficulty, so dynamicMaxEnemies() reads only the density setting.
-function dynamicMaxEnemies(){ return enemyDensity==='low' ? 400 : enemyDensity==='medium' ? 1000 : MAX_ENEMIES; }
+// 400/1000 (low/medium tiers) are deliberately left as inline literals for now —
+// CONFIG.caps.MAX_ENEMIES only covers the "high"/uncapped tier this phase.
+function dynamicMaxEnemies(){ return enemyDensity==='low' ? 400 : enemyDensity==='medium' ? 1000 : CONFIG.caps.MAX_ENEMIES; }
 const AI_TICK_INTERVAL = 0.2; // normal enemies re-run their brain logic ~5x/sec instead of 60x/sec; elites/bosses are exempt
 // Wind-up window (seconds) before a dash/charge actually fires — during this window
 // e.dashTelegraph is populated and render() draws a dotted line + arrowhead so the player
@@ -5287,13 +5340,12 @@ function updateEnemies(dt){
 // put 500+ concurrent minions on screen, each spawned at the position of a just-
 // killed enemy (guaranteed on-camera, so viewport culling doesn't help) and each
 // paid its own shadowBlur pass — the diagnosed root cause of a real player-reported
-// save-hang (.tools/docs/bugs/save-hang-analysis.md). Chosen high enough to never
-// bite a normal build (MAX_BULLETS is 900 for comparison) while still bounding the
-// worst case.
-const MAX_MINIONS = 150;
+// save-hang (.tools/docs/archive/bugs/save-hang-analysis.md). Chosen high enough to
+// never bite a normal build (CONFIG.caps.MAX_BULLETS is 900 for comparison) while
+// still bounding the worst case.
 let minionPool = [];
 function spawnMinion(props){
-  if(minions.length>=MAX_MINIONS) return null;
+  if(minions.length>=CONFIG.caps.MAX_MINIONS) return null;
   const m = minionPool.pop() || {};
   m.dead=false;
   Object.assign(m, props);
@@ -5420,7 +5472,8 @@ const HEAL_ABILITY_PCT = 0.12;    // fraction of maxHp restored per use
 // actually *declines* over a run now (31.6% -> 22.4%, t=300 to t=2400) instead of
 // staying flat — real, continuing risk for the whole run, not just the opening
 // minutes, which was the explicit ask ("усложнения жизни игроку").
-const LIFESTEAL_HPS_CAP = 80;
+// (Value now lives in CONFIG.caps.LIFESTEAL_HPS_CAP, see CONFIG_DEFAULTS near the
+// top of the file — this tuning-history comment stays here.)
 // Direct playtest feedback (not just verify-balance's threat-abstraction, which has
 // no spatial resolution and can't see a player dashing/kiting around most contact):
 // a flat 80/sec ceiling is still enormous against a *typical* (non-HP-stacked)
@@ -5441,37 +5494,24 @@ const LIFESTEAL_HPS_CAP = 80;
 // flattening once the flat cap alone kicks in (35.0%/34.3%/28.5%/28.4%/22.8% at
 // t=300/600/1200/1800/2400) and spreading boss deaths across most of the roster
 // again instead of just Dragon+wave-pressure.
-const LIFESTEAL_HPS_PCT_CAP = 0.20;
-const LIFESTEAL_HPS_PCT_CAP_START_T = 600;
-const STAT_CAPS = {
-  dmgMult:[0,32], atkSpeedMult:[0.1,6], cdrMult:[0.18,3], critChance:[0,0.8], critMult:[1,4.5],
-  damageReduction:[0,0.55], arcaneDmgMult:[0.2,4], reviveChance:[0,0.4], chillCap:[0.1,0.6], burnStacks:[1,4],
-  moveSpeed:[40,820], pickupRadius:[20,2000], armor:[0,65], regen:[0,40], goldMult:[0,8], xpMult:[0,8],
-  lifesteal:[0,0.45], chainOnHitChance:[0,0.8], burnOnHitChance:[0,0.8], extraChainChance:[0,0.8],
-  eliteDmgMult:[0,7], soulMult:[0,8], thorns:[0,0.85], bonusPierce:[0,40], bonusProjectiles:[0,15],
-  aoeRadiusMult:[0.2,4], rangeMult:[0.2,4], summonDmgMult:[0,8], summonCountMult:[0,4], fireMult:[0,8],
-  frostMult:[0,8], lightningMult:[0,8], poisonMult:[0,8], holyMult:[0,8],
-  // Was uncapped entirely (real bug, see .tools/docs/bugs/save-hang-analysis.md and MAX_MINIONS
-  // above spawnMinion()). Current max realistic stack is ~0.36 (necromancers_pact 0.1 +
-  // restless_dead 2x0.08 + lich_lord_build synergy 0.1) — 0.5 sits comfortably above that so no
-  // existing build gets nerfed, it's a safety valve against future additions stacking unbounded,
-  // not a balance nerf. MAX_MINIONS is the real defense against the population-explosion crash.
-  raiseDeadChance:[0,0.5],
-};
+// (Values above now live in CONFIG.caps — LIFESTEAL_HPS_CAP/LIFESTEAL_HPS_PCT_CAP/
+// LIFESTEAL_HPS_PCT_CAP_START_T/STAT_CAPS — see CONFIG_DEFAULTS near the top of the
+// file; this comment block stays here since it's the tuning history for those exact
+// numbers, not for anything else nearby.)
 function clampPlayerStats(){
   if(!player) return;
   const s = player.stats;
-  for(const key in STAT_CAPS){
+  for(const key in CONFIG.caps.STAT_CAPS){
     const v = s[key];
-    if(typeof v!=="number" || !isFinite(v)) { s[key] = STAT_CAPS[key][0]; continue; }
-    const [lo,hi] = STAT_CAPS[key];
+    if(typeof v!=="number" || !isFinite(v)) { s[key] = CONFIG.caps.STAT_CAPS[key][0]; continue; }
+    const [lo,hi] = CONFIG.caps.STAT_CAPS[key];
     s[key] = clamp(v, lo, hi);
   }
   if(!isFinite(player.hp)) player.hp = 1;
   if(!isFinite(player.maxHp) || player.maxHp<=0) player.maxHp = 10;
   player.maxHp = Math.min(player.maxHp, 100000);
   player.hp = clamp(player.hp, 0, player.maxHp);
-  if(Object.keys(player.weapons).length > MAX_WEAPON_SLOTS_BASE+10) { /* safety valve, should never trigger via normal play */ }
+  if(Object.keys(player.weapons).length > CONFIG.caps.MAX_WEAPON_SLOTS_BASE+10) { /* safety valve, should never trigger via normal play */ }
 }
 
 // Cooldown a dash charge regenerates in, after dashCdrMult (Blink Step card etc).
@@ -5610,9 +5650,8 @@ function applyKnockback(fromX, fromY, dist){
 // strobing at high frequency). Past the cap, new value merges into the
 // nearest same-type orb instead of spawning another shape, so nothing is
 // ever lost — kills just stop multiplying the on-screen orb count.
-const MAX_ORBS = 220;
 function spawnOrb(orb){
-  if(orbs.length<MAX_ORBS){ orbs.push(orb); return; }
+  if(orbs.length<CONFIG.caps.MAX_ORBS){ orbs.push(orb); return; }
   let nearest=null, nearestD=Infinity;
   for(const o of orbs){
     if(o.type!==orb.type) continue;
@@ -5928,7 +5967,7 @@ function charInfoStatsHtml(){
     <div class="stat-row"><span class="k">Attack Range</span><span>+${Math.round(((s.rangeMult||1)-1)*100)}% (cam ${Math.round((camera.zoom||targetZoomForRange())*100)}%)</span></div>
     <div class="stat-row"><span class="k">Elite Dmg Mult</span><span>+${Math.round((s.eliteDmgMult-1)*100)}%</span></div>
     <div class="stat-row"><span class="k">Fire / Frost / Lightning / Poison</span><span>${s.fireMult.toFixed(2)} / ${s.frostMult.toFixed(2)} / ${s.lightningMult.toFixed(2)} / ${s.poisonMult.toFixed(2)}</span></div>
-    <div class="stat-row"><span class="k">Passives</span><span>${player.passives.length} / ${MAX_PASSIVE_SLOTS+(s.extraPassiveSlots||0)}</span></div>
+    <div class="stat-row"><span class="k">Passives</span><span>${player.passives.length} / ${CONFIG.caps.MAX_PASSIVE_SLOTS+(s.extraPassiveSlots||0)}</span></div>
     <div class="stat-row"><span class="k">Weapon Slots</span><span>${Object.keys(player.weapons).length} / ${maxWeaponSlots(player)}</span></div>
     <div class="stat-row"><span class="k">Synergies Active</span><span>${player.synergiesActive.length}</span></div>
     <div class="stat-row"><span class="k">Revive</span><span style="color:${player.hasRevive?'var(--xp)':'var(--dim)'}">${player.hasRevive?"READY ☥":"None"}</span></div>
@@ -5972,7 +6011,7 @@ function charInfoPassivesHtml(){
     html+=`<div class="inv-section-title">Active Builds</div>`;
     html+=activeSyns.map(s=>`<div class="inv-row"><div class="inv-icon">🧬</div><div class="inv-body"><div class="inv-name">${s.name}</div><div class="inv-desc">${s.desc}</div></div></div>`).join("");
   }
-  const slotMax=MAX_PASSIVE_SLOTS+(player.stats.extraPassiveSlots||0);
+  const slotMax=CONFIG.caps.MAX_PASSIVE_SLOTS+(player.stats.extraPassiveSlots||0);
   html+=`<div class="inv-section-title">Passives (${player.passives.length} / ${slotMax})</div>`;
   html+= player.passives.length ? player.passives.map(id=>{
     const d=PASSIVES.find(x=>x.id===id); if(!d) return "";
@@ -6413,12 +6452,11 @@ function win(){
    PART 12 — JUICE / HUD / RENDER
    ========================================================================= */
 const QUALITY_PARTICLE_MULT={low:0.2,medium:0.55,high:1};
-const MAX_PARTICLES=600, MAX_FLOATERS=150; // hard ceilings so a huge kill cluster can't create unbounded objects in one frame
 let particlePool=[], floaterPool=[];
 function spawnParticle(x,y,color,n=5){
   n=Math.ceil(n*(QUALITY_PARTICLE_MULT[quality]??1));
   for(let i=0;i<n;i++){
-    if(particles.length>=MAX_PARTICLES) break;
+    if(particles.length>=CONFIG.caps.MAX_PARTICLES) break;
     const ang=rand(0,Math.PI*2),spd=rand(40,200);
     const p = particlePool.pop() || {};
     p.x=x; p.y=y; p.vx=Math.cos(ang)*spd; p.vy=Math.sin(ang)*spd; p.life=rand(0.3,0.6); p.maxLife=0.6; p.color=color;
@@ -6426,7 +6464,7 @@ function spawnParticle(x,y,color,n=5){
   }
 }
 function spawnFloater(x,y,text,color){
-  if(floaters.length>=MAX_FLOATERS) return;
+  if(floaters.length>=CONFIG.caps.MAX_FLOATERS) return;
   const f = floaterPool.pop() || {};
   f.x=x; f.y=y; f.text=text; f.color=color; f.life=0.6; f.vy=-40;
   floaters.push(f);
@@ -7438,11 +7476,17 @@ function updatePendingShots(dt){
 // Phase 3 step 1 completion (WASM_ECS_MIGRATION_PLAN.md) — pre-allocated,
 // reused every frame (same "don't allocate a fresh typed array every tick"
 // discipline as the rest of this codebase's pooled buffers). Sized to
-// MAX_BULLETS since that's the hard ceiling on how many player bullets can
-// ever be eligible in one frame.
-const bulletEchoXs=new Float32Array(MAX_BULLETS), bulletEchoYs=new Float32Array(MAX_BULLETS),
-      bulletEchoVxs=new Float32Array(MAX_BULLETS), bulletEchoVys=new Float32Array(MAX_BULLETS);
-const bulletEchoRefs=new Array(MAX_BULLETS);
+// CONFIG.caps.MAX_BULLETS since that's the hard ceiling on how many player
+// bullets can ever be eligible in one frame. NOTE (CONFIG Phase 2): unlike
+// spawnBullet()'s cap check above (reads CONFIG.caps.MAX_BULLETS fresh every
+// call, so a live override takes effect immediately), these are fixed-size
+// buffers allocated ONCE here at script-eval time — a future Config Editor
+// change to MAX_BULLETS changes the enforced population cap live, but does
+// NOT resize these arrays without a page reload. Documented, not silently
+// papered over — flagged for whoever builds Phase 6's live-apply path.
+const bulletEchoXs=new Float32Array(CONFIG.caps.MAX_BULLETS), bulletEchoYs=new Float32Array(CONFIG.caps.MAX_BULLETS),
+      bulletEchoVxs=new Float32Array(CONFIG.caps.MAX_BULLETS), bulletEchoVys=new Float32Array(CONFIG.caps.MAX_BULLETS);
+const bulletEchoRefs=new Array(CONFIG.caps.MAX_BULLETS);
 let wasmBulletPhysicsChecked=0, wasmBulletPhysicsMismatches=0, bulletPhysicsSource="js-fallback";
 function updateBullets(dt){
   const useWasm = !!(window.EngineBridge && window.EngineBridge.isReady());
@@ -7476,7 +7520,12 @@ function updateBullets(dt){
       }
     }
     if(!b.orbit){
-      if(useWasm && eligibleCount<MAX_BULLETS){
+      // Bound against the echo buffers' actual allocated length, not CONFIG.caps.MAX_BULLETS
+      // directly — they're the same value today, but the buffers are fixed-size at load (see
+      // the comment above their allocation) while CONFIG.caps.MAX_BULLETS could in principle
+      // diverge from it after a live override, until a reload reallocates them. Checking the
+      // real array length can never index out of bounds regardless of which one is current.
+      if(useWasm && eligibleCount<bulletEchoXs.length){
         bulletEchoXs[eligibleCount]=b.x; bulletEchoYs[eligibleCount]=b.y;
         bulletEchoVxs[eligibleCount]=b.vx; bulletEchoVys[eligibleCount]=b.vy;
         bulletEchoRefs[eligibleCount]=b;
