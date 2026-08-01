@@ -2544,7 +2544,26 @@ const CONFIG_DEFAULTS = {
       raiseDeadChance:[0,0.5],
     },
   },
-  balance: {},
+  // Phase 3 Group A — global multipliers. IMPORTANT CAVEAT for Phase 6 (the
+  // live editor): PLAYER_WEAPON_DMG_MULT/ENEMY_HP_MULT/ENEMY_DMG_MULT/
+  // BOSS_HP_MULT/BOSS_DMG_MULT are baked ONCE into WEAPONS/ENEMIES/BOSS_ROSTER
+  // at module-eval time below (see checkWeaponBalance()-adjacent bake loop,
+  // the ENEMIES_NORMAL/ENEMIES_ELITE map, and the BOSS_ROSTER map) — they are
+  // NOT re-read per-spawn/per-hit, so changing them via CONFIG after boot has
+  // NO effect without a page reload (which re-runs the bake from the new
+  // CONFIG value). WAVE_POWER_MULT/WAVE_SPAWN_RATE_MULT are the opposite —
+  // read fresh inside currentWave() every spawn, genuinely live-editable.
+  // BOSS_TARGET_FIGHT_SECONDS is read fresh inside spawnBoss(), also live.
+  balance: {
+    PLAYER_WEAPON_DMG_MULT: 0.85,
+    ENEMY_HP_MULT: 1.3,
+    ENEMY_DMG_MULT: 1.12,
+    WAVE_POWER_MULT: 1.1, // modest global bump to enemy scaling density (pairs with ENEMY_HP_MULT/ENEMY_DMG_MULT)
+    WAVE_SPAWN_RATE_MULT: 1.35, // waves read as sparse/easy — trickle-spawn cadence faster across every wave entry
+    BOSS_HP_MULT: 4.5,
+    BOSS_DMG_MULT: 1.2,
+    BOSS_TARGET_FIGHT_SECONDS: 7,
+  },
   colors: { palette: {}, semantic: {} },
   texts: {},
 };
@@ -2568,6 +2587,14 @@ const CONFIG_SCHEMA = {
   "caps.MAX_ORBS": {type:"number", min:10, max:2000},
   "caps.MAX_PARTICLES": {type:"number", min:10, max:5000},
   "caps.MAX_FLOATERS": {type:"number", min:10, max:2000},
+  "balance.PLAYER_WEAPON_DMG_MULT": {type:"number", min:0.1, max:5},
+  "balance.ENEMY_HP_MULT": {type:"number", min:0.1, max:10},
+  "balance.ENEMY_DMG_MULT": {type:"number", min:0.1, max:10},
+  "balance.WAVE_POWER_MULT": {type:"number", min:0.1, max:5},
+  "balance.WAVE_SPAWN_RATE_MULT": {type:"number", min:0.1, max:5},
+  "balance.BOSS_HP_MULT": {type:"number", min:0.1, max:20},
+  "balance.BOSS_DMG_MULT": {type:"number", min:0.1, max:10},
+  "balance.BOSS_TARGET_FIGHT_SECONDS": {type:"number", min:1, max:120},
 };
 // STAT_CAPS entries are themselves [lo,hi] BOUNDS, not values to bound — one
 // generic "array" schema type (added to validateAndClamp below) covers all of
@@ -2753,13 +2780,12 @@ const WEAPONS = {
 // down by one tunable constant here, applied uniformly right after the weapon
 // data is defined above (evolutions, per-level scaling, talents, etc. all read
 // the already-nerfed numbers, so nothing downstream needs to change).
-const PLAYER_WEAPON_DMG_MULT = 0.85;
 for(const wid of Object.keys(WEAPONS)){
   const w = WEAPONS[wid];
-  if(w.base.dmg!=null) w.base.dmg = +(w.base.dmg*PLAYER_WEAPON_DMG_MULT).toFixed(2);
-  if(w.base.dps!=null) w.base.dps = +(w.base.dps*PLAYER_WEAPON_DMG_MULT).toFixed(2);
-  if(w.perLevel.dmg!=null) w.perLevel.dmg = +(w.perLevel.dmg*PLAYER_WEAPON_DMG_MULT).toFixed(2);
-  if(w.perLevel.dps!=null) w.perLevel.dps = +(w.perLevel.dps*PLAYER_WEAPON_DMG_MULT).toFixed(2);
+  if(w.base.dmg!=null) w.base.dmg = +(w.base.dmg*CONFIG.balance.PLAYER_WEAPON_DMG_MULT).toFixed(2);
+  if(w.base.dps!=null) w.base.dps = +(w.base.dps*CONFIG.balance.PLAYER_WEAPON_DMG_MULT).toFixed(2);
+  if(w.perLevel.dmg!=null) w.perLevel.dmg = +(w.perLevel.dmg*CONFIG.balance.PLAYER_WEAPON_DMG_MULT).toFixed(2);
+  if(w.perLevel.dps!=null) w.perLevel.dps = +(w.perLevel.dps*CONFIG.balance.PLAYER_WEAPON_DMG_MULT).toFixed(2);
 }
 // Per-weapon color, used everywhere a weapon's projectile/effect is drawn so each
 // weapon reads as visually distinct instead of every bullet being the same beige.
@@ -3138,8 +3164,6 @@ const ENEMIES_NORMAL_RAW = [
 // below. Kept moderate on purpose — see the range/camera-zoom additions further
 // down, which are meant to offset this by letting the player actually see and
 // react to the extra threat instead of just taking more unavoidable damage.
-const ENEMY_HP_MULT = 1.3;
-const ENEMY_DMG_MULT = 1.12;
 // Per-hit damage-scale cap (spawnEnemy applies Math.min(wave.mult*WAVE_POWER_MULT,
 // CONFIG.caps.ENEMY_DMG_SCALE_CAP) to dmg) — prevents wave.mult alone from ever
 // one-shotting the player at high mult, while raw HP (uncapped) keeps scaling so
@@ -3155,7 +3179,7 @@ const ENEMY_DMG_MULT = 1.12;
 const ENEMY_CHASE_SPEED_MULT = 1.6;
 const ENEMIES_NORMAL = ENEMIES_NORMAL_RAW.map(([id,role,hp,speed,dmg,behavior],i)=>{
   const rc = roleColor(role,i);
-  hp = Math.round(hp*ENEMY_HP_MULT); dmg = +(dmg*ENEMY_DMG_MULT).toFixed(1);
+  hp = Math.round(hp*CONFIG.balance.ENEMY_HP_MULT); dmg = +(dmg*CONFIG.balance.ENEMY_DMG_MULT).toFixed(1);
   if(role==="melee"||role==="tank") speed = Math.round(speed*ENEMY_CHASE_SPEED_MULT);
   return { id,name:id.replace(/_/g," ").replace(/\b\w/g,c=>c.toUpperCase()), role, hp, speed, dmg,
     xp:Math.max(1,Math.round(hp/6)), gold:Math.max(1,Math.round(hp/14)),
@@ -3187,7 +3211,7 @@ const ENEMIES_ELITE_RAW = [
 ];
 const ENEMIES_ELITE = ENEMIES_ELITE_RAW.map(([id,role,hp,speed,dmg,special,behavior],i)=>{
   const rc = roleColor(role,i+30);
-  hp = Math.round(hp*ENEMY_HP_MULT); dmg = +(dmg*ENEMY_DMG_MULT).toFixed(1);
+  hp = Math.round(hp*CONFIG.balance.ENEMY_HP_MULT); dmg = +(dmg*CONFIG.balance.ENEMY_DMG_MULT).toFixed(1);
   return { id,name:id.replace(/_/g," ").replace(/\b\w/g,c=>c.toUpperCase()), role, hp, speed, dmg, special,
     xp:Math.max(4,Math.round(hp/10)), gold:Math.max(2,Math.round(hp/18)),
     brain:brainForRole(role), radius:{melee:18,ranged:16,tank:24,swarm:14,assassin:16,support:19}[role]||18,
@@ -3269,10 +3293,8 @@ function currentDangerTier(t){
 // enough for their attack patterns to actually play out, not die in one hit.
 // Reward economy is intentionally decoupled from this (see rawHp below) so buffing
 // boss survivability doesn't also inflate gold/xp payouts.
-const BOSS_HP_MULT = 4.5, BOSS_DMG_MULT = 1.2;
 // spawnBoss() takes the max of (this legacy wave.mult-scaled hp) and
-// (playerCP(player)*BOSS_TARGET_FIGHT_SECONDS) — see spawnBoss() for why.
-const BOSS_TARGET_FIGHT_SECONDS = 7;
+// (playerCP(player)*CONFIG.balance.BOSS_TARGET_FIGHT_SECONDS) — see spawnBoss() for why.
 const BOSS_ROSTER_RAW = {
   dragon:   { name:"Dragon",         hp:5200,  dmg:34, speed:34, radius:46, color:"#ff4d5e", glow:"#6b1c22" },
   wyvern:   { name:"Wyvern",         hp:8200,  dmg:38, speed:40, radius:44, color:"#ff9d4d", glow:"#7a3d0f" },
@@ -3290,7 +3312,7 @@ for(const key of Object.keys(BOSS_ROSTER_RAW)){
   const b = BOSS_ROSTER_RAW[key];
   // rawHp kept alongside the HP_MULT-scaled hp so spawnBoss can reward xp/gold off
   // the un-inflated number — boss survivability and boss loot are separate knobs.
-  BOSS_ROSTER[key] = Object.assign({}, b, { hp: Math.round(b.hp*BOSS_HP_MULT), rawHp: b.hp, dmg: +(b.dmg*BOSS_DMG_MULT).toFixed(1) });
+  BOSS_ROSTER[key] = Object.assign({}, b, { hp: Math.round(b.hp*CONFIG.balance.BOSS_HP_MULT), rawHp: b.hp, dmg: +(b.dmg*CONFIG.balance.BOSS_DMG_MULT).toFixed(1) });
 }
 
 const BOSSES = {
@@ -4734,11 +4756,9 @@ function killEnemy(enemy){
 /* =========================================================================
    PART 8 — ENEMY SPAWNING / AI (extends base chase/keep_distance/charge/swarm/summon + phaseboss + elite specials)
    ========================================================================= */
-const WAVE_POWER_MULT = 1.1; // modest global bump to enemy scaling density (pairs with ENEMY_HP_MULT/ENEMY_DMG_MULT)
-const WAVE_SPAWN_RATE_MULT = 1.35; // waves read as sparse/easy — trickle-spawn cadence faster across every wave entry
 function currentWave(){
   let w=WAVES[0]; for(const ww of WAVES) if(runTime>=ww.t) w=ww;
-  w = Object.assign({}, w, { mult: w.mult*WAVE_POWER_MULT, interval: w.interval/WAVE_SPAWN_RATE_MULT });
+  w = Object.assign({}, w, { mult: w.mult*CONFIG.balance.WAVE_POWER_MULT, interval: w.interval/CONFIG.balance.WAVE_SPAWN_RATE_MULT });
   if(runTime>ENDLESS_START_T){
     // Endless post-Overlord scaling: keep raising density/multiplier over time instead of
     // freezing at the last authored wave's numbers forever (see ENDLESS_* constants above).
@@ -4832,7 +4852,7 @@ function spawnBoss(bossDefId, forcedPos){
   // late-game player's real DPS compounds far past what wave.mult implies.
   // Sizing off playerCP tracks whatever the player's build actually does, so
   // every boss fight stays roughly BOSS_TARGET_FIGHT_SECONDS long.
-  const cpHp = Math.max(1, playerCP(player)) * BOSS_TARGET_FIGHT_SECONDS;
+  const cpHp = Math.max(1, playerCP(player)) * CONFIG.balance.BOSS_TARGET_FIGHT_SECONDS;
   const hp = Math.max(def.hp*scale, cpHp);
   let x,y;
   if(forcedPos){x=forcedPos.x;y=forcedPos.y;} else { const ang=rand(0,Math.PI*2); const r=offscreenSpawnRadius(140); x=clamp(player.x+Math.cos(ang)*r,40,WORLD.w-40); y=clamp(player.y+Math.sin(ang)*r,40,WORLD.h-40); }
