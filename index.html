@@ -20,10 +20,32 @@
      resolving through CONFIG.colors.semantic["css.xp"] etc -> CONFIG.colors.palette.
      Keep these values in sync with CONFIG_DEFAULTS.colors' css.* entries by
      hand if either ever changes — same "keep in sync" discipline this
-     project already applies to other JS<->non-JS constant pairs. */
+     project already applies to other JS<->non-JS constant pairs.
+
+     "Every color, absolutely all of it, configurable" pass — every rgba()/
+     hex literal below was audited; alpha-variants of the 13 original theme
+     colors (accent/gold/crystal/soul/artifact) were converted to
+     color-mix(in srgb, var(--x) N%, transparent) so they derive from ONE
+     live CONFIG value instead of duplicating its RGB triplet at N different
+     opacities; 11 genuinely new colors (danger/dangerVignette/glitchCyan/
+     debug/warning/hpDark/xpDark/killCount/onAccent/onAccentDark/victoryGold)
+     were added to CONFIG_DEFAULTS.colors above with the SAME hex they always
+     had, so nothing here changed visually, it just stopped being a bare
+     literal. Deliberately NOT converted, on purpose, not an oversight: any
+     rgba(0,0,0,X) used for a genuine box-shadow/drop-shadow (a cast shadow
+     reads as "shadow" specifically because it's dark, on every real light-
+     mode UI too — this isn't the same class of bug the veil/grid overlay
+     fix addressed, where a literal WHITE overlay actively broke on a light
+     background) and the #000 inside -webkit-mask/mask radial-gradients (a
+     mask's color channel controls opacity-punched-out vs visible, not a
+     paint color — any opaque color works identically there, so there's
+     nothing to theme). */
   :root{
     --void:#08090d; --panel:#12141b; --panel2:#191c26; --line:#2a2e3a; --text:#dfe3ee; --dim:#7b8194;
     --xp:#7cff6b; --gold:#ffb347; --soul:#5ce1e6; --hp:#ff4d5e; --accent:#b98cff; --accent2:#ff6f9c; --crystal:#7ee0ff; --artifact:#ff9ecb;
+    --danger:#ff3b3b; --dangerVignette:#ff1414; --glitchCyan:#4dd9ff; --debug:#8fffcf; --warning:#ff8a4d; --hpDark:#8b1c2c; --xpDark:#2f8f22; --killCount:#8fb4ff;
+    --onAccent:#000000; --onAccentDark:#14101c; --victoryGold:#ffd479;
+    --veil-inner:rgba(30,20,50,0.55); --veil-outer:rgba(4,5,8,0.92); --chip-text-shadow:0 1px 2px rgba(0,0,0,0.6);
     --safe-top:env(safe-area-inset-top,0px); --safe-bottom:env(safe-area-inset-bottom,0px);
     --safe-left:env(safe-area-inset-left,0px); --safe-right:env(safe-area-inset-right,0px);
   }
@@ -48,12 +70,12 @@
      for what can receive it. Outline (not box-shadow) so it never fights an
      element's own box-shadow (char-card-selected glow, talent-node.maxed, etc). */
   .kbd-focus{outline:3px solid var(--accent); outline-offset:3px;}
-  .veil{position:absolute; inset:0; background:radial-gradient(ellipse at 50% 30%, rgba(30,20,50,0.55), rgba(4,5,8,0.92) 70%);}
+  .veil{position:absolute; inset:0; background:radial-gradient(ellipse at 50% 30%, var(--veil-inner), var(--veil-outer) 70%);}
   .title-wrap{position:relative; z-index:2; text-align:center; margin-bottom:28px;}
   .kicker{font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:4px; color:var(--accent); opacity:0.8; margin-bottom:10px;}
   .title{font-family:'Rajdhani',sans-serif; font-weight:700; font-size:56px; letter-spacing:6px; line-height:1;
-    background:linear-gradient(180deg,#fff, #b98cff 140%); -webkit-background-clip:text; background-clip:text; color:transparent;
-    text-shadow:0 0 60px rgba(185,140,255,0.25);}
+    background:linear-gradient(180deg,var(--text), var(--accent) 140%); -webkit-background-clip:text; background-clip:text; color:transparent;
+    text-shadow:0 0 60px color-mix(in srgb, var(--accent) 25%, transparent);}
   .subtitle{margin-top:10px; font-size:13px; color:var(--dim); letter-spacing:1px; max-width:520px;}
   /* POLISH_PLAN items 8-9 — glitch is deliberately rare-burst, not constant (see
      the 93-100% "hold" ranges below): a title that glitches nonstop is just noisy,
@@ -63,11 +85,11 @@
      Menu/victory already lean on this game's "corrupted machine" identity (see
      the menu's own "ASCENSёON"/"he11o wor1_D" copy) — this just animates it. */
   @keyframes glitchRgb{
-    0%,93%,100%{text-shadow:0 0 60px rgba(185,140,255,0.25);}
-    94%{text-shadow:-2px 0 #ff3b3b, 2px 0 #4dd9ff, 0 0 60px rgba(185,140,255,0.25);}
-    95%{text-shadow:2px 0 #ff3b3b, -2px 0 #4dd9ff, 0 0 60px rgba(185,140,255,0.25);}
-    96%{text-shadow:0 0 60px rgba(185,140,255,0.25);}
-    97%{text-shadow:-1px 0 #ff3b3b, 1px 0 #4dd9ff, 0 0 60px rgba(185,140,255,0.25);}
+    0%,93%,100%{text-shadow:0 0 60px color-mix(in srgb, var(--accent) 25%, transparent);}
+    94%{text-shadow:-2px 0 var(--danger), 2px 0 var(--glitchCyan), 0 0 60px color-mix(in srgb, var(--accent) 25%, transparent);}
+    95%{text-shadow:2px 0 var(--danger), -2px 0 var(--glitchCyan), 0 0 60px color-mix(in srgb, var(--accent) 25%, transparent);}
+    96%{text-shadow:0 0 60px color-mix(in srgb, var(--accent) 25%, transparent);}
+    97%{text-shadow:-1px 0 var(--danger), 1px 0 var(--glitchCyan), 0 0 60px color-mix(in srgb, var(--accent) 25%, transparent);}
   }
   @keyframes glitchScan{
     0%,96%,100%{opacity:1; clip-path:inset(0 0 0 0);}
@@ -103,7 +125,7 @@
   .btn:hover:not(:disabled)::before{opacity:1; left:12px;}
   .btn:active:not(:disabled){transform:scale(0.98);}
   .btn:disabled{opacity:0.35; cursor:not-allowed;}
-  .btn.primary{border-color:var(--accent); box-shadow:0 0 30px rgba(185,140,255,0.15) inset;}
+  .btn.primary{border-color:var(--accent); box-shadow:0 0 30px color-mix(in srgb, var(--accent) 15%, transparent) inset;}
   .soul-badge{position:absolute; top:calc(22px + var(--safe-top)); right:calc(26px + var(--safe-right)); z-index:2; display:flex; align-items:center; gap:8px;
     font-family:'JetBrains Mono',monospace; font-size:14px; color:var(--soul); border:1px solid var(--line); background:var(--panel);
     padding:7px 12px; border-radius:2px;}
@@ -127,7 +149,7 @@
      instead of judged by feel. Off by default, opt-in via Settings > Video. */
   #debugOverlay{position:fixed; bottom:calc(8px + var(--safe-bottom)); right:calc(8px + var(--safe-right)); z-index:9999;
     pointer-events:none; font-family:'JetBrains Mono',monospace; font-size:9px; line-height:1.4;
-    color:#8fffcf; background:rgba(8,10,14,0.4); border:1px solid rgba(143,255,207,0.2); border-radius:6px;
+    color:var(--debug); background:color-mix(in srgb, var(--void) 40%, transparent); border:1px solid color-mix(in srgb, var(--debug) 20%, transparent); border-radius:6px;
     padding:4px 7px; white-space:pre; text-shadow:none;}
   .hud-top{position:absolute; top:0; left:0; right:0; z-index:8; display:flex; justify-content:space-between; align-items:flex-start;
     padding:calc(16px + var(--safe-top)) calc(20px + var(--safe-right)) 16px calc(20px + var(--safe-left));}
@@ -136,12 +158,12 @@
      threshold that already triggers SFX.startHeartbeat(), so the visual and the
      audio cue agree instead of only one of them existing. */
   .hp-wrap.low-hp .bar-track{animation:lowHpPulse 0.9s ease-in-out infinite;}
-  @keyframes lowHpPulse{0%,100%{box-shadow:0 0 0 rgba(255,60,60,0);} 50%{box-shadow:0 0 14px rgba(255,60,60,0.85);}}
-  .bar-track{width:100%; height:15px; background:#1a1c24; border:1px solid var(--line); border-radius:3px; overflow:hidden; position:relative;}
+  @keyframes lowHpPulse{0%,100%{box-shadow:0 0 0 color-mix(in srgb, var(--danger) 0%, transparent);} 50%{box-shadow:0 0 14px color-mix(in srgb, var(--danger) 85%, transparent);}}
+  .bar-track{width:100%; height:15px; background:var(--panel2); border:1px solid var(--line); border-radius:3px; overflow:hidden; position:relative;}
   .bar-fill{height:100%; transition:width .12s linear;}
-  .hp-fill{background:linear-gradient(90deg,#8b1c2c,var(--hp));}
-  .shield-fill{position:absolute; top:0; left:0; height:100%; background:rgba(126,224,255,0.55);}
-  .bar-label{position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:10px; font-family:'JetBrains Mono',monospace; color:#fff; text-shadow:0 1px 2px #000; letter-spacing:1px;}
+  .hp-fill{background:linear-gradient(90deg,var(--hpDark),var(--hp));}
+  .shield-fill{position:absolute; top:0; left:0; height:100%; background:color-mix(in srgb, var(--crystal) 55%, transparent);}
+  .bar-label{position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:10px; font-family:'JetBrains Mono',monospace; color:var(--text); text-shadow:var(--chip-text-shadow); letter-spacing:1px;}
   .lvl-chip{display:inline-flex; align-items:center; justify-content:center; width:26px; height:26px; border-radius:50%; background:var(--panel); border:1px solid var(--accent); color:var(--accent); font-weight:700; font-size:12px; margin-right:8px;}
   .hp-row{display:flex; align-items:center; margin-bottom:6px;}
   .resource-row{display:flex; gap:10px; font-family:'JetBrains Mono',monospace; font-size:12px; flex-wrap:wrap; max-width:340px;}
@@ -151,7 +173,7 @@
   .dot{width:8px; height:8px; border-radius:50%;}
   .timer{font-family:'JetBrains Mono',monospace; font-size:24px; letter-spacing:2px; color:var(--text); text-align:center;}
   .timer .phase{display:block; font-size:10px; letter-spacing:3px; color:var(--accent); text-align:center; margin-top:2px; transition:color .3s, text-shadow .3s;}
-  .timer .phase.phase-reveal{color:var(--gold); text-shadow:0 0 10px rgba(255,179,71,0.7); letter-spacing:4px;}
+  .timer .phase.phase-reveal{color:var(--gold); text-shadow:0 0 10px color-mix(in srgb, var(--gold) 70%, transparent); letter-spacing:4px;}
   /* Same decode-scramble class (revealPhaseText, PART 12) reused for the event title —
      glow tied to --event-color instead of the HUD phase-reveal's hardcoded gold, so the
      reveal itself carries the event's category color. */
@@ -176,7 +198,7 @@
   .ability-hud{position:absolute; right:calc(20px + var(--safe-right)); bottom:calc(96px + var(--safe-bottom)); z-index:7; display:flex; flex-direction:column; gap:26px; pointer-events:auto;}
   .ability-btn{position:relative; width:52px; height:52px; border-radius:50%; background:var(--panel); border:2px solid var(--line); display:flex; align-items:center; justify-content:center; font-size:22px; cursor:pointer; user-select:none; transition:border-color .15s;}
   .ability-btn.ready{border-color:var(--accent); animation:abilityReadyPulse 1.6s ease-in-out infinite;}
-  @keyframes abilityReadyPulse{0%,100%{box-shadow:0 0 8px rgba(185,140,255,0.25);} 50%{box-shadow:0 0 16px rgba(185,140,255,0.55);}}
+  @keyframes abilityReadyPulse{0%,100%{box-shadow:0 0 8px color-mix(in srgb, var(--accent) 25%, transparent);} 50%{box-shadow:0 0 16px color-mix(in srgb, var(--accent) 55%, transparent);}}
   /* POLISH_PLAN_7 — dash/heal reverted from the POLISH_PLAN_6 SVG set back to
      themed emoji (💨/❤️) per a later request; the HUD action panel (fullscreen/
      pause/stats/shop/fusion) keeps the SVG .ui-icon set below, unaffected. Since
@@ -207,17 +229,17 @@
     -webkit-mask:radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 4px));
     mask:radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 4px));}
   .ability-btn .ab-label{position:absolute; bottom:-15px; left:50%; transform:translateX(-50%); font-family:'JetBrains Mono',monospace; font-size:8px; letter-spacing:1px; color:var(--dim); white-space:nowrap;}
-  .ability-btn .ab-charges{position:absolute; bottom:-2px; right:-2px; z-index:1; background:var(--accent); color:#000; font-size:8.5px; font-weight:700; border-radius:8px; padding:0 4px; font-family:'JetBrains Mono',monospace;}
+  .ability-btn .ab-charges{position:absolute; bottom:-2px; right:-2px; z-index:1; background:var(--accent); color:var(--onAccent); font-size:8.5px; font-weight:700; border-radius:8px; padding:0 4px; font-family:'JetBrains Mono',monospace;}
   .xp-track{width:min(560px,70vw); height:10px;}
   .weapon-row{display:flex; gap:6px; flex-wrap:wrap; justify-content:center; max-width:90vw;}
   .wpn-icon{width:34px; height:34px; border:1px solid var(--line); background:var(--panel); border-radius:4px; display:flex; align-items:center; justify-content:center; font-size:15px; position:relative;}
-  .wpn-icon.evolved{border-color:var(--gold); box-shadow:0 0 10px rgba(255,179,71,0.35) inset; filter:drop-shadow(0 0 4px rgba(255,179,71,0.7));}
+  .wpn-icon.evolved{border-color:var(--gold); box-shadow:0 0 10px color-mix(in srgb, var(--gold) 35%, transparent) inset; filter:drop-shadow(0 0 4px color-mix(in srgb, var(--gold) 70%, transparent));}
   /* Shrine of Silence etc. — previously a disabled weapon had zero visual cue
      (only a one-time log line), reading as a bug ("my weapon just stopped").
      Grayscale + a corner ⛔ makes the state legible at a glance in the HUD. */
   .wpn-icon.disabled{filter:grayscale(1); opacity:0.55;}
   .wpn-icon.disabled::after{content:'⛔'; position:absolute; bottom:-3px; left:-3px; font-size:10px;}
-  .wpn-icon .wlvl{position:absolute; bottom:-2px; right:-2px; background:var(--accent); color:#000; font-size:8.5px; font-weight:700; border-radius:8px; padding:0 4px; font-family:'JetBrains Mono',monospace;}
+  .wpn-icon .wlvl{position:absolute; bottom:-2px; right:-2px; background:var(--accent); color:var(--onAccent); font-size:8.5px; font-weight:700; border-radius:8px; padding:0 4px; font-family:'JetBrains Mono',monospace;}
   .passive-row{display:flex; gap:6px;}
   .psv-icon{width:26px; height:26px; border:1px solid var(--soul); background:var(--panel); border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:12px;}
   .event-log{position:absolute; bottom:calc(96px + var(--safe-bottom)); left:calc(20px + var(--safe-left)); width:230px; display:flex; flex-direction:column; gap:3px; font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--dim);}
@@ -233,34 +255,34 @@
      effects elsewhere. */
   .hud-action-panel{display:flex; flex-direction:column; gap:8px; position:relative; padding-left:8px;}
   .hud-action-panel::before{content:''; position:absolute; left:0; top:2px; bottom:2px; width:2px; background:linear-gradient(180deg,var(--accent),transparent); opacity:0.5;}
-  .pause-hint{display:flex; align-items:center; justify-content:center; font-family:'JetBrains Mono',monospace; font-size:13px; color:var(--dim); pointer-events:auto; cursor:pointer; border:1px solid var(--line); background:var(--panel); padding:6px 9px; border-radius:2px;
-    transition:border-color .15s, box-shadow .15s, color .15s; animation:hudIconGlitch 7s infinite;}
-  .pause-hint:hover{color:var(--text); border-color:var(--accent); box-shadow:0 0 10px rgba(185,140,255,0.35);}
+  .pause-hint{display:flex; align-items:center; justify-content:center; font-family:'JetBrains Mono',monospace; font-size:13px; color:var(--text); opacity:0.75; pointer-events:auto; cursor:pointer; border:1px solid var(--line); background:var(--panel); padding:6px 9px; border-radius:2px;
+    transition:border-color .15s, box-shadow .15s, opacity .15s; animation:hudIconGlitch 7s infinite;}
+  .pause-hint:hover{opacity:1; border-color:var(--accent); box-shadow:0 0 10px color-mix(in srgb, var(--accent) 35%, transparent);}
   @keyframes hudIconGlitch{0%,96%,100%{filter:none;} 97%{filter:brightness(1.6) hue-rotate(25deg);} 98%{filter:none;}}
   #fusionBtnHud:not(.hidden){border-color:var(--gold); animation:fusionPulse 1.4s ease-in-out infinite;}
-  @keyframes fusionPulse{0%,100%{box-shadow:0 0 0 rgba(255,179,71,0);} 50%{box-shadow:0 0 14px rgba(255,179,71,0.65);}}
+  @keyframes fusionPulse{0%,100%{box-shadow:0 0 0 color-mix(in srgb, var(--gold) 0%, transparent);} 50%{box-shadow:0 0 14px color-mix(in srgb, var(--gold) 65%, transparent);}}
   .fusion-card{width:280px;}
   .fusion-card .fuse-row{display:flex; align-items:center; justify-content:center; gap:10px; margin-bottom:10px;}
   .fusion-card .fuse-icon{font-size:26px; width:44px; height:44px; display:flex; align-items:center; justify-content:center; background:var(--panel2); border:1px solid var(--line); border-radius:6px;}
   .fusion-card .fuse-plus{color:var(--dim); font-size:16px;}
   .fusion-card .fuse-arrow{color:var(--gold); font-size:18px;}
-  .fusion-card .fuse-result{font-size:30px; width:50px; height:50px; display:flex; align-items:center; justify-content:center; background:var(--panel2); border:2px solid var(--gold); border-radius:8px; box-shadow:0 0 12px rgba(255,179,71,0.25);}
+  .fusion-card .fuse-result{font-size:30px; width:50px; height:50px; display:flex; align-items:center; justify-content:center; background:var(--panel2); border:2px solid var(--gold); border-radius:8px; box-shadow:0 0 12px color-mix(in srgb, var(--gold) 25%, transparent);}
   .fusion-card .fuse-result.forging{animation:fuseForge 0.6s ease-out;}
-  @keyframes fuseForge{0%{transform:scale(0.6); box-shadow:0 0 0 rgba(255,179,71,0);} 55%{transform:scale(1.25); box-shadow:0 0 30px rgba(255,179,71,0.9);} 100%{transform:scale(1); box-shadow:0 0 12px rgba(255,179,71,0.25);}}
+  @keyframes fuseForge{0%{transform:scale(0.6); box-shadow:0 0 0 color-mix(in srgb, var(--gold) 0%, transparent);} 55%{transform:scale(1.25); box-shadow:0 0 30px color-mix(in srgb, var(--gold) 90%, transparent);} 100%{transform:scale(1); box-shadow:0 0 12px color-mix(in srgb, var(--gold) 25%, transparent);}}
   .cards-wrap{display:flex; flex-wrap:wrap; align-items:stretch; justify-content:center; gap:16px; z-index:2; width:min(92vw,820px); max-height:78vh; overflow-y:auto; padding:4px;}
   .card{width:220px; background:var(--panel); border:1px solid var(--line); border-top:3px solid var(--line); border-radius:6px; padding:16px 15px 18px; cursor:pointer; transition:transform .15s, border-color .15s, box-shadow .15s; display:flex; flex-direction:column; position:relative;}
-  .card:hover{border-color:var(--accent); border-top-color:var(--accent); box-shadow:0 12px 30px rgba(185,140,255,0.15);}
+  .card:hover{border-color:var(--accent); border-top-color:var(--accent); box-shadow:0 12px 30px color-mix(in srgb, var(--accent) 15%, transparent);}
   /* POLISH_PLAN_6 item 2 — :hover doesn't fire reliably from a tap on touch (and
      can "stick" after the finger lifts on some mobile browsers), so touch users
      got zero visual response to pressing a card. :active fires on press-down for
      touch too, same accent treatment as :hover so both input methods read the
      same. */
-  .card:active{border-color:var(--accent); border-top-color:var(--accent); box-shadow:0 12px 30px rgba(185,140,255,0.15); transform:scale(0.97);}
+  .card:active{border-color:var(--accent); border-top-color:var(--accent); box-shadow:0 12px 30px color-mix(in srgb, var(--accent) 15%, transparent); transform:scale(0.97);}
   /* Confirm-pick flash — a brief accent-glow pulse on the card actually chosen,
      right before the screen fades out (afterCardPicked -> hideAll), so the
      "this is the one I picked" moment reads on mouse and touch alike. */
   .card.picked{animation:cardPickedPulse .3s ease-out;}
-  @keyframes cardPickedPulse{0%{box-shadow:0 0 0 rgba(185,140,255,0);} 40%{box-shadow:0 0 34px rgba(185,140,255,0.85);} 100%{box-shadow:0 0 34px rgba(185,140,255,0);}}
+  @keyframes cardPickedPulse{0%{box-shadow:0 0 0 color-mix(in srgb, var(--accent) 0%, transparent);} 40%{box-shadow:0 0 34px color-mix(in srgb, var(--accent) 85%, transparent);} 100%{box-shadow:0 0 34px color-mix(in srgb, var(--accent) 0%, transparent);}}
   /* POLISH_PLAN_2 item 9 — keyboard focus ring for the level-up screen, visually
      distinct from :hover (outline, not border-color) so it stays visible even on
      a rarity-tinted border, and doesn't fight mouse-hover on a different card. */
@@ -294,13 +316,13 @@
   .card.rarity-common, .card.rarity-uncommon, .card.rarity-rare, .card.rarity-legendary{
     background-repeat:no-repeat; background-size:220% 100%;
   }
-  .card.rarity-common{background-image:linear-gradient(115deg, transparent 40%, rgba(255,255,255,0.05) 50%, transparent 60%); animation:cardShimmer 6.5s ease-in-out infinite;}
-  .card.rarity-uncommon{border-top-color:var(--xp); background-image:linear-gradient(115deg, transparent 40%, rgba(255,255,255,0.08) 50%, transparent 60%); animation:cardShimmer 5.5s ease-in-out infinite;}
-  .card.rarity-rare{border-top-color:var(--crystal); box-shadow:0 0 18px rgba(126,224,255,0.14) inset; background-image:linear-gradient(115deg, transparent 40%, rgba(255,255,255,0.12) 50%, transparent 60%); animation:cardShimmer 4.5s ease-in-out infinite;}
+  .card.rarity-common{background-image:linear-gradient(115deg, transparent 40%, color-mix(in srgb, var(--text) 5%, transparent) 50%, transparent 60%); animation:cardShimmer 6.5s ease-in-out infinite;}
+  .card.rarity-uncommon{border-top-color:var(--xp); background-image:linear-gradient(115deg, transparent 40%, color-mix(in srgb, var(--text) 8%, transparent) 50%, transparent 60%); animation:cardShimmer 5.5s ease-in-out infinite;}
+  .card.rarity-rare{border-top-color:var(--crystal); box-shadow:0 0 18px color-mix(in srgb, var(--crystal) 14%, transparent) inset; background-image:linear-gradient(115deg, transparent 40%, color-mix(in srgb, var(--text) 12%, transparent) 50%, transparent 60%); animation:cardShimmer 4.5s ease-in-out infinite;}
   .card.rarity-rare .name{color:var(--crystal);}
-  .card.rarity-legendary{border-top-color:var(--gold); background-image:linear-gradient(115deg, transparent 40%, rgba(255,255,255,0.18) 50%, transparent 60%);
+  .card.rarity-legendary{border-top-color:var(--gold); background-image:linear-gradient(115deg, transparent 40%, color-mix(in srgb, var(--text) 18%, transparent) 50%, transparent 60%);
     animation:legendaryGlow 2.2s ease-in-out infinite, cardShimmer 3.2s ease-in-out infinite;}
-  @keyframes legendaryGlow{0%,100%{box-shadow:0 0 22px rgba(255,179,71,0.2) inset;} 50%{box-shadow:0 0 30px rgba(255,179,71,0.4) inset;}}
+  @keyframes legendaryGlow{0%,100%{box-shadow:0 0 22px color-mix(in srgb, var(--gold) 20%, transparent) inset;} 50%{box-shadow:0 0 30px color-mix(in srgb, var(--gold) 40%, transparent) inset;}}
   @keyframes cardShimmer{0%{background-position:-60% 0;} 100%{background-position:160% 0;}}
   .card.rarity-legendary .name{color:var(--gold);}
   .card.rarity-legendary:hover{border-top-color:var(--gold);}
@@ -312,9 +334,9 @@
   .card.rarity-mythic .name{background:linear-gradient(90deg,var(--artifact),var(--accent),var(--crystal),var(--artifact));
     background-size:300% 100%; -webkit-background-clip:text; background-clip:text; color:transparent; animation:mythicText 3s linear infinite;}
   @keyframes mythicBorder{
-    0%,100%{border-top-color:var(--artifact); box-shadow:0 0 26px rgba(255,158,203,0.3) inset;}
-    33%{border-top-color:var(--accent); box-shadow:0 0 26px rgba(185,140,255,0.3) inset;}
-    66%{border-top-color:var(--crystal); box-shadow:0 0 26px rgba(126,224,255,0.3) inset;}}
+    0%,100%{border-top-color:var(--artifact); box-shadow:0 0 26px color-mix(in srgb, var(--artifact) 30%, transparent) inset;}
+    33%{border-top-color:var(--accent); box-shadow:0 0 26px color-mix(in srgb, var(--accent) 30%, transparent) inset;}
+    66%{border-top-color:var(--crystal); box-shadow:0 0 26px color-mix(in srgb, var(--crystal) 30%, transparent) inset;}}
   @keyframes mythicText{0%{background-position:0% 50%;} 100%{background-position:300% 50%;}}
   .rarity-label{position:absolute; top:-9px; right:10px; font-family:'JetBrains Mono',monospace; font-size:8px; letter-spacing:1.5px; padding:1px 6px; border-radius:8px; background:var(--panel); border:1px solid var(--line); color:var(--dim); text-transform:uppercase;}
   .card.rarity-uncommon .rarity-label{border-color:var(--xp); color:var(--xp);}
@@ -374,7 +396,7 @@
      transform back to it once the brief entrance finishes instead of pinning
      it forever via fill-mode:forwards — see that keyframe's own comment. */
   .char-card{transition:box-shadow .3s ease-out;}
-  .char-card.char-card-selected{box-shadow:0 0 36px var(--char-select-glow,rgba(185,140,255,0.75)); border-color:var(--char-select-glow,var(--accent)) !important;}
+  .char-card.char-card-selected{box-shadow:0 0 36px var(--char-select-glow,color-mix(in srgb, var(--accent) 75%, transparent)); border-color:var(--char-select-glow,var(--accent)) !important;}
   .char-select-wrap.locked .char-card:not(.char-card-selected){opacity:0.35; transition:opacity .3s;}
   /* Cell-mosaic transition (char select -> run start), replacing the old
      diagonal-stripe wipe. A full-viewport grid of small square cells covers
@@ -398,7 +420,7 @@
      on their own line); icon+text now sit in one row, price+buy in another
      (price left, buy right) instead of four separate lines. */
   .shop-card{ padding:10px 9px; width:100%; display:flex; flex-direction:column; gap:8px; }
-  .shop-card.locked{ background:#0a0b10; border-top-color:var(--line) !important; box-shadow:none !important; cursor:not-allowed; }
+  .shop-card.locked{ background:var(--void); border-top-color:var(--line) !important; box-shadow:none !important; cursor:not-allowed; }
   .shop-card.locked .icon{ opacity:0.7; }
   .shop-card.locked .name, .shop-card.locked .desc{ color:var(--dim); }
   .shop-card:hover:not(:disabled){ transform:none !important; }
@@ -411,7 +433,7 @@
   .shop-card-bottom{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
   .shop-card .price{ font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--gold); margin-top:0; font-weight:700; }
   .shop-card .buy-btn{ width:fit-content; border:1px solid var(--gold); color:var(--gold); background:transparent; padding:5px 8px; border-radius:2px; cursor:pointer; font-family:'JetBrains Mono',monospace; font-size:10px; font-weight:700; margin-top:0; text-transform:uppercase; flex-shrink:0; }
-  .shop-card .buy-btn:hover:not(:disabled){ background:rgba(255,179,71,0.15); }
+  .shop-card .buy-btn:hover:not(:disabled){ background:color-mix(in srgb, var(--gold) 15%, transparent); }
   .shop-card .buy-btn:disabled{ opacity:0.3; cursor:not-allowed; border-color:var(--dim); color:var(--dim); }
   #screen-shop .cards-wrap, #screen-event .cards-wrap { display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; width:min(680px,94vw); max-height:62vh; overflow-y:auto; padding:4px 6px; }
   /* POLISH_PLAN_10 — fixed height (not just max-height) so switching between the
@@ -521,36 +543,36 @@
   .talent-node{position:absolute; width:58px; height:58px; background:var(--panel); border:2px solid var(--line); border-radius:12px;
     cursor:pointer; transition:left .3s, top .3s, border-color .15s, box-shadow .15s, transform .15s, background .15s;
     display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px;}
-  .talent-node:hover:not(.locked){border-color:var(--branch-color,var(--accent)); box-shadow:0 0 14px var(--branch-glow,rgba(185,140,255,0.25)); transform:scale(1.08);}
+  .talent-node:hover:not(.locked){border-color:var(--branch-color,var(--accent)); box-shadow:0 0 14px var(--branch-glow,color-mix(in srgb, var(--accent) 25%, transparent)); transform:scale(1.08);}
   .talent-node .tn-icon{font-size:21px; line-height:1;}
   .talent-node .tn-pips{display:flex; gap:2px;}
   .talent-node .pip{width:6px; height:4px; background:var(--line); border-radius:1px;}
   .talent-node .pip.filled{background:var(--branch-color,var(--accent));}
-  .talent-node.maxed{border-color:var(--gold); box-shadow:0 0 16px rgba(255,179,71,0.28);}
+  .talent-node.maxed{border-color:var(--gold); box-shadow:0 0 16px color-mix(in srgb, var(--gold) 28%, transparent);}
   .talent-node.maxed .pip.filled{background:var(--gold);}
   /* Locked: solid dark (not just dimmed) + a dominant lock icon replacing the stat
      icon entirely — info isn't hidden, just gated behind the tooltip (always
      works, even locked, per the request). */
-  .talent-node.locked{background:#0a0b10; border-color:var(--line); cursor:not-allowed;}
+  .talent-node.locked{background:var(--void); border-color:var(--line); cursor:not-allowed;}
   .talent-node.locked .tn-icon{font-size:22px; opacity:0.8;}
   .talent-node.locked .tn-pips{opacity:0.3;}
   .talent-node.just-unlocked{animation:talentUnlockPulse .6s ease-out;}
-  @keyframes talentUnlockPulse{0%{transform:scale(0.7); box-shadow:0 0 0 rgba(185,140,255,0);} 50%{transform:scale(1.22); box-shadow:0 0 26px var(--branch-glow-strong,rgba(185,140,255,0.7));} 100%{transform:scale(1); box-shadow:0 0 0 rgba(185,140,255,0);}}
+  @keyframes talentUnlockPulse{0%{transform:scale(0.7); box-shadow:0 0 0 color-mix(in srgb, var(--accent) 0%, transparent);} 50%{transform:scale(1.22); box-shadow:0 0 26px var(--branch-glow-strong,color-mix(in srgb, var(--accent) 70%, transparent));} 100%{transform:scale(1); box-shadow:0 0 0 color-mix(in srgb, var(--accent) 0%, transparent);}}
   /* First custom tooltip component in the game (everything else used the native
      title= attribute) — fixed-positioned near whatever node/element triggered it,
      shown on hover (desktop) or tap (touch, see openTooltip's isTouchDevice
      branch) so it "always works" even for a locked node the player can't buy yet. */
-  #gameTooltip{position:fixed; z-index:60; max-width:210px; background:linear-gradient(180deg,#1c1e28,#141821);
+  #gameTooltip{position:fixed; z-index:60; max-width:210px; background:linear-gradient(180deg,var(--panel2),var(--panel));
     border:1px solid var(--accent); border-radius:6px; padding:10px 12px; pointer-events:none; opacity:0;
     transform:translateY(4px); transition:opacity .12s, transform .12s; box-shadow:0 10px 30px rgba(0,0,0,0.5);}
   #gameTooltip.show{opacity:1; transform:translateY(0);}
-  #gameTooltip .tt-name{font-family:'Rajdhani',sans-serif; font-weight:700; font-size:13.5px; color:#fff;}
+  #gameTooltip .tt-name{font-family:'Rajdhani',sans-serif; font-weight:700; font-size:13.5px; color:var(--text);}
   #gameTooltip .tt-desc{font-size:11px; color:var(--dim); margin-top:4px; line-height:1.4;}
   #gameTooltip .tt-tier{font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--accent); margin-top:6px;}
   #gameTooltip .tt-cost{font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--soul); margin-top:3px;}
-  #gameTooltip .tt-req{font-size:10px; color:#ff8a4d; margin-top:6px; line-height:1.4;}
+  #gameTooltip .tt-req{font-size:10px; color:var(--warning); margin-top:6px; line-height:1.4;}
   .buy-btn{font-family:'JetBrains Mono',monospace; font-size:12.5px; border:1px solid var(--soul); color:var(--soul); background:transparent; padding:7px 12px; border-radius:2px; cursor:pointer; white-space:nowrap;}
-  .buy-btn:hover:not(:disabled){background:rgba(92,225,230,0.1);}
+  .buy-btn:hover:not(:disabled){background:color-mix(in srgb, var(--soul) 10%, transparent);}
   .buy-btn:disabled{opacity:0.3; cursor:not-allowed; border-color:var(--dim); color:var(--dim);}
   .back-link{margin-top:20px; z-index:2; font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--dim); cursor:pointer; letter-spacing:1px;}
   .back-link:hover{color:var(--text);}
@@ -562,7 +584,7 @@
   .ach-chip{font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--dim); border:1px solid var(--line); border-radius:8px; padding:1px 7px; margin-left:8px;}
   .ach-wrap{width:780px; max-width:90vw; max-height:58vh; overflow-y:auto; z-index:2; display:grid; grid-template-columns:1fr 1fr; gap:9px; padding:4px 6px 4px 0;}
   .ach-card{display:flex; gap:12px; align-items:center; background:var(--panel); border:1px solid var(--line); border-radius:5px; padding:11px 13px; transition:border-color .15s;}
-  .ach-card.unlocked{border-color:rgba(255,179,71,0.5); box-shadow:0 0 18px rgba(255,179,71,0.06) inset;}
+  .ach-card.unlocked{border-color:color-mix(in srgb, var(--gold) 50%, transparent); box-shadow:0 0 18px color-mix(in srgb, var(--gold) 6%, transparent) inset;}
   .ach-card.locked{opacity:0.5;}
   .ach-icon{font-size:22px; width:30px; text-align:center; flex-shrink:0;}
   .ach-icon.locked-icon{filter:grayscale(1);}
@@ -585,20 +607,20 @@
   .ach-reward-chip{font-family:'JetBrains Mono',monospace; font-size:10px;
     color:var(--dim); border:1px solid var(--line); border-radius:8px; padding:0 10px; cursor:help;}
   .ach-reward-chip.collected{color:var(--xp); border-color:var(--xp); cursor:default;}
-  .ach-collect-btn{appearance:none; border:1px solid var(--gold); background:rgba(255,179,71,0.12); color:var(--gold);
+  .ach-collect-btn{appearance:none; border:1px solid var(--gold); background:color-mix(in srgb, var(--gold) 12%, transparent); color:var(--gold);
     font-family:'Rajdhani',sans-serif; font-weight:700; font-size:11.5px; letter-spacing:0.5px; padding:0 12px;
     border-radius:4px; cursor:pointer; text-transform:uppercase; animation:achCollectBlink 1.4s ease-in-out infinite;}
-  .ach-collect-btn:hover{background:rgba(255,179,71,0.24);}
-  @keyframes achCollectBlink{0%,100%{box-shadow:0 0 6px rgba(255,179,71,0.25);} 50%{box-shadow:0 0 16px rgba(255,179,71,0.9);}}
+  .ach-collect-btn:hover{background:color-mix(in srgb, var(--gold) 24%, transparent);}
+  @keyframes achCollectBlink{0%,100%{box-shadow:0 0 6px color-mix(in srgb, var(--gold) 25%, transparent);} 50%{box-shadow:0 0 16px color-mix(in srgb, var(--gold) 90%, transparent);}}
   #achToastLayer{position:absolute; top:calc(22px + var(--safe-top)); left:50%; transform:translateX(-50%); z-index:40; display:flex; flex-direction:column; gap:8px; align-items:center; pointer-events:none;}
-  .ach-toast{display:flex; align-items:center; gap:12px; background:linear-gradient(180deg,#1c1710,#141821); border:1px solid var(--gold); border-radius:5px; padding:10px 18px; box-shadow:0 10px 30px rgba(0,0,0,0.5), 0 0 24px rgba(255,179,71,0.15);
+  .ach-toast{display:flex; align-items:center; gap:12px; background:linear-gradient(180deg,var(--panel2),var(--panel)); border:1px solid var(--gold); border-radius:5px; padding:10px 18px; box-shadow:0 10px 30px rgba(0,0,0,0.5), 0 0 24px color-mix(in srgb, var(--gold) 15%, transparent);
     animation:toastIn .35s cubic-bezier(.2,.9,.3,1) forwards, toastOut .4s ease-in 3.6s forwards;}
   .ach-toast .t-icon{font-size:22px;} .ach-toast .t-kicker{font-family:'JetBrains Mono',monospace; font-size:9px; letter-spacing:2px; color:var(--gold);}
-  .ach-toast .t-name{font-family:'Rajdhani',sans-serif; font-weight:700; font-size:15px; color:#fff;}
+  .ach-toast .t-name{font-family:'Rajdhani',sans-serif; font-weight:700; font-size:15px; color:var(--text);}
   .ach-toast .t-reward{font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--gold); margin-top:2px;}
   @keyframes toastIn{from{opacity:0; transform:translateY(-16px) scale(0.96);} to{opacity:1; transform:translateY(0) scale(1);}}
   @keyframes toastOut{to{opacity:0; transform:translateY(-10px) scale(0.98);}}
-  .synergy-toast{border-color:var(--crystal) !important; box-shadow:0 10px 30px rgba(0,0,0,0.5), 0 0 24px rgba(126,224,255,0.2) !important;}
+  .synergy-toast{border-color:var(--crystal) !important; box-shadow:0 10px 30px rgba(0,0,0,0.5), 0 0 24px color-mix(in srgb, var(--crystal) 20%, transparent) !important;}
   .synergy-toast .t-kicker{color:var(--crystal) !important;}
   /* Fixed height (not just max-height) so switching tabs — whose panes each hold a
      different number of rows — doesn't resize this wrap and shift .settings-tabs
@@ -622,33 +644,33 @@
   .setting-row .s-desc{color:var(--dim); font-size:11px; margin-top:2px; max-width:330px;}
   .seg-control{display:flex; border:1px solid var(--line); border-radius:2px; overflow:hidden; flex-shrink:0;}
   .seg-btn{font-family:'JetBrains Mono',monospace; font-size:11px; padding:8px 12px; background:var(--panel2); color:var(--dim); border:none; cursor:pointer; border-right:1px solid var(--line);}
-  .seg-btn:last-child{border-right:none;} .seg-btn.active{background:var(--accent); color:#14101c;}
+  .seg-btn:last-child{border-right:none;} .seg-btn.active{background:var(--accent); color:var(--onAccentDark);}
   .toggle-switch{position:relative; width:46px; height:25px; background:var(--panel2); border:1px solid var(--line); border-radius:13px; cursor:pointer; flex-shrink:0;}
   .toggle-switch .knob{position:absolute; top:2px; left:2px; width:19px; height:19px; border-radius:50%; background:var(--dim); transition:transform .15s, background .15s;}
   .toggle-switch.on{border-color:var(--accent);} .toggle-switch.on .knob{transform:translateX(21px); background:var(--accent);}
   .slider-row{display:flex; align-items:center; gap:10px; flex-shrink:0; width:190px;}
   .slider-row input[type=range]{-webkit-appearance:none; appearance:none; flex:1; height:4px; background:var(--line); border-radius:2px; outline:none;}
-  .slider-row input[type=range]::-webkit-slider-thumb{-webkit-appearance:none; width:16px; height:16px; border-radius:50%; background:var(--accent); cursor:pointer; border:2px solid #14101c;}
+  .slider-row input[type=range]::-webkit-slider-thumb{-webkit-appearance:none; width:16px; height:16px; border-radius:50%; background:var(--accent); cursor:pointer; border:2px solid var(--onAccentDark);}
   .slider-val{font-family:'JetBrains Mono',monospace; font-size:11.5px; color:var(--accent); width:32px; text-align:right;}
   .joystick-capture{position:absolute; inset:0; z-index:1; touch-action:none; pointer-events:none;}
   .joystick-zone{position:absolute; width:132px; height:132px; z-index:6; pointer-events:none; touch-action:none; display:none; transform:translate(-50%,-50%);}
-  .joystick-base{position:absolute; inset:0; border-radius:50%; background:rgba(18,20,27,0.45); border:1px solid var(--line);}
-  .joystick-knob{position:absolute; width:52%; height:52%; top:24%; left:24%; border-radius:50%; background:rgba(185,140,255,0.32); border:1px solid var(--accent);}
+  .joystick-base{position:absolute; inset:0; border-radius:50%; background:color-mix(in srgb, var(--panel) 45%, transparent); border:1px solid var(--line);}
+  .joystick-knob{position:absolute; width:52%; height:52%; top:24%; left:24%; border-radius:50%; background:color-mix(in srgb, var(--accent) 32%, transparent); border:1px solid var(--accent);}
   #bossWarning{position:absolute; inset:0; z-index:30; display:flex; align-items:center; justify-content:center; flex-direction:column; pointer-events:none; opacity:0;}
   #bossWarning.show{animation: bwFade 4.2s ease forwards;}
-  #bossWarning .bw-vignette{position:absolute; inset:0; background:radial-gradient(ellipse at center, rgba(255,20,20,0) 42%, rgba(140,10,10,0.4) 100%); animation: bwPulse 0.7s ease-in-out infinite;}
+  #bossWarning .bw-vignette{position:absolute; inset:0; background:radial-gradient(ellipse at center, color-mix(in srgb, var(--dangerVignette) 0%, transparent) 42%, color-mix(in srgb, var(--dangerVignette) 55%, black) 100%); animation: bwPulse 0.7s ease-in-out infinite;}
   /* TODO item 10 — player.hurtFlash-driven damage feedback: opacity set per-frame
      in refreshHud(), scaled by hit size relative to max HP (see damagePlayer()).
      transition smooths the frame-to-frame decay set in updatePlayer(). */
   #hurtVignette{position:absolute; inset:0; z-index:9; pointer-events:none; opacity:0; transition:opacity .08s linear;
-    background:radial-gradient(ellipse at center, rgba(255,20,20,0) 35%, rgba(200,10,10,0.65) 100%);}
-  #bossWarning .bw-text{position:relative; font-family:'JetBrains Mono',monospace; font-weight:700; font-size:15px; letter-spacing:8px; color:#ff5f6d; text-shadow:0 0 20px rgba(255,60,60,0.8);}
-  #bossWarning .bw-name{position:relative; font-family:'Rajdhani',sans-serif; font-weight:700; font-size:clamp(30px,6vw,58px); letter-spacing:4px; color:#fff; text-shadow:0 0 30px rgba(255,60,60,0.9); margin-top:8px; text-align:center;}
+    background:radial-gradient(ellipse at center, color-mix(in srgb, var(--dangerVignette) 0%, transparent) 35%, color-mix(in srgb, color-mix(in srgb, var(--dangerVignette) 78%, black) 65%, transparent) 100%);}
+  #bossWarning .bw-text{position:relative; font-family:'JetBrains Mono',monospace; font-weight:700; font-size:15px; letter-spacing:8px; color:var(--danger); text-shadow:0 0 20px color-mix(in srgb, var(--danger) 80%, transparent);}
+  #bossWarning .bw-name{position:relative; font-family:'Rajdhani',sans-serif; font-weight:700; font-size:clamp(30px,6vw,58px); letter-spacing:4px; color:var(--text); text-shadow:0 0 30px color-mix(in srgb, var(--danger) 90%, transparent); margin-top:8px; text-align:center;}
   @keyframes bwFade{0%{opacity:0;} 8%{opacity:1;} 85%{opacity:1;} 100%{opacity:0;}}
   @keyframes bwPulse{0%,100%{opacity:0.5;} 50%{opacity:1;}}
-  .elite-toast{border-color:#ff8a4d !important;} .elite-toast .t-kicker{color:#ff8a4d !important;}
+  .elite-toast{border-color:var(--warning) !important;} .elite-toast .t-kicker{color:var(--warning) !important;}
   .event-toast .t-name{max-width:280px; white-space:normal; line-height:1.3;}
-  #screen-victory .title{background:linear-gradient(180deg,#fff,#ffd479 140%); -webkit-background-clip:text; background-clip:text; color:transparent;}
+  #screen-victory .title{background:linear-gradient(180deg,var(--text),var(--victoryGold) 140%); -webkit-background-clip:text; background-clip:text; color:transparent;}
   /* Event screen — was a flat plate with zero motion, same for every category. Now
      driven by --event-color (set from EVENT_CAT_COLOR in triggerRandomEvent(), same
      pattern the talent tree already uses for --branch-color) so a Cursed Shrine and a
@@ -699,7 +721,7 @@
         <div class="resource-row">
           <div class="res-chip"><span class="dot" style="background:var(--gold)"></span><span id="goldVal">0</span></div>
           <div class="res-chip"><span class="dot" style="background:var(--crystal)"></span><span id="crystalVal">0</span></div>
-          <div class="res-chip"><span class="dot" style="background:#8fb4ff"></span><span id="killVal">0</span></div>
+          <div class="res-chip"><span class="dot" style="background:var(--killCount)"></span><span id="killVal">0</span></div>
           <div class="res-chip"><span class="dot" style="background:var(--accent2)"></span><span id="dpsVal">0 dps</span></div>
         </div>
         <div class="passive-row" id="passiveRow" style="margin-top:6px;"></div>
@@ -717,7 +739,7 @@
     <div class="event-log" id="eventLog"></div>
     <div class="save-indicator" id="saveIndicator">SAVED</div>
     <div class="hud-bottom">
-      <div class="bar-track xp-track"><div class="bar-fill" id="xpFill" style="width:0%;background:linear-gradient(90deg,#2f8f22,var(--xp));"></div><div class="bar-label" id="xpLabel">0 / 10 XP</div></div>
+      <div class="bar-track xp-track"><div class="bar-fill" id="xpFill" style="width:0%;background:linear-gradient(90deg,var(--xpDark),var(--xp));"></div><div class="bar-label" id="xpLabel">0 / 10 XP</div></div>
     </div>
     <div class="ability-hud" id="abilityHud">
       <div class="ability-btn" id="dashBtn" title="Dash (Space / swipe)"><span class="ab-icon">💨</span><div class="ab-cd" id="dashCd"></div><div class="ab-label">DASH</div></div>
@@ -2499,7 +2521,7 @@ boot();
 // Semver-ish display version (shown in the main menu, see #versionTag) — bump
 // by hand per notable batch of work. Independent from SAVE_VERSION below:
 // this one is purely informational, the other one gates save migrations.
-const GAME_VERSION = "0.39.0";
+const GAME_VERSION = "0.39.1";
 
 
 /* =========================================================================
@@ -2683,6 +2705,39 @@ const CONFIG_DEFAULTS = {
       c_8fe0a0: "#8fe0a0",
       c_ffb3d9: "#ffb3d9",
       c_ff7a3d: "#ff7a3d",
+      // Added in the "absolutely every color" pass — these 10 were raw hex/rgb
+      // literals scattered through <style> and canvas render() calls with no
+      // CONFIG backing at all (found by grepping every #hex/rgba() in the file
+      // and checking which ones weren't already one of the 55 entries above).
+      // Each keeps its CURRENT default-theme value exactly, so this pass adds
+      // configurability without changing how anything looks today.
+      c_ff3b3b: "#ff3b3b", // css.danger — dash telegraph, hit-flash, title glitch red channel, low-hp pulse glow
+      c_ff1414: "#ff1414", // css.dangerVignette — boss-warning/hurt vignette base (darker ring stops derived via color-mix)
+      c_4dd9ff: "#4dd9ff", // css.glitchCyan — title glitch cyan channel (pairs with css.danger's red channel)
+      c_8fffcf: "#8fffcf", // css.debug — FPS/entity-count debug overlay text (dev-only, gated behind Settings > Video)
+      c_warning_ff8a4d: "#ff8a4d", // css.warning — tooltip requirement text/disabled-weapon label/elite-toast text; SAME
+      // default hex as mutation.dasher/weapon.spike_trap+whip/eventCat.eliteArena but its OWN key (not reused) so a
+      // theme can fix this specific text's contrast (see COLOR_THEME_AUDIT.md) without retuning those gameplay colors.
+      c_8b1c2c: "#8b1c2c", // css.hpDark — hp-bar's dark gradient stop + vampiric lifesteal particle burst
+      c_2f8f22: "#2f8f22", // css.xpDark — xp-bar's dark gradient stop
+      c_8fb4ff: "#8fb4ff", // css.killCount — HUD kill-count chip dot
+      c_turretBolt_8fffcf: "#8fffcf", // css.turretBolt — stationary-minion (turret) attack bullet color;
+      // same current hex as css.debug purely by coincidence, kept as its own entry so tuning the dev
+      // debug overlay's color can never accidentally retint a real gameplay projectile, or vice versa.
+      c_playerBody_ffffff: "#ffffff", // css.playerBody — the player's own permanent body fill (NOT the
+      // hit-flash — that's css.danger). Separate key from weapon.holy_aura even though both happen to
+      // start at the same white: a player-marker's job (a stable "this is you" reference point) is
+      // unrelated to a weapon's visual identity, and conflating them would mean retuning one retints
+      // the other. Found via a real regression: this used to be hardcoded "#fff" unconditionally, and
+      // got mis-mapped to css.text (the structural readable-text role) during the "make everything
+      // configurable" pass, which is wrong — css.text is deliberately dark on the white theme for
+      // paragraph contrast, and that dragged the player's body dark right along with it.
+      c_8c5028: "#8c5028", // css.slowZone — "slowOnly"-tagged zone fill (spike trap/tesla/glacier totem area denial)
+      c_8cff78: "#8cff78", // css.zoneGeneric — generic (non-owner-weapon) player zone fill
+      c_000000: "#000000", // css.onAccent — text sitting directly on an accent-colored fill (.ab-charges, .wlvl badge)
+      c_14101c: "#14101c", // css.onAccentDark — a SECOND, slightly different "dark text on accent" value that
+      // already existed independently (.seg-btn.active text, range-slider thumb border) — kept separate from
+      // css.onAccent rather than merged, since nothing indicates the two were meant to be identical.
     },
     semantic: {
       "css.void": "c_08090d",
@@ -2778,6 +2833,29 @@ const CONFIG_DEFAULTS = {
       "weapon.blight_frost": "c_8fe0a0",
       "weapon.sakura_barrage": "c_ffb3d9",
       "weapon.cluster_charge": "c_ff7a3d",
+      // New css.* entries backing the 10 new palette keys above.
+      "css.danger": "c_ff3b3b",
+      "css.dangerVignette": "c_ff1414",
+      "css.glitchCyan": "c_4dd9ff",
+      "css.debug": "c_8fffcf",
+      "css.warning": "c_warning_ff8a4d",
+      "css.hpDark": "c_8b1c2c",
+      "css.xpDark": "c_2f8f22",
+      "css.killCount": "c_8fb4ff",
+      "css.slowZone": "c_8c5028",
+      "css.zoneGeneric": "c_8cff78",
+      // New semantic NAMES reusing EXISTING palette keys (no new hex) — these
+      // give a raw literal a clearer, use-appropriate name instead of a new
+      // entry for a color that already exists under a differently-scoped key.
+      "css.crit": "c_ffe15c",   // reuses weapon.tesla_coil's electric-yellow for crit-damage floaters/chain-arc default
+      "css.parry": "c_8fd8ff",  // reuses weapon.frost_field's ice-blue for PARRY/frost-enemy-bolt call sites
+      "css.metal": "c_8a8f9e",  // reuses mutation.armored's grey for robotic bullet/turret-tint call sites
+      "css.bone": "c_c8c8d8",   // reuses weapon.chain_hook's pale grey for raised-skeleton minion tint
+      "css.onAccent": "c_000000",
+      "css.onAccentDark": "c_14101c",
+      "css.victoryGold": "c_ffd479", // reuses weapon.bow's gold for the victory-screen title gradient
+      "css.turretBolt": "c_turretBolt_8fffcf",
+      "css.playerBody": "c_playerBody_ffffff",
     },
   },
   // Phase 5 — pure UI chrome only: button labels, screen/segment-control
@@ -2905,6 +2983,500 @@ for(const _semanticKey of Object.keys(CONFIG_DEFAULTS.colors.semantic)) CONFIG_S
     else if(val && typeof val==="object") registerTextSchema(val, fullPath);
   }
 })(CONFIG_DEFAULTS.texts, "texts");
+// COLOR_THEME_PRESETS — devtools-only alternate FULL palettes for the color-
+// correction/theme-compare tooling in .tools/devtools.html (see .tools/docs/
+// engineering/COLOR_THEME_AUDIT.md for the audit these were derived from and
+// why). Each entry is a complete replacement for CONFIG.colors.palette — same
+// 55 keys, semantic mapping untouched — so applying one is a single
+// applyConfigOverride({colors:{palette: PRESET}}) call, no engine changes.
+// 'default' is a LIVE REFERENCE to CONFIG_DEFAULTS.colors.palette (not a
+// copy) so it can never drift from the real defaults. warm/cool/highContrast/
+// colorblindSafe are generated transforms, not hand-picked: warm/cool are an
+// RGB channel-bias grade (like a white-balance shift, not a hue rotation —
+// rotating hue on a cool color moves it toward a RANDOM other hue, not
+// necessarily a warmer one); highContrast pushes saturation up and lightness
+// away from 50%; colorblindSafe remaps each hue 75% of the way toward the
+// nearest of 8 Okabe-Ito-inspired 'safe' hues (pure green bent toward blue-
+// green so it reads apart from red under deuteranopia/protanopia) — verified
+// against a deuteranopia LMS simulation to actually increase perceived
+// distance on the game's real red/green pairs (HP-red vs XP-green: 57->138
+// on a 0-441 scale; frenzied-red vs regenerating-green: 37->93). `white` is
+// a genuine light theme — its own comment sits right above its entry below,
+// since it needed different treatment (hand-picked structural roles, not a
+// formula) rather than fitting this same generated-transform family.
+// Regeneration script:
+// .tools/docs/engineering/gen_color_themes.js (kept for reproducibility if
+// these ever need regenerating after a palette change).
+const COLOR_THEME_PRESETS = {
+  default: CONFIG_DEFAULTS.colors.palette,
+  warm: {
+    c_08090d: "#09090b",
+    c_12141b: "#141418",
+    c_191c26: "#1c1c21",
+    c_2a2e3a: "#2e2e33",
+    c_dfe3ee: "#f5e3d1",
+    c_7b8194: "#878182",
+    c_7cff6b: "#88ff5e",
+    c_ffb347: "#ffb33e",
+    c_5ce1e6: "#65e1ca",
+    c_ff4d5e: "#ff4d53",
+    c_b98cff: "#cc8ce0",
+    c_ff6f9c: "#ff6f89",
+    c_7ee0ff: "#8be0e0",
+    c_ff9ecb: "#ff9eb3",
+    c_ff5c5c: "#ff5c51",
+    c_8aff6b: "#98ff5e",
+    c_ff6bcf: "#ff6bb6",
+    c_ff8a4d: "#ff8a44",
+    c_ff4d4d: "#ff4d44",
+    c_ffe15c: "#ffe151",
+    c_8a8f9e: "#988f8b",
+    c_ff9d4d: "#ff9d44",
+    c_8fd8ff: "#9dd8e0",
+    c_5cbf5c: "#65bf51",
+    c_c86bff: "#dc6be0",
+    c_ff6b3d: "#ff6b36",
+    c_6b1c22: "#761c1e",
+    c_7a3d0f: "#863d0d",
+    c_4a1c6b: "#511c5e",
+    c_ff2d4d: "#ff2d44",
+    c_3a0a12: "#400a10",
+    c_1c4a1c: "#1f4a19",
+    c_7a5cff: "#865ce0",
+    c_2a1c5c: "#2e1c51",
+    c_2a2d37: "#2e2d30",
+    c_6b5c1c: "#765c19",
+    c_1c4a6b: "#1f4a5e",
+    c_ff6e6e: "#ff6e61",
+    c_6b1c1c: "#761c19",
+    c_c8c8d8: "#dcc8be",
+    c_ffd479: "#ffd46a",
+    c_e0b48a: "#f6b479",
+    c_ffffff: "#ffffe0",
+    c_e8c96b: "#ffc95e",
+    c_ff7a8a: "#ff7a79",
+    c_c97fdb: "#dd7fc1",
+    c_c9a6ff: "#dda6e0",
+    c_d495c7: "#e995af",
+    c_ffb050: "#ffb046",
+    c_fff066: "#fff05a",
+    c_e0a97a: "#f6a96b",
+    c_c98fd6: "#dd8fbc",
+    c_8fe0a0: "#9de08d",
+    c_ffb3d9: "#ffb3bf",
+    c_ff7a3d: "#ff7a36",
+    c_ff3b3b: "#ff3b34",
+    c_ff1414: "#ff1412",
+    c_4dd9ff: "#55d9e0",
+    c_8fffcf: "#9dffb6",
+    c_warning_ff8a4d: "#ff8a44",
+    c_8b1c2c: "#991c27",
+    c_2f8f22: "#348f1e",
+    c_8fb4ff: "#9db4e0",
+    c_turretBolt_8fffcf: "#9dffb6",
+    c_8c5028: "#9a5023",
+    c_8cff78: "#9aff6a",
+    c_000000: "#000000",
+    c_14101c: "#161019",
+    c_playerBody_ffffff: "#ffffff",
+  },
+  cool: {
+    c_08090d: "#07090f",
+    c_12141b: "#10141e",
+    c_191c26: "#161c2b",
+    c_2a2e3a: "#252e41",
+    c_dfe3ee: "#c4e3ff",
+    c_7b8194: "#6c81a6",
+    c_7cff6b: "#6dff78",
+    c_ffb347: "#e0b350",
+    c_5ce1e6: "#51e1ff",
+    c_ff4d5e: "#e04d69",
+    c_b98cff: "#a38cff",
+    c_ff6f9c: "#e06faf",
+    c_7ee0ff: "#6fe0ff",
+    c_ff9ecb: "#e09ee6",
+    c_ff5c5c: "#e05c6b",
+    c_8aff6b: "#7bff78",
+    c_ff6bcf: "#e06bea",
+    c_ff8a4d: "#e08a58",
+    c_ff4d4d: "#e04d5b",
+    c_ffe15c: "#e0e169",
+    c_8a8f9e: "#7a8fb4",
+    c_ff9d4d: "#e09d59",
+    c_8fd8ff: "#7fd8ff",
+    c_5cbf5c: "#51bf65",
+    c_c86bff: "#b06bff",
+    c_ff6b3d: "#e06b47",
+    c_6b1c22: "#5e1c27",
+    c_7a3d0f: "#6b3d1a",
+    c_4a1c6b: "#411c78",
+    c_ff2d4d: "#e02d5b",
+    c_3a0a12: "#330a14",
+    c_1c4a1c: "#194a20",
+    c_7a5cff: "#6b5cff",
+    c_2a1c5c: "#251c68",
+    c_2a2d37: "#252d40",
+    c_6b5c1c: "#5e5c20",
+    c_1c4a6b: "#194a78",
+    c_ff6e6e: "#e06e79",
+    c_6b1c1c: "#5e1c20",
+    c_c8c8d8: "#b6c8f3",
+    c_ffd479: "#e0d488",
+    c_e0b48a: "#c5b49b",
+    c_ffffff: "#e0ffff",
+    c_e8c96b: "#cec978",
+    c_ff7a8a: "#e07a9d",
+    c_c97fdb: "#b17fff",
+    c_c9a6ff: "#b1a6ff",
+    c_d495c7: "#bc95e5",
+    c_ffb050: "#e0b05a",
+    c_fff066: "#e0f077",
+    c_e0a97a: "#c5a98b",
+    c_c98fd6: "#b18fff",
+    c_8fe0a0: "#7ee0b4",
+    c_ffb3d9: "#e0b3f3",
+    c_ff7a3d: "#e07a44",
+    c_ff3b3b: "#e03b42",
+    c_ff1414: "#e01416",
+    c_4dd9ff: "#44d9ff",
+    c_8fffcf: "#7effe8",
+    c_warning_ff8a4d: "#e08a56",
+    c_8b1c2c: "#7a1c31",
+    c_2f8f22: "#298f26",
+    c_8fb4ff: "#7eb4ff",
+    c_turretBolt_8fffcf: "#7effe8",
+    c_8c5028: "#7b502d",
+    c_8cff78: "#7bff86",
+    c_000000: "#000000",
+    c_14101c: "#12101f",
+    c_playerBody_ffffff: "#ffffff",
+  },
+  highContrast: {
+    c_08090d: "#06070b",
+    c_12141b: "#0d0f16",
+    c_191c26: "#12151f",
+    c_2a2e3a: "#1f232f",
+    c_dfe3ee: "#e7ebf4",
+    c_7b8194: "#a1a6b6",
+    c_7cff6b: "#a3ff97",
+    c_ffb347: "#ffca7e",
+    c_5ce1e6: "#82f4f8",
+    c_ff4d5e: "#ff828e",
+    c_b98cff: "#ceafff",
+    c_ff6f9c: "#ff9aba",
+    c_7ee0ff: "#a5e9ff",
+    c_ff9ecb: "#ffbbdb",
+    c_ff5c5c: "#ff8d8d",
+    c_8aff6b: "#adff97",
+    c_ff6bcf: "#ff97dd",
+    c_ff8a4d: "#ffad82",
+    c_ff4d4d: "#ff8282",
+    c_ffe15c: "#ffea8d",
+    c_8a8f9e: "#acb0bd",
+    c_ff9d4d: "#ffba82",
+    c_8fd8ff: "#b1e4ff",
+    c_5cbf5c: "#85da85",
+    c_c86bff: "#d997ff",
+    c_ff6b3d: "#ff9777",
+    c_6b1c22: "#5a0f15",
+    c_7a3d0f: "#682e03",
+    c_4a1c6b: "#3b0f5a",
+    c_ff2d4d: "#ff6c82",
+    c_3a0a12: "#31040b",
+    c_1c4a1c: "#123e12",
+    c_7a5cff: "#a28dff",
+    c_2a1c5c: "#1e104d",
+    c_2a2d37: "#20222c",
+    c_6b5c1c: "#5a4c0f",
+    c_1c4a6b: "#0f3b5a",
+    c_ff6e6e: "#ff9a9a",
+    c_6b1c1c: "#5a0f0f",
+    c_c8c8d8: "#d7d7e5",
+    c_ffd479: "#ffe1a1",
+    c_e0b48a: "#f0caa6",
+    c_ffffff: "#ffffff",
+    c_e8c96b: "#f9de8e",
+    c_ff7a8a: "#ffa2ad",
+    c_c97fdb: "#de9eed",
+    c_c9a6ff: "#d9c1ff",
+    c_d495c7: "#e6b0db",
+    c_ffb050: "#ffc885",
+    c_fff066: "#fff494",
+    c_e0a97a: "#f1c29a",
+    c_c98fd6: "#ddabe8",
+    c_8fe0a0: "#aaf0b9",
+    c_ffb3d9: "#ffcae4",
+    c_ff7a3d: "#ffa277",
+    c_ff3b3b: "#ff7676",
+    c_ff1414: "#ff5b5b",
+    c_4dd9ff: "#82e4ff",
+    c_8fffcf: "#b1ffdd",
+    c_warning_ff8a4d: "#ffad82",
+    c_8b1c2c: "#760c1c",
+    c_2f8f22: "#1e7911",
+    c_8fb4ff: "#b1caff",
+    c_turretBolt_8fffcf: "#b1ffdd",
+    c_8c5028: "#763d17",
+    c_8cff78: "#afffa1",
+    c_000000: "#000000",
+    c_14101c: "#0f0b17",
+    c_playerBody_ffffff: "#ffffff",
+  },
+  colorblindSafe: {
+    c_08090d: "#08090d",
+    c_12141b: "#12151b",
+    c_191c26: "#191d26",
+    c_2a2e3a: "#2a2f3a",
+    c_dfe3ee: "#dfe3ee",
+    c_7b8194: "#7b8294",
+    c_7cff6b: "#6bffba",
+    c_ffb347: "#ffac47",
+    c_5ce1e6: "#5cc6e6",
+    c_ff4d5e: "#ff5b4d",
+    c_b98cff: "#ca8cff",
+    c_ff6f9c: "#ff6fc2",
+    c_7ee0ff: "#7edaff",
+    c_ff9ecb: "#ff9eda",
+    c_ff5c5c: "#ff6c5c",
+    c_8aff6b: "#f1ff6b",
+    c_ff6bcf: "#ff6bce",
+    c_ff8a4d: "#ffa34d",
+    c_ff4d4d: "#ff5f4d",
+    c_ffe15c: "#ffe75c",
+    c_8a8f9e: "#8a909e",
+    c_ff9d4d: "#ffa84d",
+    c_8fd8ff: "#8fdcff",
+    c_5cbf5c: "#5cbf94",
+    c_c86bff: "#c36bff",
+    c_ff6b3d: "#ff5c3d",
+    c_6b1c22: "#6b221c",
+    c_7a3d0f: "#7a450f",
+    c_4a1c6b: "#4a1c6b",
+    c_ff2d4d: "#ff3a2d",
+    c_3a0a12: "#3a0d0a",
+    c_1c4a1c: "#1c4a36",
+    c_7a5cff: "#ab5cff",
+    c_2a1c5c: "#3b1c5c",
+    c_2a2d37: "#2a2e37",
+    c_6b5c1c: "#6b5f1c",
+    c_1c4a6b: "#1c516b",
+    c_ff6e6e: "#ff7c6e",
+    c_6b1c1c: "#6b241c",
+    c_c8c8d8: "#c8ccd8",
+    c_ffd479: "#ffc579",
+    c_e0b48a: "#e0b78a",
+    c_ffffff: "#ffffff",
+    c_e8c96b: "#e8d46b",
+    c_ff7a8a: "#ff837a",
+    c_c97fdb: "#ba7fdb",
+    c_c9a6ff: "#d6a6ff",
+    c_d495c7: "#d495c1",
+    c_ffb050: "#ffae50",
+    c_fff066: "#ffec66",
+    c_e0a97a: "#e0af7a",
+    c_c98fd6: "#bd8fd6",
+    c_8fe0a0: "#8fe0c1",
+    c_ffb3d9: "#ffb3e3",
+    c_ff7a3d: "#ff603d",
+    c_ff3b3b: "#ff4f3b",
+    c_ff1414: "#ff2c14",
+    c_4dd9ff: "#4dcdff",
+    c_8fffcf: "#8fffde",
+    c_warning_ff8a4d: "#ffa34d",
+    c_8b1c2c: "#8b231c",
+    c_2f8f22: "#228f5c",
+    c_8fb4ff: "#8fb1ff",
+    c_turretBolt_8fffcf: "#8fffde",
+    c_8c5028: "#8c5a28",
+    c_8cff78: "#78ffbf",
+    c_000000: "#000000",
+    c_14101c: "#16101c",
+    c_playerBody_ffffff: "#ffffff",
+  },
+  // white — a genuine light theme, not a filter: the 6 structural roles
+  // (void/panel/panel2/line/text/dim) are hand-picked, not derived, since
+  // "invert lightness" alone doesn't make a good light UI (elevation
+  // direction, border visibility, and text contrast all need real design
+  // judgment, not a formula). Every OTHER entry (weapon/character/mutation/
+  // boss/orb-status identity colors — all read LIVE by weaponColor()/
+  // resolveColor() during actual gameplay rendering, not just menu chrome)
+  // keeps its hue but gets re-derived: near-neutral colors (sat<15%) invert
+  // the same as the structural roles; real hued colors (most of the palette,
+  // including chain_hook's pale grey-blue, which has JUST enough saturation
+  // to take this branch instead) keep their hue and get iteratively
+  // darkened until they clear 4.5:1 against css.panel (#fff) — a flat HSL-
+  // lightness clamp wasn't enough for yellow/green/cyan, whose perceived
+  // luminance stays high well past what red/blue/purple need.
+  // Regeneration script: gen_color_themes.js's white-theme companion,
+  // .tools/docs/engineering/gen_white_theme.js. See COLOR_THEME_AUDIT.md.
+  // c_dfe3ee (css.text — ALSO weapon.shuriken_storm/weapon.twin_daggers,
+  // same shared-palette-key indirection every theme uses) is a HAND
+  // override for a structural reason, not a cosmetic one: this key is near-
+  // neutral, so the generic pass would invert it straight to near-black
+  // (#1b1e29, 16.6:1 — excellent for text, but those 2 weapons render on
+  // canvas as a near-invisible dark blob with essentially no glow, since
+  // drawGlowSprite fades their OWN color to transparent, not a separate
+  // lighter variant). #454a5c is the compromise: still 8.8:1 against white
+  // (comfortably past the 4.5:1 AA floor everywhere it's used as text) while
+  // reading as a visible steel-grey bullet color, in the same family as
+  // chain_hook/turret_deployer's already-medium greys instead of an outlier.
+  // c_ffffff (weapon.holy_aura only, no shared-key conflict) is ALSO hand-
+  // picked — the generic pass's invert-to-black technically "works" (holy
+  // aura becomes the darkest, starkest thing on screen, same logic as any
+  // other near-neutral) but reads backwards for a HOLY effect specifically.
+  // #886c11 (a bronze-gold, ~5:1 against white) keeps the "radiant/divine"
+  // color association a plain black square loses entirely.
+  // c_b98cff/c_c9a6ff/c_c86bff/c_7a5cff (the violet/blue-violet family —
+  // css.accent/character.mage/weapon.void_rift, weapon.spectral_lance,
+  // mutation.vampiric, boss.void_knight.color) are HAND overrides, not the
+  // algorithm's output. Two compounding problems with the generic pass for
+  // this specific hue range: (1) violet/blue hues have low perceived
+  // luminance, so "darken until 4.5:1 against white" pushes them down hard —
+  // and darkened violet reads as muddy/brownish to the eye in a way darkened
+  // green or red doesn't, a real perceptual asymmetry, not just a number; (2)
+  // accent is ALSO used as a filled BADGE BACKGROUND under literal black text
+  // (.wlvl weapon-level badge, .ab-charges), which the white-only contrast
+  // target never accounted for. Each of these 4 is hand-picked at the same
+  // lightness (L=66 in HSL, own hue preserved) balancing BOTH directions —
+  // ~3.6-4.8:1 against white AND ~4.4-5.9:1 against black — instead of
+  // chasing one number in one direction. See gen_white_theme.js's contrast
+  // sweep in COLOR_THEME_AUDIT.md for the full per-hue tradeoff tables this
+  // was picked from.
+  // The 10 boss.X.glow entries (c_6b1c22/c_7a3d0f/c_4a1c6b/c_3a0a12/c_1c4a1c/
+  // c_2a1c5c/c_6b5c1c/c_1c4a6b/c_6b1c1c, plus c_2a2d37 which the near-neutral
+  // branch already inverted) are ALSO hand-lightened, for a reason specific
+  // to this theme: render() draws e.glow as a halo BEHIND every enemy/boss
+  // (drawGlowSprite: color -> transparent) — these were always dark, ~20%
+  // lightness, so it read as a soft dusky aura on a dark canvas. On a light
+  // canvas the exact same dark halo reads as a literal dark smudge around
+  // every boss. Each is its boss's own hue pushed to ~82% lightness (same
+  // convention roleColor() below now uses for regular/elite enemies via
+  // themeIsLight()) instead of the generic darken-for-contrast pass, which
+  // would have just kept them dark (a dark color already clears contrast
+  // against white with no darkening needed, so the generic loop never
+  // touches these — lightening them is a deliberate override, not something
+  // the algorithm would ever produce on its own).
+  //
+  // 2026-08-02 — replaced the ORIGINAL per-entry generic pass (iteratively
+  // darken each hued color until it clears 4.5:1 against white) for every
+  // GAMEPLAY-ONLY identity color (weapon bullet/aura colors, mutation ring
+  // colors, danger/glitch/zone-fill effects) with a LIGHTNESS-BAND clamp
+  // instead: `max(50, min(70, originalLightness))`, hue+saturation kept
+  // (saturation nudged ×1.05). Real user feedback after shipping the first
+  // version: contrast-chasing produced colors that were technically legible
+  // but looked muddy/dark — "не тупой контраст, управляемая система" (not
+  // dumb/blind contrast-chasing, a controllable system). A band clamp IS
+  // that system: most of these dark-theme colors already sit at 55-70%
+  // lightness (bright enough to pop on black without being pastel-washed-
+  // out), so clamping into the SAME band mostly just caps the handful that
+  // were near-90%+ pastels — it does NOT force anything down to a dark,
+  // muddy shade the way chasing a contrast number did. The accepted
+  // tradeoff: some of these now sit at 1.2-2:1 contrast against pure white,
+  // clearly below AA — accepted deliberately for GAMEPLAY colors rendered
+  // with their own shape/glow/motion on the canvas, not read as flat text.
+  // Explicitly EXCLUDED from this band-clamp (kept at their previous,
+  // contrast-tuned value) because they're read as literal TEXT or reused
+  // pervasively as <style> UI chrome, not just a canvas swatch: the 8
+  // shared css.xp/gold/soul/hp/accent/accent2/crystal/artifact vars (shop
+  // prices, tags, borders — genuinely need real contrast), css.warning
+  // (tooltip/disabled/toast text), css.crit (a floating damage NUMBER —
+  // shares c_ffe15c with mutation.swift/weapon.tesla_coil, so those 3 stay
+  // at the contrast-tuned value too as accepted collateral), and css.debug
+  // (FPS-overlay text — css.turretBolt got its own separate key specifically
+  // so it wouldn't be dragged along by this exclusion). Structural roles,
+  // the two gradient-dark stops, the 10 already-lightened boss glows, the
+  // 2 on-accent-text darks, the violet/purple hand overrides, and holy_aura
+  // are UNCHANGED by this pass (already correct, or excluded for their own
+  // stated reason above). `c_playerBody_ffffff` is a NEW key fixing a real
+  // regression found via user testing: the player's own permanent body fill
+  // (not the hit-flash — separate) had been mapped to css.text, which is
+  // deliberately dark on this theme for paragraph contrast, so the player
+  // rendered as an unwanted dark circle. Given its own key + a light grey
+  // (#adadad — the SAME band-clamp formula applied to white/sat=0) so it no
+  // longer inherits css.text's dark-for-reading-paragraphs behavior.
+  white: {
+    c_08090d: "#eef1f6",
+    c_12141b: "#ffffff",
+    c_191c26: "#e4e8f0",
+    c_2a2e3a: "#c7cddb",
+    c_dfe3ee: "#454a5c",
+    c_7b8194: "#5b6178",
+    c_7cff6b: "#0f8500",
+    c_ffb347: "#a36000",
+    c_5ce1e6: "#0f7c80",
+    c_ff4d5e: "#eb0016",
+    c_b98cff: "#9552ff",
+    c_ff6f9c: "#eb0049",
+    c_7ee0ff: "#007ca3",
+    c_ff9ecb: "#e00068",
+    c_ff5c5c: "#ff5c5c",
+    c_8aff6b: "#86ff66",
+    c_ff6bcf: "#ff66cd",
+    c_ff8a4d: "#ff8a4d",
+    c_ff4d4d: "#ff4d4d",
+    c_ffe15c: "#856c00",
+    c_8a8f9e: "#8a8f9e",
+    c_ff9d4d: "#ff9d4d",
+    c_8fd8ff: "#66caff",
+    c_5cbf5c: "#5ac15a",
+    c_c86bff: "#bf52ff",
+    c_ff6b3d: "#ff6b3d",
+    c_6b1c22: "#ecb6ba",
+    c_7a3d0f: "#f5ccad",
+    c_4a1c6b: "#d6b6ec",
+    c_ff2d4d: "#ff2d4d",
+    c_3a0a12: "#f2b1bb",
+    c_1c4a1c: "#bae8ba",
+    c_7a5cff: "#7252ff",
+    c_2a1c5c: "#c3b9ea",
+    c_2a2d37: "#c8cbd5",
+    c_6b5c1c: "#ece2b6",
+    c_1c4a6b: "#b6d6ec",
+    c_ff6e6e: "#ff6666",
+    c_6b1c1c: "#ecb6b6",
+    c_c8c8d8: "#a5a5c0",
+    c_ffd479: "#ffce66",
+    c_e0b48a: "#e1b184",
+    c_ffffff: "#886c11",
+    c_e8c96b: "#ebcb68",
+    c_ff7a8a: "#ff6678",
+    c_c97fdb: "#ca7ddd",
+    c_c9a6ff: "#9652ff",
+    c_d495c7: "#d491c6",
+    c_ffb050: "#ffb050",
+    c_fff066: "#fff066",
+    c_e0a97a: "#e3a977",
+    c_c98fd6: "#ca8dd8",
+    c_8fe0a0: "#85e098",
+    c_ffb3d9: "#ff66b3",
+    c_ff7a3d: "#ff7a3d",
+    c_ff3b3b: "#ff3b3b",
+    c_ff1414: "#ff1414",
+    c_4dd9ff: "#4dd9ff",
+    c_8fffcf: "#00854c",
+    c_warning_ff8a4d: "#cc4600",
+    c_8b1c2c: "#8f1829",
+    c_2f8f22: "#27821a",
+    c_8fb4ff: "#6699ff",
+    c_turretBolt_8fffcf: "#66ffbd",
+    c_8c5028: "#ca7135",
+    c_8cff78: "#7dff66",
+    // c_000000 (css.onAccent) is a HAND override, not the algorithm's output —
+    // it's near-neutral (pure black, sat=0) so the generic pass inverts it
+    // the same way it inverts void/panel (100% lightness -> #ffffff), which
+    // is exactly backwards here: this key is TEXT drawn on top of the
+    // accent-colored badge fill (.ab-charges/.wlvl), not a background/
+    // foreground page role, so it needs to stay dark regardless of whether
+    // the overall theme is light or dark (accent itself stays a vivid mid-
+    // tone in every theme — see the accent-family override above — so black
+    // text on it always has enough contrast). White #ffffff text on a white
+    // theme's accent badge would still work numerically but reads wrong —
+    // kept identical to every other theme's value on purpose.
+    c_000000: "#000000",
+    c_14101c: "#16101c",
+    c_playerBody_ffffff: "#adadad",
+  },
+};
 // Deep-clones CONFIG_DEFAULTS so the live, possibly-overridden CONFIG the
 // game actually reads never accidentally shares a nested object with
 // CONFIG_DEFAULTS (mutating one must never be able to mutate the other).
@@ -2990,7 +3562,8 @@ function resolveColor(semanticKey){
 // default (see the <style> block near the top) — kept as an explicit list
 // (not "every css.* semantic key") so a future semantic key that ISN'T a
 // real CSS var doesn't silently try to setProperty something meaningless.
-const CSS_COLOR_VAR_NAMES = ["void","panel","panel2","line","text","dim","xp","gold","soul","hp","accent","accent2","crystal","artifact"];
+const CSS_COLOR_VAR_NAMES = ["void","panel","panel2","line","text","dim","xp","gold","soul","hp","accent","accent2","crystal","artifact",
+  "danger","dangerVignette","glitchCyan","debug","warning","hpDark","xpDark","killCount","onAccent","onAccentDark","victoryGold"];
 // Resolves a UI-chrome text key (dot-path into CONFIG.texts, e.g.
 // "menu.newRun") with optional {token} substitution — the one path anything
 // reads user-facing chrome strings through, mirroring resolveColor()'s role
@@ -3047,6 +3620,42 @@ function applyStaticTexts(){
     if(btn) btn.textContent = t(key);
   }
 }
+function hexToRgba(hex,a){
+  if(!hex || hex[0]!=='#' || hex.length<7) return hex; // best-effort passthrough for non-hex colors (rare)
+  const r=parseInt(hex.slice(1,3),16), g=parseInt(hex.slice(3,5),16), b=parseInt(hex.slice(5,7),16);
+  return `rgba(${r},${g},${b},${a})`;
+}
+// WCAG relative luminance of a #rrggbb hex — used below to decide whether the
+// active theme's canvas background reads as "light" or "dark", so the couple
+// of hardcoded white-overlay VFX (movement grid, veil vignette) can flip
+// polarity instead of vanishing into a light background. Defined here (PART
+// 4, not alongside the render()-adjacent code that also uses it) specifically
+// because onConfigApplied() below needs it, and onConfigApplied() must stay
+// inside the PART 1-4 slice that balance-lab.html/verify-balance.js extract
+// into a sandboxed Function with no PART 5+ (canvas/render) code at all —
+// defining these two functions after PART 5 like drawGlowSprite's neighbors
+// broke that extraction outright (ReferenceError: themeIsLight is not
+// defined) the first time this shipped. Everything else painted on the
+// canvas (bullets, enemies, particles, world border) is untouched by this —
+// those are hued colors already tuned per-theme via CONFIG.colors, not a
+// fixed alpha-white overlay that only works against a dark backdrop.
+function relLuminance(hex){
+  const r=parseInt(hex.slice(1,3),16)/255, g=parseInt(hex.slice(3,5),16)/255, b=parseInt(hex.slice(5,7),16)/255;
+  const f = c => c<=0.03928 ? c/12.92 : Math.pow((c+0.055)/1.055,2.4);
+  return 0.2126*f(r)+0.7152*f(g)+0.0722*f(b);
+}
+function themeIsLight(){ return relLuminance(resolveColor("css.void")) > 0.5; }
+// Declared here (not down by resyncProceduralEntityColors()'s own
+// definition near BOSS_ROSTER) because it's a `let`, not a `var` — unlike a
+// hoisted function declaration, a `let` binding is in the temporal dead
+// zone until its OWN declaration statement actually executes, and merely
+// REFERENCING it (even inside an if-guard that would evaluate to false)
+// throws ReferenceError if that point hasn't been reached yet. onConfigApplied()
+// below is called unconditionally during initial CONFIG setup, textually
+// before ENEMIES_NORMAL/BOSS_ROSTER (and this flag) are built — so the
+// declaration itself must live before that first call, even though the
+// flag is only ever SET to true later, right after those tables exist.
+let _enemyColorTablesReady = false;
 function onConfigApplied(){
   // No-ops outside a real DOM (Node-based extraction: verify-balance.js/
   // balance-lab.html's LIVE DATA LOADER eval this same PART 1-4 slice in a
@@ -3056,6 +3665,19 @@ function onConfigApplied(){
   if(typeof document==="undefined") return;
   const root = document.documentElement;
   for(const name of CSS_COLOR_VAR_NAMES) root.style.setProperty("--"+name, resolveColor("css."+name));
+  // A handful of general <style> component colors (screen vignette, chip
+  // text-shadow) were hardcoded rgba() literals tuned ONLY for a dark theme —
+  // a light theme (see COLOR_THEME_PRESETS.white) needs a genuinely different
+  // look here, not just a different hex plugged into the same formula (a
+  // dark vignette painted over a light panel just looks broken). These two
+  // are hand-picked per light/dark, same spirit as themeIsLight()'s canvas-
+  // grid branch above — the dark branch is pixel-identical to what was
+  // hardcoded before this existed, so no existing (non-white) theme's look
+  // changes at all.
+  const light = themeIsLight();
+  root.style.setProperty("--veil-inner", light ? hexToRgba(resolveColor("css.accent"), 0.10) : "rgba(30,20,50,0.55)");
+  root.style.setProperty("--veil-outer", light ? "rgba(120,128,150,0.16)" : "rgba(4,5,8,0.92)");
+  root.style.setProperty("--chip-text-shadow", light ? "0 1px 2px rgba(255,255,255,0.6)" : "0 1px 2px rgba(0,0,0,0.6)");
   // Re-applies static labels so a future editor edit updates already-visible
   // buttons immediately. Dynamic textContent= sites (achievement/log/shop
   // messages built at the moment they're shown) aren't re-rendered here —
@@ -3063,6 +3685,13 @@ function onConfigApplied(){
   // same "some things need a re-open, not instant" precedent Phases 3-4
   // already established for module-eval-time-baked values.
   applyStaticTexts();
+  // Guarded: this very function runs once, unconditionally, at initial
+  // CONFIG setup (PART 1) — BEFORE ENEMIES_NORMAL/ENEMIES_ELITE/BOSS_ROSTER
+  // exist (PART 2). _enemyColorTablesReady only flips true once those are
+  // actually built, so this is a no-op on that first call and does the real
+  // work on every subsequent applyConfigOverride() (devtools theme switch,
+  // JSON import, etc).
+  if(_enemyColorTablesReady) resyncProceduralEntityColors();
 }
 // The one and only path anything uses to change CONFIG after boot. Returns
 // what was actually applied (post-clamp/post-drop) so a caller (e.g. the
@@ -3230,7 +3859,7 @@ const RING_SHAPES = { fire_nova:"segmented", frost_field:"hex", poison_cloud:"se
 // thickness, area/aura pulse intensity, etc. so leveling up reads as a growing presence on screen,
 // not just a bigger number in the level-up card.
 function weaponVisualTier(level){ return level>=7?4 : level>=5?3 : level>=3?2 : 1; }
-function weaponColor(wid){ return CONFIG.colors.semantic["weapon."+wid] ? resolveColor("weapon."+wid) : "#ffd479"; }
+function weaponColor(wid){ return CONFIG.colors.semantic["weapon."+wid] ? resolveColor("weapon."+wid) : resolveColor("weapon.bow"); }
 
 const EVOLUTIONS = {
   crimson_executioner:{from:"blood_blade",catalyst:"blood_chalice",name:"Crimson Executioner",icon:"🩸",desc:"Every hit heals for 8% of damage dealt; executes below 15% HP."},
@@ -3476,7 +4105,7 @@ const CHARACTERS = [
 ];
 // Player body/ring color by class — falls back to Mage's violet (the old universal default)
 // for any unrecognized id, same fallback pattern weaponColor() uses.
-function characterColor(id){ const c=CHARACTERS.find(x=>x.id===id); return (c&&c.color)||"#b98cff"; }
+function characterColor(id){ const c=CHARACTERS.find(x=>x.id===id); return (c&&c.color)||resolveColor("css.accent"); }
 // POLISH_PLAN_7 — talent branch id matches a CHARACTERS id for 5 of 6 branches
 // (reusing characterColor keeps them in sync if a class color ever changes);
 // "survivor" has no CHARACTERS entry (it's the generic/economy branch, open to
@@ -3493,7 +4122,15 @@ const TALENT_BRANCH_COLOR = { warrior:characterColor('warrior'), mage:characterC
 function roleColor(role, idx){
   const hueBase = {melee:0,ranged:200,tank:100,swarm:280,assassin:320,support:48}[role] ?? 0;
   const hue = (hueBase + idx*11) % 360;
-  return { color:`hsl(${hue},72%,62%)`, glow:`hsl(${hue},72%,28%)` };
+  // The glow halo (drawGlowSprite: color -> transparent) was always a DARK
+  // 28%-lightness shade — reads as a soft dusky aura on a dark canvas
+  // background, but as a literal dark smudge around every enemy once the
+  // canvas itself goes light (COLOR_THEME_PRESETS.white). themeIsLight()
+  // flips it to a bright, pale variant instead — a light bloom radiating
+  // outward reads correctly on a light background the same way a dark aura
+  // does on a dark one.
+  const glowL = themeIsLight() ? 82 : 28;
+  return { color:`hsl(${hue},72%,62%)`, glow:`hsl(${hue},72%,${glowL}%)` };
 }
 function brainForRole(role){
   return {melee:"chase",ranged:"keep_distance_shoot",tank:"chase",swarm:"swarm",assassin:"charge",support:"summon"}[role] || "chase";
@@ -3736,6 +4373,39 @@ for(const key of Object.keys(BOSS_ROSTER_RAW)){
   // the un-inflated number — boss survivability and boss loot are separate knobs.
   BOSS_ROSTER[key] = Object.assign({}, b, { hp: Math.round(b.hp*CONFIG.balance.BOSS_HP_MULT), rawHp: b.hp, dmg: +(b.dmg*CONFIG.balance.BOSS_DMG_MULT).toFixed(1) });
 }
+// Re-stamps color/glow onto the already-built ENEMIES_NORMAL/ENEMIES_ELITE/
+// BOSS_ROSTER tables in place whenever CONFIG changes — called from
+// onConfigApplied() below (guarded by _enemyColorTablesReady, since
+// onConfigApplied() also fires once during initial module eval, BEFORE these
+// tables exist). Without this, switching a color theme live (devtools'
+// whole reason to exist) would silently do nothing for enemy/boss glow —
+// they'd stay whatever roleColor()/resolveColor() produced at the ORIGINAL
+// page load, same "module-eval-time bake" class of gotcha CHARACTERS/
+// ENEMY_MUTATIONS/the 5 balance multipliers already have (see the comment
+// above BOSS_ROSTER_RAW) — except color specifically doesn't need to stay
+// reload-gated the way HP/DMG multipliers do; a color is safe to hot-swap
+// with zero balance implications. Deliberately touches ONLY color/glow, not
+// hp/dmg/rawHp — those stay reload-gated exactly as documented, this isn't
+// trying to also unstick that. Already-SPAWNED enemy instances on screen
+// keep whatever color/glow they copied at spawn time (their own fields);
+// only the shared definition tables update, so newly spawned enemies (which
+// happens continuously via updateSpawns(), not just at run-start) pick up
+// the new theme immediately — no reload/new run required for this one.
+function resyncProceduralEntityColors(){
+  for(let i=0;i<ENEMIES_NORMAL.length;i++){
+    const rc = roleColor(ENEMIES_NORMAL[i].role, i);
+    ENEMIES_NORMAL[i].color = rc.color; ENEMIES_NORMAL[i].glow = rc.glow;
+  }
+  for(let i=0;i<ENEMIES_ELITE.length;i++){
+    const rc = roleColor(ENEMIES_ELITE[i].role, i+30);
+    ENEMIES_ELITE[i].color = rc.color; ENEMIES_ELITE[i].glow = rc.glow;
+  }
+  for(const key of Object.keys(BOSS_ROSTER)){
+    BOSS_ROSTER[key].color = resolveColor("boss."+key+".color");
+    BOSS_ROSTER[key].glow = resolveColor("boss."+key+".glow");
+  }
+}
+_enemyColorTablesReady = true;
 
 const BOSSES = {
   // Each boss gets one signature pattern nobody else uses (its "this is what
@@ -4685,7 +5355,7 @@ function weaponFire(wid, lvl, dt){
           const hit=new Set([target]);
           forEachEnemyNear(player.x,player.y,range,e=>{
             if(hit.size>extraBeams || hit.has(e)) return;
-            hit.add(e); dealDamage(e, dps*def.base.tick*0.6*elemental, wid); spawnParticle(e.x,e.y,"#ffd479",1+weaponVisualTier(lvl));
+            hit.add(e); dealDamage(e, dps*def.base.tick*0.6*elemental, wid); spawnParticle(e.x,e.y,resolveColor("weapon.bow"),1+weaponVisualTier(lvl));
           });
         }
         // cdMult (attack speed) previously only gated melee/projectile/area/trap/chain/summon
@@ -5080,17 +5750,17 @@ function dealDamage(enemy, dmg, weaponId){
     const critRolled = player.stats.critChance>0 && rngBool(player.stats.critChance);
     trackCritRoll(player.stats.critChance, critRolled);
     if(forcedCrit || critRolled){ dmg*=player.stats.critMult; crit=true; }
-    if(enemy.special==="parryFirstHit" && !enemy.parried){ enemy.parried=true; spawnFloater(enemy.x,enemy.y-10,"PARRY","#8fd8ff"); return; }
+    if(enemy.special==="parryFirstHit" && !enemy.parried){ enemy.parried=true; spawnFloater(enemy.x,enemy.y-10,"PARRY",resolveColor("css.parry")); return; }
     if(enemy.special==="stagger"){ enemy.hitCount=(enemy.hitCount||0)+1; if(enemy.hitCount%4===0){ enemy.staggerT=1.0; } }
     if(enemy.special==="reflect" && weaponId){ const wdef=weaponDef(weaponId); if(wdef && (wdef.type==="melee")){ damagePlayer(enemy.dmg*0.2); } } // Thornback/Iron Colossus: reflects melee damage back
     if(enemy.special==="mark" && !enemy._marked){ enemy._marked=true; } // Abyssal Watcher marks on first hit
     if(enemy._marked) forcedCrit=true;
     if(enemy.mutArmor) dmg *= (1-enemy.mutArmor);
-    if(enemy.shield>0){ const absorbed=Math.min(enemy.shield,dmg); enemy.shield-=absorbed; dmg-=absorbed; if(dmg<=0){ spawnFloater(enemy.x,enemy.y-10,"BLOCK","#7ee0ff"); return; } }
+    if(enemy.shield>0){ const absorbed=Math.min(enemy.shield,dmg); enemy.shield-=absorbed; dmg-=absorbed; if(dmg<=0){ spawnFloater(enemy.x,enemy.y-10,"BLOCK",resolveColor("css.crystal")); return; } }
     dmg = Math.max(0, Math.min(dmg, 999999)); // sanity clamp against NaN/Infinity from broken combos
     enemy.hp -= dmg; enemy.hitFlash=1;
     dpsWindow.push({t:runTime,dmg}); dpsWindowSum+=dmg;
-    spawnFloater(enemy.x,enemy.y-10,fmtFlavorBig(dmg), crit?"#ffe15c":(isEliteOrBoss?"#ffb347":"#fff"));
+    spawnFloater(enemy.x,enemy.y-10,fmtFlavorBig(dmg), crit?resolveColor("css.crit"):(isEliteOrBoss?resolveColor("css.gold"):resolveColor("css.text")));
     if(player.stats.lifesteal>0){
       if(runTime-player.lifestealWindowStart>=1){ player.lifestealWindowStart=runTime; player.lifestealHealedThisSec=0; }
       const capThisSec = runTime<CONFIG.caps.LIFESTEAL_HPS_PCT_CAP_START_T ? CONFIG.caps.LIFESTEAL_HPS_CAP : Math.min(CONFIG.caps.LIFESTEAL_HPS_CAP, player.maxHp*CONFIG.caps.LIFESTEAL_HPS_PCT_CAP);
@@ -5120,7 +5790,7 @@ function dealDamage(enemy, dmg, weaponId){
 
 function killEnemy(enemy){
   if(enemy.dead) return; // guard: never run death side-effects twice for the same enemy
-  if(enemy.special==="reassemble" && !enemy._reassembled){ enemy._reassembled=true; enemy.hp=enemy.maxHp*0.5; spawnParticle(enemy.x,enemy.y,"#fff",16); logEvent(`${enemy.name||"The enemy"} reassembles!`); return; }
+  if(enemy.special==="reassemble" && !enemy._reassembled){ enemy._reassembled=true; enemy.hp=enemy.maxHp*0.5; spawnParticle(enemy.x,enemy.y,resolveColor("css.text"),16); logEvent(`${enemy.name||"The enemy"} reassembles!`); return; }
   // Mark dead but DO NOT splice out of `enemies` here: this can run mid-iteration
   // (updateEnemies' burn-tick, or a weapon hitting several enemies in one pass),
   // and mutating the array's length while a for-of loop walks it shifts every
@@ -5153,7 +5823,7 @@ function killEnemy(enemy){
   spawnParticle(enemy.x,enemy.y,enemy.color,10);
   if(enemy.id==="imp" && !enemy.isSplit){ for(let i=0;i<2;i++){ const ang=rand(0,Math.PI*2); spawnEnemy("imp",{x:enemy.x+Math.cos(ang)*14,y:enemy.y+Math.sin(ang)*14},{isSplit:true,hpMult:0.4,radiusMult:0.65}); } }
   if(enemy.special==="explodeOnDeath"){ for(let i=0;i<4;i++){ const ang=(i/4)*Math.PI*2; spawnEnemy("rat_swarm",{x:enemy.x+Math.cos(ang)*30,y:enemy.y+Math.sin(ang)*30}); } logEvent("It explodes into a swarm!"); }
-  if(enemy.mutExplode){ spawnParticle(enemy.x,enemy.y,"#ff9d4d",14); spawnZone({x:enemy.x,y:enemy.y,radius:75,dmg:enemy.dmg*1.2,life:0.35,maxLife:0.35,tickCd:0,tag:"boss",targetsPlayer:true}); }
+  if(enemy.mutExplode){ spawnParticle(enemy.x,enemy.y,resolveColor("mutation.volatile"),14); spawnZone({x:enemy.x,y:enemy.y,radius:75,dmg:enemy.dmg*1.2,life:0.35,maxLife:0.35,tickCd:0,tag:"boss",targetsPlayer:true}); }
   if(player.stats.raiseDeadChance>0 && rngBool(player.stats.raiseDeadChance)){ spawnMinion({x:enemy.x,y:enemy.y,weaponId:"raised",dmg:enemy.dmg*0.5,hp:20,speed:180,atkCd:0,life:12,radius:9,icon:"💀"}); }
   if(enemy.burning && player.stats.burnExplode){ forEachEnemyNear(enemy.x,enemy.y,80,e2=>{ if(!e2.dead){ e2.burning=true; e2.burnT=2; e2.burnDps=enemy.burnDps||4; } }); }
   if(enemy.slowed && player.stats.frostShatter){ forEachEnemyNear(enemy.x,enemy.y,90,e2=>{ if(e2!==enemy) queueSecondaryDamage(e2,20,null); }); }
@@ -5448,8 +6118,8 @@ function bossCtx(dt){
     teleportAway:(b,dist)=>{ const ang=rand(0,Math.PI*2); b.x=clamp(b.x+Math.cos(ang)*dist,b.radius,WORLD.w-b.radius); b.y=clamp(b.y+Math.sin(ang)*dist,b.radius,WORLD.h-b.radius); spawnParticle(b.x,b.y,b.color,14); },
     teleportBehindAndStrike:(b)=>{ const ang=rand(0,Math.PI*2); b.x=clamp(player.x+Math.cos(ang)*(b.radius+player.radius+20),b.radius,WORLD.w-b.radius); b.y=clamp(player.y+Math.sin(ang)*(b.radius+player.radius+20),b.radius,WORLD.h-b.radius); spawnParticle(b.x,b.y,b.color,10); damagePlayer(b.dmg*1.1); },
     zoneDenial:(b,dmgPerTick,radius,duration)=>{ spawnZone({x:player.x,y:player.y,radius,dmg:dmgPerTick,life:duration,maxLife:duration,tickCd:0,tag:"boss",targetsPlayer:true}); },
-    sweepLaser:(b,range)=>{ for(let a=0;a<10;a++){ const ang=(a/10)*Math.PI*2; spawnBullet({owner:"enemy",x:b.x,y:b.y,vx:Math.cos(ang)*260,vy:Math.sin(ang)*260,dmg:b.dmg*0.5,radius:6,life:range/260,color:"#8a8f9e",pierce:0}); } },
-    deployTurrets:(b,count)=>{ for(let i=0;i<count;i++){ if(enemies.length<dynamicMaxEnemies()){ const ang=(i/count)*Math.PI*2; const t=spawnEnemy("skeleton_archer",{x:b.x+Math.cos(ang)*70,y:b.y+Math.sin(ang)*70}); if(t){ t.speed=0; t.hp=t.maxHp=30; t.color="#8a8f9e"; } } } },
+    sweepLaser:(b,range)=>{ for(let a=0;a<10;a++){ const ang=(a/10)*Math.PI*2; spawnBullet({owner:"enemy",x:b.x,y:b.y,vx:Math.cos(ang)*260,vy:Math.sin(ang)*260,dmg:b.dmg*0.5,radius:6,life:range/260,color:resolveColor("css.metal"),pierce:0}); } },
+    deployTurrets:(b,count)=>{ for(let i=0;i<count;i++){ if(enemies.length<dynamicMaxEnemies()){ const ang=(i/count)*Math.PI*2; const t=spawnEnemy("skeleton_archer",{x:b.x+Math.cos(ang)*70,y:b.y+Math.sin(ang)*70}); if(t){ t.speed=0; t.hp=t.maxHp=30; t.color=resolveColor("css.metal"); } } } },
     grantShield:(b,amount)=>{ b.shield=(b.shield||0)+amount; },
     stealResource:(b,type,pct)=>{ if(type==="gold"){ const amt=Math.floor(player.gold*pct); player.gold-=amt; runStats.stolenByCollector=true; logEvent("The Collector steals your gold!"); } else { player.xp=Math.max(0,player.xp-player.xp*pct); runStats.stolenByCollector=true; logEvent("The Collector siphons your XP!"); } },
     disableRandomWeapon:(duration)=>{ const wids=Object.keys(player.weapons); if(!wids.length) return; const wid=pick(wids); player.disabledWeapons[wid]= duration===Infinity?Infinity:(runTime+duration); logEvent(`${WEAPONS[wid].name} has been disabled!`); },
@@ -5579,7 +6249,7 @@ function updateEliteSpecial(e,dt){
       if(e._sacrificeCd<=0){
         let victim=null,bestD=200*200;
         forEachEnemyNear(e.x,e.y,200,other=>{ if(other!==e && !other.elite && !other.boss && !other.dead){ const dd=dist2(e.x,e.y,other.x,other.y); if(dd<bestD){bestD=dd;victim=other;} } });
-        if(victim){ e.hp=Math.min(e.maxHp,e.hp+victim.maxHp*0.5); victim.dead=true; spawnParticle(victim.x,victim.y,"#8b1c2c",8); }
+        if(victim){ e.hp=Math.min(e.maxHp,e.hp+victim.maxHp*0.5); victim.dead=true; spawnParticle(victim.x,victim.y,resolveColor("css.hpDark"),8); }
         e._sacrificeCd=rand(5,7);
       }
       break;
@@ -5740,7 +6410,7 @@ function updateEnemies(dt){
       }
       e.x += e.vx*dt*speedMult; e.y += e.vy*dt*speedMult;
       e.shootCd -= dt;
-      if(e.shootCd<=0){ spawnBullet({owner:"enemy",x:e.x,y:e.y,vx:(dx/d)*260,vy:(dy/d)*260,dmg:e.dmg,radius:5,life:3,color:"#8fd8ff",pierce:0}); e.shootCd=1.6; }
+      if(e.shootCd<=0){ spawnBullet({owner:"enemy",x:e.x,y:e.y,vx:(dx/d)*260,vy:(dy/d)*260,dmg:e.dmg,radius:5,life:3,color:resolveColor("css.parry"),pierce:0}); e.shootCd=1.6; }
     } else if(e.brain==="charge"){
       e.chargeCd -= dt;
       if(e.chargeState==="idle"){
@@ -5805,7 +6475,7 @@ function updateMinions(dt){
       else { m.x=clamp(m.x+(player.x-m.x)*0.02,m.radius,WORLD.w-m.radius); m.y=clamp(m.y+(player.y-m.y)*0.02,m.radius,WORLD.h-m.radius); }
     } else {
       const target=nearestEnemy(m.x,m.y,weaponRange(260)); m.atkCd-=dt;
-      if(target && m.atkCd<=0){ const ang=Math.atan2(target.y-m.y,target.x-m.x); spawnBullet({owner:"player",x:m.x,y:m.y,vx:Math.cos(ang)*400,vy:Math.sin(ang)*400,dmg:m.dmg,radius:4,life:1.5,color:"#8fffcf",pierce:0}); m.atkCd=0.6; }
+      if(target && m.atkCd<=0){ const ang=Math.atan2(target.y-m.y,target.x-m.x); spawnBullet({owner:"player",x:m.x,y:m.y,vx:Math.cos(ang)*400,vy:Math.sin(ang)*400,dmg:m.dmg,radius:4,life:1.5,color:resolveColor("css.turretBolt"),pierce:0}); m.atkCd=0.6; }
     }
   }
   pruneMinions();
@@ -5978,7 +6648,7 @@ function updatePlayer(dt){
       if(player.stats.dashImpactDmg>0){
         const r=60*(player.stats.aoeRadiusMult||1);
         forEachEnemyNear(player.x,player.y,r,e=>dealDamage(e,player.stats.dashImpactDmg*player.stats.dmgMult,null));
-        novaPulses.push({x:player.x,y:player.y,radius:r,life:0.35,maxLife:0.35,color:"#b98cff"});
+        novaPulses.push({x:player.x,y:player.y,radius:r,life:0.35,maxLife:0.35,color:resolveColor("css.accent")});
       }
     }
   }
@@ -6029,7 +6699,7 @@ function tryFastHeal(){
   const healed=Math.min(player.maxHp,player.hp+player.maxHp*HEAL_ABILITY_PCT)-player.hp;
   player.hp+=healed;
   SFX.fastHeal();
-  spawnFloater(player.x, player.y-player.radius-10, `+${Math.round(healed)}`, "#7cff6b");
+  spawnFloater(player.x, player.y-player.radius-10, `+${Math.round(healed)}`, resolveColor("css.xp"));
 }
 function damagePlayer(amount){
   if(player.abilities.dash.active) return; // dash i-frames
@@ -6373,7 +7043,7 @@ function charInfoWeaponsHtml(){
   return wids.map(wid=>{
     const def=weaponDef(wid), lvl=player.weapons[wid];
     const disabled=isWeaponDisabled(wid);
-    const disabledLine=disabled ? `<div class="inv-desc" style="color:#ff8a4d">🔇 Disabled${player.disabledWeapons[wid]===Infinity?" (permanent)":""}</div>` : "";
+    const disabledLine=disabled ? `<div class="inv-desc" style="color:${resolveColor("css.warning")}">🔇 Disabled${player.disabledWeapons[wid]===Infinity?" (permanent)":""}</div>` : "";
     return `<div class="inv-row"><div class="inv-icon">${def.icon}</div><div class="inv-body"><div class="inv-name">${def.name}${def.evolved?' ⭐':''} — Lv.${lvl}/${def.maxLevel||8}</div><div class="inv-desc">${weaponTooltipDesc(wid)}</div>${disabledLine}</div></div>`;
   }).join("");
 }
@@ -7074,11 +7744,6 @@ function drawGlowSprite(x,y,color,rawSize){
   const spr = getGlowSprite(color, size*1.4);
   ctx2d.drawImage(spr.canvas, x-spr.r, y-spr.r);
 }
-function hexToRgba(hex,a){
-  if(!hex || hex[0]!=='#' || hex.length<7) return hex; // best-effort passthrough for non-hex colors (rare)
-  const r=parseInt(hex.slice(1,3),16), g=parseInt(hex.slice(3,5),16), b=parseInt(hex.slice(5,7),16);
-  return `rgba(${r},${g},${b},${a})`;
-}
 // POLISH_PLAN_3 item 4 — replaces the flat arc()-stroke/fill "boring circle" look
 // shared by area-weapon bursts, aura radii, and the melee swing ring with a
 // layered abstract-pattern look: soft radial glow (instead of flat fill) + a
@@ -7212,7 +7877,11 @@ function targetZoomForRange(){
 }
 function render(){
   const w=canvas.width,h=canvas.height;
-  ctx2d.fillStyle="#08090d"; ctx2d.fillRect(0,0,w,h);
+  // Reads CONFIG live (not baked at module-eval time) instead of the flat
+  // literal this used to be — the one canvas-level color that MUST track a
+  // theme swap 1:1, since every other themed thing (weapon/enemy/boss/
+  // mutation colors) is rendered against whatever this fills in as the base.
+  ctx2d.fillStyle=resolveColor("css.void"); ctx2d.fillRect(0,0,w,h);
   const targetZoom = targetZoomForRange();
   camera.zoom = camera.zoom==null ? targetZoom : camera.zoom+(targetZoom-camera.zoom)*0.04;
   const zoom = camera.zoom;
@@ -7225,10 +7894,14 @@ function render(){
   if(Math.abs(camera.lagX)<0.5) camera.lagX=0; if(Math.abs(camera.lagY)<0.5) camera.lagY=0;
   camera.x=player.x-viewW/2+shakeX+camera.lagX; camera.y=player.y-viewH/2+shakeY+camera.lagY;
   ctx2d.save(); ctx2d.scale(zoom,zoom); ctx2d.translate(-camera.x,-camera.y);
-  ctx2d.strokeStyle="rgba(255,255,255,0.035)"; ctx2d.lineWidth=1;
+  // Subtle movement-grid overlay — flips to a dark line at a slightly
+  // stronger alpha on a light theme (see themeIsLight()) instead of
+  // staying a fixed white overlay that would vanish against a light
+  // background; unchanged (same literal as before) on every dark theme.
+  ctx2d.strokeStyle = themeIsLight() ? "rgba(20,22,30,0.06)" : "rgba(255,255,255,0.035)"; ctx2d.lineWidth=1;
   const grid=80, startX=Math.floor(camera.x/grid)*grid, endX=camera.x+viewW+grid, startY=Math.floor(camera.y/grid)*grid, endY=camera.y+viewH+grid;
   ctx2d.beginPath(); for(let x=startX;x<endX;x+=grid){ctx2d.moveTo(x,startY);ctx2d.lineTo(x,endY);} for(let y=startY;y<endY;y+=grid){ctx2d.moveTo(startX,y);ctx2d.lineTo(endX,y);} ctx2d.stroke();
-  ctx2d.strokeStyle="rgba(185,140,255,0.25)"; ctx2d.lineWidth=4; ctx2d.strokeRect(0,0,WORLD.w,WORLD.h);
+  ctx2d.strokeStyle=hexToRgba(resolveColor("css.accent"),0.25); ctx2d.lineWidth=4; ctx2d.strokeRect(0,0,WORLD.w,WORLD.h);
   // Viewport culling: WORLD is 4600x4600 but the visible viewport is a small fraction of
   // that, and population-floor/burst spawning (updateSpawns) deliberately keeps a growing
   // number of enemies alive off-screen as a run goes on. Every entity used to get a full
@@ -7252,13 +7925,13 @@ function render(){
       // for the rest of its life, matching when updateZones() actually starts dealing damage.
       if(z.armT>0){
         const warnT=1-clamp(z.armT/0.9,0,1);
-        ctx2d.strokeStyle="#ff6b3d"; ctx2d.globalAlpha=0.35+warnT*0.5; ctx2d.lineWidth=2; ctx2d.setLineDash([6,6]);
+        ctx2d.strokeStyle=resolveColor("mutation.quaker"); ctx2d.globalAlpha=0.35+warnT*0.5; ctx2d.lineWidth=2; ctx2d.setLineDash([6,6]);
         ctx2d.beginPath(); ctx2d.arc(z.x,z.y,z.radius*(0.4+warnT*0.6),0,7); ctx2d.stroke(); ctx2d.setLineDash([]);
-        ctx2d.strokeStyle="#ffb347"; ctx2d.lineWidth=1.5; ctx2d.globalAlpha=0.5+warnT*0.4;
+        ctx2d.strokeStyle=resolveColor("css.gold"); ctx2d.lineWidth=1.5; ctx2d.globalAlpha=0.5+warnT*0.4;
         for(const ang of z.crackAngles){ ctx2d.beginPath(); ctx2d.moveTo(z.x,z.y); ctx2d.lineTo(z.x+Math.cos(ang)*z.radius*warnT,z.y+Math.sin(ang)*z.radius*warnT); ctx2d.stroke(); }
         ctx2d.globalAlpha=1;
       } else {
-        ctx2d.beginPath(); ctx2d.fillStyle="#ff6b3d"; ctx2d.globalAlpha=clamp(z.life/0.7,0,0.4); ctx2d.arc(z.x,z.y,z.radius,0,7); ctx2d.fill(); ctx2d.globalAlpha=1;
+        ctx2d.beginPath(); ctx2d.fillStyle=resolveColor("mutation.quaker"); ctx2d.globalAlpha=clamp(z.life/0.7,0,0.4); ctx2d.arc(z.x,z.y,z.radius,0,7); ctx2d.fill(); ctx2d.globalAlpha=1;
       }
       continue;
     }
@@ -7268,19 +7941,19 @@ function render(){
     // even though they share the "physical"/"lightning" tag. Enemy-sourced zones (boss attacks,
     // trail hazards) keep the tag-based fallback since they have no owning player weapon.
     if(z.ownerWeapon){ ctx2d.fillStyle=weaponColor(z.ownerWeapon); ctx2d.globalAlpha=0.16; }
-    else { ctx2d.fillStyle= z.tag==="boss"?"rgba(255,77,94,0.15)": z.slowOnly?"rgba(140,80,40,0.15)":"rgba(140,255,120,0.14)"; }
+    else { ctx2d.fillStyle= z.tag==="boss"?hexToRgba(resolveColor("css.hp"),0.15): z.slowOnly?hexToRgba(resolveColor("css.slowZone"),0.15):hexToRgba(resolveColor("css.zoneGeneric"),0.14); }
     ctx2d.arc(z.x,z.y,z.radius,0,7); ctx2d.fill(); ctx2d.globalAlpha=1;
   }
   // Softer glow than most other glowing entities on purpose — orbs are the single
   // highest-frequency glowing shape on screen late-game, and gold's near-max-
   // contrast yellow-on-black is a real flash/photosensitivity concern at volume
   // (see spawnOrb's MAX_ORBS cap, which cuts the count; this cuts the intensity).
-  for(const o of orbs){ if(!inView(o.x,o.y)) continue; ctx2d.beginPath(); ctx2d.fillStyle = o.type==="xp"?"#7cff6b": o.type==="gold"?"#ffb347": o.type==="crystal"?"#7ee0ff":"#ff9ecb"; ctx2d.shadowColor=ctx2d.fillStyle; ctx2d.shadowBlur=glow(3.5); ctx2d.arc(o.x,o.y,o.radius,0,7); ctx2d.fill(); }
+  for(const o of orbs){ if(!inView(o.x,o.y)) continue; ctx2d.beginPath(); ctx2d.fillStyle = o.type==="xp"?resolveColor("css.xp"): o.type==="gold"?resolveColor("css.gold"): o.type==="crystal"?resolveColor("css.crystal"):resolveColor("css.artifact"); ctx2d.shadowColor=ctx2d.fillStyle; ctx2d.shadowBlur=glow(3.5); ctx2d.arc(o.x,o.y,o.radius,0,7); ctx2d.fill(); }
   ctx2d.shadowBlur=0;
   // Chain-lightning arcs and area-burst pulses (see updateJuice fix above) — actually drawn now.
   for(const c of chainArcs){
     const alpha=clamp(c.life/c.maxLife,0,1); ctx2d.beginPath();
-    ctx2d.strokeStyle = c.color||"#ffe15c"; ctx2d.globalAlpha=alpha*0.85; ctx2d.lineWidth=c.width||3; ctx2d.shadowColor=c.color||"#ffe15c"; ctx2d.shadowBlur=glow(10);
+    ctx2d.strokeStyle = c.color||resolveColor("css.crit"); ctx2d.globalAlpha=alpha*0.85; ctx2d.lineWidth=c.width||3; ctx2d.shadowColor=c.color||resolveColor("css.crit"); ctx2d.shadowBlur=glow(10);
     ctx2d.moveTo(c.points[0].x,c.points[0].y);
     for(let i=1;i<c.points.length;i++) ctx2d.lineTo(c.points[i].x,c.points[i].y);
     ctx2d.stroke(); ctx2d.globalAlpha=1; ctx2d.shadowBlur=0;
@@ -7291,9 +7964,9 @@ function render(){
   }
   if(player.swordFx){
     const fx=player.swordFx, alpha=fx.t/0.22;
-    drawEnergyRing(player.x,player.y,fx.r,fx.color||"#b98cff",alpha*0.75,{lineWidth:fx.width||6,ticks:8,spinSpeed:3.4,glow:false});
+    drawEnergyRing(player.x,player.y,fx.r,fx.color||resolveColor("css.accent"),alpha*0.75,{lineWidth:fx.width||6,ticks:8,spinSpeed:3.4,glow:false});
     // Evolved melee weapons leave a brighter white afterimage ring just inside the main swing.
-    if(fx.evolved){ ctx2d.save(); ctx2d.strokeStyle="#ffffff"; ctx2d.globalAlpha=alpha*0.45; ctx2d.lineWidth=Math.max(2,(fx.width||6)*0.4); ctx2d.beginPath(); ctx2d.arc(player.x,player.y,fx.r*0.85,0,Math.PI*2); ctx2d.stroke(); ctx2d.restore(); }
+    if(fx.evolved){ ctx2d.save(); ctx2d.strokeStyle=resolveColor("css.text"); ctx2d.globalAlpha=alpha*0.45; ctx2d.lineWidth=Math.max(2,(fx.width||6)*0.4); ctx2d.beginPath(); ctx2d.arc(player.x,player.y,fx.r*0.85,0,Math.PI*2); ctx2d.stroke(); ctx2d.restore(); }
   }
   if(player.beamTargets){
     for(const wid of Object.keys(player.beamTargets)){
@@ -7320,7 +7993,7 @@ function render(){
     // stored on the minion) is now the minion's actual body, sized to its radius, instead of a
     // small 12px label floating above a plain colored circle — a summon now reads as *itself* at
     // a glance, not as an anonymous dot with a tiny badge.
-    const mc = m.weaponId==="raised" ? "#c8c8d8" : weaponColor(m.weaponId);
+    const mc = m.weaponId==="raised" ? resolveColor("css.bone") : weaponColor(m.weaponId);
     // Same glow-sprite swap as bullets above — measured ~0.18ms/minion with
     // live shadowBlur (150 synthetic minions dropped the same 613-enemy
     // scene from 53fps to 22fps), the highest per-entity cost of any type
@@ -7360,13 +8033,13 @@ function render(){
   for(const e of enemies){
     if(!inView(e.x,e.y)) continue;
     const canGlow = e.boss || e.elite || !glowSet || glowSet.has(e);
-    ctx2d.fillStyle=e.hitFlash>0?"#ffffff":e.color;
+    ctx2d.fillStyle=e.hitFlash>0?resolveColor("css.text"):e.color;
     if(canGlow) drawGlowSprite(e.x,e.y,e.glow,e.boss?26:(e.elite?18:10));
     if(e.boss || !e.shape){ ctx2d.beginPath(); ctx2d.arc(e.x,e.y,e.radius,0,7); ctx2d.fill(); } else drawEnemyShape(ctx2d,e);
     if(e.mutation){ ctx2d.beginPath(); ctx2d.strokeStyle=e.mutationColor; ctx2d.lineWidth=2.5; ctx2d.arc(e.x,e.y,e.radius+2,0,7); ctx2d.stroke(); }
-    if(e.elite||e.boss){ const bw=e.radius*2.4; ctx2d.fillStyle="#1a1c24"; ctx2d.fillRect(e.x-bw/2,e.y-e.radius-14,bw,5);
-      ctx2d.fillStyle=e.boss?"#ff4d5e":"#ffb347";
-      if(e.boss) drawGlowSprite(e.x,e.y-e.radius-11.5,"#ff4d5e",10);
+    if(e.elite||e.boss){ const bw=e.radius*2.4; ctx2d.fillStyle=resolveColor("css.panel2"); ctx2d.fillRect(e.x-bw/2,e.y-e.radius-14,bw,5);
+      ctx2d.fillStyle=e.boss?resolveColor("css.hp"):resolveColor("css.gold");
+      if(e.boss) drawGlowSprite(e.x,e.y-e.radius-11.5,resolveColor("css.hp"),10);
       ctx2d.fillRect(e.x-bw/2,e.y-e.radius-14,bw*clamp(e.hp/e.maxHp,0,1),5); }
     // Status-effect icons: previously the only visible feedback for burn/poison/slow/
     // shield/stagger/mark was a one-frame white hit-flash. Each active effect now
@@ -7395,10 +8068,10 @@ function render(){
     if(e.dashTelegraph){
       const tel=e.dashTelegraph, urgency=1-clamp(tel.t/tel.maxT,0,1), len=(60+urgency*70);
       const tx=e.x+tel.dx*len, ty=e.y+tel.dy*len;
-      ctx2d.strokeStyle="#ff3b3b"; ctx2d.globalAlpha=0.35+urgency*0.5; ctx2d.lineWidth=2; ctx2d.setLineDash([7,6]);
+      ctx2d.strokeStyle=resolveColor("css.danger"); ctx2d.globalAlpha=0.35+urgency*0.5; ctx2d.lineWidth=2; ctx2d.setLineDash([7,6]);
       ctx2d.beginPath(); ctx2d.moveTo(e.x,e.y); ctx2d.lineTo(tx,ty); ctx2d.stroke(); ctx2d.setLineDash([]);
       const ang=Math.atan2(tel.dy,tel.dx);
-      ctx2d.save(); ctx2d.translate(tx,ty); ctx2d.rotate(ang); ctx2d.fillStyle="#ff3b3b";
+      ctx2d.save(); ctx2d.translate(tx,ty); ctx2d.rotate(ang); ctx2d.fillStyle=resolveColor("css.danger");
       ctx2d.beginPath(); ctx2d.moveTo(10,0); ctx2d.lineTo(-6,-6); ctx2d.lineTo(-6,6); ctx2d.closePath(); ctx2d.fill();
       ctx2d.restore(); ctx2d.globalAlpha=1;
     }
@@ -7454,7 +8127,7 @@ function render(){
     }
     // Evolved weapons get a bright white-hot core ring on every shot — a constant, at-a-glance
     // "this weapon evolved" tell in combat, not just a changed name/icon in the level-up menu.
-    if(b.evolved){ ctx2d.beginPath(); ctx2d.strokeStyle="#ffffff"; ctx2d.lineWidth=1.4; ctx2d.globalAlpha=0.8; ctx2d.arc(b.x,b.y,b.radius*0.55,0,7); ctx2d.stroke(); ctx2d.globalAlpha=1; }
+    if(b.evolved){ ctx2d.beginPath(); ctx2d.strokeStyle=resolveColor("css.text"); ctx2d.lineWidth=1.4; ctx2d.globalAlpha=0.8; ctx2d.arc(b.x,b.y,b.radius*0.55,0,7); ctx2d.stroke(); ctx2d.globalAlpha=1; }
   }
   ctx2d.shadowBlur=0;
   for(const p of particles){ ctx2d.globalAlpha=clamp(p.life/p.maxLife,0,1); ctx2d.fillStyle=p.color; ctx2d.fillRect(p.x-2,p.y-2,4,4); }
@@ -7467,14 +8140,14 @@ function render(){
     // spawnParticle above (updatePlayer) adds the loose spark texture around it.
     const tailX=player.x-dash.dx*52, tailY=player.y-dash.dy*52;
     const grad=ctx2d.createLinearGradient(tailX,tailY,player.x,player.y);
-    grad.addColorStop(0,"rgba(0,0,0,0)"); grad.addColorStop(0.55,pc); grad.addColorStop(1,"#ffffff");
+    grad.addColorStop(0,"rgba(0,0,0,0)"); grad.addColorStop(0.55,pc); grad.addColorStop(1,resolveColor("css.text"));
     ctx2d.save(); ctx2d.globalAlpha=0.55; ctx2d.strokeStyle=grad; ctx2d.lineWidth=player.radius*1.4; ctx2d.lineCap='round';
     ctx2d.beginPath(); ctx2d.moveTo(tailX,tailY); ctx2d.lineTo(player.x,player.y); ctx2d.stroke();
     ctx2d.globalAlpha=0.8; ctx2d.lineWidth=player.radius*0.6;
     ctx2d.beginPath(); ctx2d.moveTo(tailX,tailY); ctx2d.lineTo(player.x,player.y); ctx2d.stroke();
     ctx2d.restore();
   }
-  ctx2d.beginPath(); ctx2d.fillStyle=player.hitFlash>0?"#ff3b3b":"#fff"; ctx2d.shadowColor=pc; ctx2d.shadowBlur=glow(player.abilities.dash.active?26:16); ctx2d.arc(player.x,player.y,player.radius,0,7); ctx2d.fill(); ctx2d.shadowBlur=0;
+  ctx2d.beginPath(); ctx2d.fillStyle=player.hitFlash>0?resolveColor("css.danger"):resolveColor("css.playerBody"); ctx2d.shadowColor=pc; ctx2d.shadowBlur=glow(player.abilities.dash.active?26:16); ctx2d.arc(player.x,player.y,player.radius,0,7); ctx2d.fill(); ctx2d.shadowBlur=0;
   ctx2d.beginPath(); ctx2d.strokeStyle=pc; ctx2d.lineWidth=2; ctx2d.arc(player.x,player.y,player.radius+4,0,7); ctx2d.stroke();
   ctx2d.font="bold 13px 'JetBrains Mono', monospace"; ctx2d.textAlign="center";
   for(const f of floaters){ ctx2d.globalAlpha=clamp(f.life/0.6,0,1); ctx2d.fillStyle=f.color; ctx2d.fillText(f.text,f.x,f.y); }
@@ -8397,7 +9070,7 @@ function mixHex(hexA,hexB,t){
 }
 const CELL_WIPE_TARGET_COUNT=420, CELL_WIPE_COVER_MS=260, CELL_WIPE_UNCOVER_MS=220, CELL_WIPE_STAGGER_MS=200;
 function playCellWipeTransition(onCovered, charColor){
-  charColor = charColor || '#b98cff';
+  charColor = charColor || resolveColor("css.accent");
   const voidColor = (getComputedStyle(document.documentElement).getPropertyValue('--void')||'#08090d').trim();
   const overlay=document.createElement('div'); overlay.className='cell-wipe';
   const vw=window.innerWidth, vh=window.innerHeight;
@@ -8427,7 +9100,7 @@ function playCellWipeTransition(onCovered, charColor){
     // itself is ever visible.
     const cs=document.getElementById('screen-charselect'); if(cs) cs.classList.add('hidden');
     onCovered();
-    cells.forEach(cell=>{ cell.style.background=mixHex('#ffffff',charColor,cell._norm); }); // swap to the uncover palette before releasing
+    cells.forEach(cell=>{ cell.style.background=mixHex(resolveColor("css.text"),charColor,cell._norm); }); // swap to the uncover palette before releasing
     overlay.classList.remove('cover'); overlay.classList.add('uncover');
     setTimeout(()=>overlay.remove(), CELL_WIPE_UNCOVER_MS+CELL_WIPE_STAGGER_MS+80);
   }, CELL_WIPE_COVER_MS+CELL_WIPE_STAGGER_MS);
@@ -8507,7 +9180,7 @@ function renderCharSelect(){
   let locked=false;
   CHARACTERS.forEach((c,i)=>{
     const el=document.createElement('div'); el.className='card char-card';
-    const color=c.color||'#b98cff';
+    const color=c.color||resolveColor("css.accent");
     el.style.width=cardW+'px';
     el.style.setProperty('--char-card-delay',(i*0.07)+'s');
     el.style.borderTopColor=color;
@@ -8643,7 +9316,7 @@ function renderTalentTree(activeBranch){
   // POLISH_PLAN_7 — set once per branch switch on #screen-meta (ancestor of both
   // the tab bar and the graph below), every --branch-color/-glow/-glow-strong
   // reference in the CSS updates from this single assignment.
-  const branchColor=TALENT_BRANCH_COLOR[activeBranch]||"#b98cff";
+  const branchColor=TALENT_BRANCH_COLOR[activeBranch]||resolveColor("css.accent");
   const screenMeta=document.getElementById('screen-meta');
   screenMeta.style.setProperty('--branch-color', branchColor);
   screenMeta.style.setProperty('--branch-glow', hexToRgba(branchColor,0.18));
@@ -9006,6 +9679,7 @@ window.__ASCENSION_DEBUG__ = {
   get CONFIG(){ return CONFIG; },
   get CONFIG_DEFAULTS(){ return CONFIG_DEFAULTS; },
   get CONFIG_SCHEMA(){ return CONFIG_SCHEMA; },
+  get COLOR_THEME_PRESETS(){ return COLOR_THEME_PRESETS; },
   applyConfigOverride, resolveColor, persistConfigOverride, diffFromDefaults, cloneConfigDefaults,
   get player(){ return player; },
   get enemies(){ return enemies; },
