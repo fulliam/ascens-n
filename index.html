@@ -45,7 +45,7 @@
     --xp:#7cff6b; --gold:#ffb347; --soul:#5ce1e6; --hp:#ff4d5e; --accent:#b98cff; --accent2:#ff6f9c; --crystal:#7ee0ff; --artifact:#ff9ecb;
     --danger:#ff3b3b; --dangerVignette:#ff1414; --glitchCyan:#4dd9ff; --debug:#8fffcf; --warning:#ff8a4d; --hpDark:#8b1c2c; --xpDark:#2f8f22; --killCount:#8fb4ff;
     --onAccent:#000000; --onAccentDark:#14101c; --victoryGold:#ffd479;
-    --veil-inner:rgba(30,20,50,0.55); --veil-outer:rgba(4,5,8,0.92); --chip-text-shadow:0 1px 2px rgba(0,0,0,0.6);
+    --veil-inner:rgba(30,20,50,0.55); --veil-outer:rgba(4,5,8,0.92);
     --safe-top:env(safe-area-inset-top,0px); --safe-bottom:env(safe-area-inset-bottom,0px);
     --safe-left:env(safe-area-inset-left,0px); --safe-right:env(safe-area-inset-right,0px);
   }
@@ -159,11 +159,21 @@
      audio cue agree instead of only one of them existing. */
   .hp-wrap.low-hp .bar-track{animation:lowHpPulse 0.9s ease-in-out infinite;}
   @keyframes lowHpPulse{0%,100%{box-shadow:0 0 0 color-mix(in srgb, var(--danger) 0%, transparent);} 50%{box-shadow:0 0 14px color-mix(in srgb, var(--danger) 85%, transparent);}}
-  .bar-track{width:100%; height:15px; background:var(--panel2); border:1px solid var(--line); border-radius:3px; overflow:hidden; position:relative;}
+  /* isolation:isolate scopes .bar-label's mix-blend-mode below to just THIS bar's own
+     stack (track+fill+shield), not the whole page behind it — without it, difference
+     blending would pick up whatever's rendered under the HUD too. */
+  .bar-track{width:100%; height:15px; background:var(--panel2); border:1px solid var(--line); border-radius:3px; overflow:hidden; position:relative; isolation:isolate;}
   .bar-fill{height:100%; transition:width .12s linear;}
   .hp-fill{background:linear-gradient(90deg,var(--hpDark),var(--hp));}
   .shield-fill{position:absolute; top:0; left:0; height:100%; background:color-mix(in srgb, var(--crystal) 55%, transparent);}
-  .bar-label{position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:10px; font-family:'JetBrains Mono',monospace; color:var(--text); text-shadow:var(--chip-text-shadow); letter-spacing:1px;}
+  /* Progress-bar label text spans BOTH the filled and empty portions of the bar at
+     once, and those are never the same color (hp-fill's red vs panel2's dark grey,
+     xp-fill's bright green vs panel2, etc) — a single fixed text color can only ever
+     be tuned for one side. mix-blend-mode:difference inverts against whatever's
+     actually underneath each pixel of the glyph, live, as the fill width changes —
+     genuinely dynamic contrast with no JS and no per-theme tuning, instead of
+     guessing one shadow/color that's "good enough" on both. */
+  .bar-label{position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:10px; font-family:'JetBrains Mono',monospace; color:#fff; mix-blend-mode:difference; letter-spacing:1px;}
   .lvl-chip{display:inline-flex; align-items:center; justify-content:center; width:26px; height:26px; border-radius:50%; background:var(--panel); border:1px solid var(--accent); color:var(--accent); font-weight:700; font-size:12px; margin-right:8px;}
   .hp-row{display:flex; align-items:center; margin-bottom:6px;}
   .resource-row{display:flex; gap:10px; font-family:'JetBrains Mono',monospace; font-size:12px; flex-wrap:wrap; max-width:340px;}
@@ -2521,7 +2531,7 @@ boot();
 // Semver-ish display version (shown in the main menu, see #versionTag) — bump
 // by hand per notable batch of work. Independent from SAVE_VERSION below:
 // this one is purely informational, the other one gates save migrations.
-const GAME_VERSION = "0.40.0";
+const GAME_VERSION = "0.39.1";
 
 
 /* =========================================================================
@@ -2660,7 +2670,7 @@ const CONFIG_DEFAULTS = {
       c_ffb347: "#ffb347",
       c_5ce1e6: "#5ce1e6",
       c_ff4d5e: "#ff4d5e",
-      c_b98cff: "#b98cff",
+      c_b98cff: "#d8bfff", // css.accent/character.mage/weapon.void_rift — lightened (L+10 HSL) at user request
       c_ff6f9c: "#ff6f9c",
       c_7ee0ff: "#7ee0ff",
       c_ff9ecb: "#ff9ecb",
@@ -2676,19 +2686,9 @@ const CONFIG_DEFAULTS = {
       c_5cbf5c: "#5cbf5c",
       c_c86bff: "#c86bff",
       c_ff6b3d: "#ff6b3d",
-      c_6b1c22: "#6b1c22",
-      c_7a3d0f: "#7a3d0f",
-      c_4a1c6b: "#4a1c6b",
       c_ff2d4d: "#ff2d4d",
-      c_3a0a12: "#3a0a12",
-      c_1c4a1c: "#1c4a1c",
       c_7a5cff: "#7a5cff",
-      c_2a1c5c: "#2a1c5c",
-      c_2a2d37: "#2a2d37",
-      c_6b5c1c: "#6b5c1c",
-      c_1c4a6b: "#1c4a6b",
       c_ff6e6e: "#ff6e6e",
-      c_6b1c1c: "#6b1c1c",
       c_c8c8d8: "#c8c8d8",
       c_ffd479: "#ffd479",
       c_e0b48a: "#e0b48a",
@@ -2738,6 +2738,19 @@ const CONFIG_DEFAULTS = {
       c_14101c: "#14101c", // css.onAccentDark — a SECOND, slightly different "dark text on accent" value that
       // already existed independently (.seg-btn.active text, range-slider thumb border) — kept separate from
       // css.onAccent rather than merged, since nothing indicates the two were meant to be identical.
+      // css.xp/gold/crystal/soul/artifact are deliberately kept dark-for-text-contrast on the
+      // white theme (see COLOR_THEME_PRESETS.white's own comment) because they're ALSO read as
+      // literal UI text (shop prices, resource chips). The canvas pickup ORB is a gameplay
+      // object, not text, and wants the opposite treatment — bright/poppy, same "gameplay-
+      // identity" band-clamp (own hue, L clamped to 50-70%) every weapon/mutation color
+      // already gets. These 4 give the orb its own value, identical to css.xp/gold/crystal/
+      // artifact in every theme EXCEPT white (where it diverges to stay bright instead of
+      // inheriting the text-safe dark one) — css.xpGlow etc below point here now, and the
+      // orb's own fillStyle (not just its glow) reads through the same key.
+      c_orbXp_78ff66: "#7cff6b",
+      c_orbGold_ffb347: "#ffb347",
+      c_orbCrystal_66daff: "#7ee0ff",
+      c_orbArtifact_ff66ad: "#ff9ecb",
     },
     semantic: {
       "css.void": "c_08090d",
@@ -2771,26 +2784,28 @@ const CONFIG_DEFAULTS = {
       "mutation.dasher": "c_ff8a4d",
       "mutation.bruiser": "c_ffb347",
       "mutation.quaker": "c_ff6b3d",
+      // .glow points at the SAME palette key as .color (no separate dimmed variant) —
+      // same "glow = the entity's own color, always" policy as weapon/character/orb glow.
       "boss.dragon.color": "c_ff4d5e",
-      "boss.dragon.glow": "c_6b1c22",
+      "boss.dragon.glow": "c_ff4d5e",
       "boss.wyvern.color": "c_ff9d4d",
-      "boss.wyvern.glow": "c_7a3d0f",
+      "boss.wyvern.glow": "c_ff9d4d",
       "boss.lich.color": "c_c86bff",
-      "boss.lich.glow": "c_4a1c6b",
+      "boss.lich.glow": "c_c86bff",
       "boss.overlord.color": "c_ff2d4d",
-      "boss.overlord.glow": "c_3a0a12",
+      "boss.overlord.glow": "c_ff2d4d",
       "boss.ancient_tree.color": "c_5cbf5c",
-      "boss.ancient_tree.glow": "c_1c4a1c",
+      "boss.ancient_tree.glow": "c_5cbf5c",
       "boss.void_knight.color": "c_7a5cff",
-      "boss.void_knight.glow": "c_2a1c5c",
+      "boss.void_knight.glow": "c_7a5cff",
       "boss.machine_god.color": "c_8a8f9e",
-      "boss.machine_god.glow": "c_2a2d37",
+      "boss.machine_god.glow": "c_8a8f9e",
       "boss.the_collector.color": "c_ffe15c",
-      "boss.the_collector.glow": "c_6b5c1c",
+      "boss.the_collector.glow": "c_ffe15c",
       "boss.frost_queen.color": "c_8fd8ff",
-      "boss.frost_queen.glow": "c_1c4a6b",
+      "boss.frost_queen.glow": "c_8fd8ff",
       "boss.bloodmoon_alpha.color": "c_ff6e6e",
-      "boss.bloodmoon_alpha.glow": "c_6b1c1c",
+      "boss.bloodmoon_alpha.glow": "c_ff6e6e",
       "weapon.blood_blade": "c_ff4d5e",
       "weapon.chain_hook": "c_c8c8d8",
       "weapon.warhammer": "c_ffb347",
@@ -2856,6 +2871,85 @@ const CONFIG_DEFAULTS = {
       "css.victoryGold": "c_ffd479", // reuses weapon.bow's gold for the victory-screen title gradient
       "css.turretBolt": "c_turretBolt_8fffcf",
       "css.playerBody": "c_playerBody_ffffff",
+      // Enemy hit-flash needs its own key for the SAME reason css.playerBody got one:
+      // a canvas fill that must stay bright/attention-grabbing on every theme, not
+      // css.text's dark-for-paragraph-contrast white-theme value. Reuses playerBody's
+      // already-solved-for-this-exact-problem value rather than re-deriving a new one.
+      "css.hitFlash": "c_playerBody_ffffff",
+      // Per-unit glow variants — deliberately point at the SAME palette key as their
+      // base entity color (weapon.bow.glow === weapon.bow, etc), not a separate
+      // dimmed/lightened hex: the halo is meant to read as "this entity's own color",
+      // full stop. Kept as their own semantic keys (not just reusing weaponColor() for
+      // the glow too) so each one stays individually retunable later via the Config
+      // Editor without touching the entity's own fill color. Accepted tradeoff (see
+      // boss.X.glow/roleColor()'s own comments elsewhere in this file, which went the
+      // opposite way for exactly this reason): a few near-neutral/dark colors here will
+      // read as a dim smudge rather than a bright halo on the white theme — chosen
+      // deliberately over the dimmed-lightness formula this replaced.
+      // xp/gold/crystal/artifact are the one exception: they point at the DEDICATED
+      // c_orb*_* palette keys (own comment above, near the palette's other orb-color
+      // entries), not at css.xp/gold/crystal/artifact themselves — those stay tuned for
+      // UI-text contrast (shop prices/resource chips), which is the wrong target for a
+      // canvas game object. The orb's fillStyle (not just its glow) also reads through
+      // these same keys now, so the pickup is a single, consistently bright color.
+      "css.xpGlow": "c_orbXp_78ff66",
+      "css.goldGlow": "c_orbGold_ffb347",
+      "css.crystalGlow": "c_orbCrystal_66daff",
+      "css.artifactGlow": "c_orbArtifact_ff66ad",
+      "css.critGlow": "c_ffe15c",
+      "css.boneGlow": "c_c8c8d8",
+      "css.hpGlow": "c_ff4d5e",
+      "css.accentGlow": "c_b98cff",
+      "css.turretBoltGlow": "c_turretBolt_8fffcf",
+      "css.metalGlow": "c_8a8f9e",
+      "css.parryGlow": "c_8fd8ff",
+      "character.warrior.glow": "c_ff5c5c",
+      "character.mage.glow": "c_b98cff",
+      "character.hunter.glow": "c_8aff6b",
+      "character.engineer.glow": "c_7ee0ff",
+      "character.necromancer.glow": "c_ff6bcf",
+      "weapon.blood_blade.glow": "c_ff4d5e",
+      "weapon.chain_hook.glow": "c_c8c8d8",
+      "weapon.warhammer.glow": "c_ffb347",
+      "weapon.bow.glow": "c_ffd479",
+      "weapon.plasma_rifle.glow": "c_ff6f9c",
+      "weapon.railgun.glow": "c_7ee0ff",
+      "weapon.shuriken_storm.glow": "c_dfe3ee",
+      "weapon.laser_array.glow": "c_ff6f9c",
+      "weapon.prism_beam.glow": "c_b98cff",
+      "weapon.fire_nova.glow": "c_ff9d4d",
+      "weapon.frost_field.glow": "c_8fd8ff",
+      "weapon.poison_cloud.glow": "c_8aff6b",
+      "weapon.necro_staff.glow": "c_c86bff",
+      "weapon.spirit_wolves.glow": "c_e0b48a",
+      "weapon.turret_deployer.glow": "c_8a8f9e",
+      "weapon.spike_trap.glow": "c_ff8a4d",
+      "weapon.tesla_coil.glow": "c_ffe15c",
+      "weapon.holy_aura.glow": "c_ffffff",
+      "weapon.thorn_aura.glow": "c_8aff6b",
+      "weapon.chain_lightning.glow": "c_ffe15c",
+      "weapon.whip.glow": "c_ff8a4d",
+      "weapon.twin_daggers.glow": "c_dfe3ee",
+      "weapon.javelin.glow": "c_c8c8d8",
+      "weapon.hand_cannon.glow": "c_ffb347",
+      "weapon.gauss_needle.glow": "c_7ee0ff",
+      "weapon.arc_lance.glow": "c_ffe15c",
+      "weapon.void_rift.glow": "c_b98cff",
+      "weapon.swarm_hive.glow": "c_e0b48a",
+      "weapon.glacier_totem.glow": "c_8fd8ff",
+      "weapon.storm_chain.glow": "c_ffe15c",
+      "weapon.stormpiercer.glow": "c_e8c96b",
+      "weapon.crimson_fang.glow": "c_ff7a8a",
+      "weapon.entropy_bloom.glow": "c_c97fdb",
+      "weapon.spectral_lance.glow": "c_c9a6ff",
+      "weapon.bone_pack.glow": "c_d495c7",
+      "weapon.voltaic_spikes.glow": "c_ffb050",
+      "weapon.maelstrom_chain.glow": "c_fff066",
+      "weapon.gravity_hammer.glow": "c_e0a97a",
+      "weapon.plasma_lance.glow": "c_c98fd6",
+      "weapon.blight_frost.glow": "c_8fe0a0",
+      "weapon.sakura_barrage.glow": "c_ffb3d9",
+      "weapon.cluster_charge.glow": "c_ff7a3d",
     },
   },
   // Phase 5 — pure UI chrome only: button labels, screen/segment-control
@@ -3020,7 +3114,7 @@ const COLOR_THEME_PRESETS = {
     c_ffb347: "#ffb33e",
     c_5ce1e6: "#65e1ca",
     c_ff4d5e: "#ff4d53",
-    c_b98cff: "#cc8ce0",
+    c_b98cff: "#eebfe0",
     c_ff6f9c: "#ff6f89",
     c_7ee0ff: "#8be0e0",
     c_ff9ecb: "#ff9eb3",
@@ -3036,19 +3130,9 @@ const COLOR_THEME_PRESETS = {
     c_5cbf5c: "#65bf51",
     c_c86bff: "#dc6be0",
     c_ff6b3d: "#ff6b36",
-    c_6b1c22: "#761c1e",
-    c_7a3d0f: "#863d0d",
-    c_4a1c6b: "#511c5e",
     c_ff2d4d: "#ff2d44",
-    c_3a0a12: "#400a10",
-    c_1c4a1c: "#1f4a19",
     c_7a5cff: "#865ce0",
-    c_2a1c5c: "#2e1c51",
-    c_2a2d37: "#2e2d30",
-    c_6b5c1c: "#765c19",
-    c_1c4a6b: "#1f4a5e",
     c_ff6e6e: "#ff6e61",
-    c_6b1c1c: "#761c19",
     c_c8c8d8: "#dcc8be",
     c_ffd479: "#ffd46a",
     c_e0b48a: "#f6b479",
@@ -3079,6 +3163,10 @@ const COLOR_THEME_PRESETS = {
     c_000000: "#000000",
     c_14101c: "#161019",
     c_playerBody_ffffff: "#ffffff",
+    c_orbXp_78ff66: "#88ff5e",
+    c_orbGold_ffb347: "#ffb33e",
+    c_orbCrystal_66daff: "#8be0e0",
+    c_orbArtifact_ff66ad: "#ff9eb3",
   },
   cool: {
     c_08090d: "#07090f",
@@ -3091,7 +3179,7 @@ const COLOR_THEME_PRESETS = {
     c_ffb347: "#e0b350",
     c_5ce1e6: "#51e1ff",
     c_ff4d5e: "#e04d69",
-    c_b98cff: "#a38cff",
+    c_b98cff: "#bebfff",
     c_ff6f9c: "#e06faf",
     c_7ee0ff: "#6fe0ff",
     c_ff9ecb: "#e09ee6",
@@ -3107,19 +3195,9 @@ const COLOR_THEME_PRESETS = {
     c_5cbf5c: "#51bf65",
     c_c86bff: "#b06bff",
     c_ff6b3d: "#e06b47",
-    c_6b1c22: "#5e1c27",
-    c_7a3d0f: "#6b3d1a",
-    c_4a1c6b: "#411c78",
     c_ff2d4d: "#e02d5b",
-    c_3a0a12: "#330a14",
-    c_1c4a1c: "#194a20",
     c_7a5cff: "#6b5cff",
-    c_2a1c5c: "#251c68",
-    c_2a2d37: "#252d40",
-    c_6b5c1c: "#5e5c20",
-    c_1c4a6b: "#194a78",
     c_ff6e6e: "#e06e79",
-    c_6b1c1c: "#5e1c20",
     c_c8c8d8: "#b6c8f3",
     c_ffd479: "#e0d488",
     c_e0b48a: "#c5b49b",
@@ -3150,6 +3228,10 @@ const COLOR_THEME_PRESETS = {
     c_000000: "#000000",
     c_14101c: "#12101f",
     c_playerBody_ffffff: "#ffffff",
+    c_orbXp_78ff66: "#6dff78",
+    c_orbGold_ffb347: "#e0b350",
+    c_orbCrystal_66daff: "#6fe0ff",
+    c_orbArtifact_ff66ad: "#e09ee6",
   },
   highContrast: {
     c_08090d: "#06070b",
@@ -3162,7 +3244,7 @@ const COLOR_THEME_PRESETS = {
     c_ffb347: "#ffca7e",
     c_5ce1e6: "#82f4f8",
     c_ff4d5e: "#ff828e",
-    c_b98cff: "#ceafff",
+    c_b98cff: "#e4d2ff",
     c_ff6f9c: "#ff9aba",
     c_7ee0ff: "#a5e9ff",
     c_ff9ecb: "#ffbbdb",
@@ -3178,19 +3260,9 @@ const COLOR_THEME_PRESETS = {
     c_5cbf5c: "#85da85",
     c_c86bff: "#d997ff",
     c_ff6b3d: "#ff9777",
-    c_6b1c22: "#5a0f15",
-    c_7a3d0f: "#682e03",
-    c_4a1c6b: "#3b0f5a",
     c_ff2d4d: "#ff6c82",
-    c_3a0a12: "#31040b",
-    c_1c4a1c: "#123e12",
     c_7a5cff: "#a28dff",
-    c_2a1c5c: "#1e104d",
-    c_2a2d37: "#20222c",
-    c_6b5c1c: "#5a4c0f",
-    c_1c4a6b: "#0f3b5a",
     c_ff6e6e: "#ff9a9a",
-    c_6b1c1c: "#5a0f0f",
     c_c8c8d8: "#d7d7e5",
     c_ffd479: "#ffe1a1",
     c_e0b48a: "#f0caa6",
@@ -3221,6 +3293,10 @@ const COLOR_THEME_PRESETS = {
     c_000000: "#000000",
     c_14101c: "#0f0b17",
     c_playerBody_ffffff: "#ffffff",
+    c_orbXp_78ff66: "#a3ff97",
+    c_orbGold_ffb347: "#ffca7e",
+    c_orbCrystal_66daff: "#a5e9ff",
+    c_orbArtifact_ff66ad: "#ffbbdb",
   },
   colorblindSafe: {
     c_08090d: "#08090d",
@@ -3233,7 +3309,7 @@ const COLOR_THEME_PRESETS = {
     c_ffb347: "#ffac47",
     c_5ce1e6: "#5cc6e6",
     c_ff4d5e: "#ff5b4d",
-    c_b98cff: "#ca8cff",
+    c_b98cff: "#e1bfff",
     c_ff6f9c: "#ff6fc2",
     c_7ee0ff: "#7edaff",
     c_ff9ecb: "#ff9eda",
@@ -3249,19 +3325,9 @@ const COLOR_THEME_PRESETS = {
     c_5cbf5c: "#5cbf94",
     c_c86bff: "#c36bff",
     c_ff6b3d: "#ff5c3d",
-    c_6b1c22: "#6b221c",
-    c_7a3d0f: "#7a450f",
-    c_4a1c6b: "#4a1c6b",
     c_ff2d4d: "#ff3a2d",
-    c_3a0a12: "#3a0d0a",
-    c_1c4a1c: "#1c4a36",
     c_7a5cff: "#ab5cff",
-    c_2a1c5c: "#3b1c5c",
-    c_2a2d37: "#2a2e37",
-    c_6b5c1c: "#6b5f1c",
-    c_1c4a6b: "#1c516b",
     c_ff6e6e: "#ff7c6e",
-    c_6b1c1c: "#6b241c",
     c_c8c8d8: "#c8ccd8",
     c_ffd479: "#ffc579",
     c_e0b48a: "#e0b78a",
@@ -3292,6 +3358,10 @@ const COLOR_THEME_PRESETS = {
     c_000000: "#000000",
     c_14101c: "#16101c",
     c_playerBody_ffffff: "#ffffff",
+    c_orbXp_78ff66: "#6bffba",
+    c_orbGold_ffb347: "#ffac47",
+    c_orbCrystal_66daff: "#7edaff",
+    c_orbArtifact_ff66ad: "#ff9eda",
   },
   // white — a genuine light theme, not a filter: the 6 structural roles
   // (void/panel/panel2/line/text/dim) are hand-picked, not derived, since
@@ -3342,20 +3412,9 @@ const COLOR_THEME_PRESETS = {
   // chasing one number in one direction. See gen_white_theme.js's contrast
   // sweep in COLOR_THEME_AUDIT.md for the full per-hue tradeoff tables this
   // was picked from.
-  // The 10 boss.X.glow entries (c_6b1c22/c_7a3d0f/c_4a1c6b/c_3a0a12/c_1c4a1c/
-  // c_2a1c5c/c_6b5c1c/c_1c4a6b/c_6b1c1c, plus c_2a2d37 which the near-neutral
-  // branch already inverted) are ALSO hand-lightened, for a reason specific
-  // to this theme: render() draws e.glow as a halo BEHIND every enemy/boss
-  // (drawGlowSprite: color -> transparent) — these were always dark, ~20%
-  // lightness, so it read as a soft dusky aura on a dark canvas. On a light
-  // canvas the exact same dark halo reads as a literal dark smudge around
-  // every boss. Each is its boss's own hue pushed to ~82% lightness (same
-  // convention roleColor() below now uses for regular/elite enemies via
-  // themeIsLight()) instead of the generic darken-for-contrast pass, which
-  // would have just kept them dark (a dark color already clears contrast
-  // against white with no darkening needed, so the generic loop never
-  // touches these — lightening them is a deliberate override, not something
-  // the algorithm would ever produce on its own).
+  // boss.X.glow (and roleColor()'s enemy glow, below) no longer have their own dark
+  // variant at all — glow points at the exact same palette key as color, so there's
+  // nothing here for this theme to separately lighten.
   //
   // 2026-08-02 — replaced the ORIGINAL per-entry generic pass (iteratively
   // darken each hued color until it clears 4.5:1 against white) for every
@@ -3421,19 +3480,9 @@ const COLOR_THEME_PRESETS = {
     c_5cbf5c: "#5ac15a",
     c_c86bff: "#bf52ff",
     c_ff6b3d: "#ff6b3d",
-    c_6b1c22: "#ecb6ba",
-    c_7a3d0f: "#f5ccad",
-    c_4a1c6b: "#d6b6ec",
     c_ff2d4d: "#ff2d4d",
-    c_3a0a12: "#f2b1bb",
-    c_1c4a1c: "#bae8ba",
     c_7a5cff: "#7252ff",
-    c_2a1c5c: "#c3b9ea",
-    c_2a2d37: "#c8cbd5",
-    c_6b5c1c: "#ece2b6",
-    c_1c4a6b: "#b6d6ec",
     c_ff6e6e: "#ff6666",
-    c_6b1c1c: "#ecb6b6",
     c_c8c8d8: "#a5a5c0",
     c_ffd479: "#ffce66",
     c_e0b48a: "#e1b184",
@@ -3475,6 +3524,15 @@ const COLOR_THEME_PRESETS = {
     c_000000: "#000000",
     c_14101c: "#16101c",
     c_playerBody_ffffff: "#adadad",
+    // The orb's canvas identity color gets the SAME "gameplay-identity" band-clamp
+    // (own hue, L clamped to 50-70%) every weapon/mutation color gets on this theme —
+    // NOT the aggressive darken-for-text-contrast pass css.xp/gold/crystal/artifact
+    // themselves get (see their own palette comment above): a filled/glowing canvas
+    // circle needs to stay bright to read as "pop", not dark for paragraph contrast.
+    c_orbXp_78ff66: "#78ff66",
+    c_orbGold_ffb347: "#ffb347",
+    c_orbCrystal_66daff: "#66daff",
+    c_orbArtifact_ff66ad: "#ff66ad",
   },
 };
 // Deep-clones CONFIG_DEFAULTS so the live, possibly-overridden CONFIG the
@@ -3665,19 +3723,16 @@ function onConfigApplied(){
   if(typeof document==="undefined") return;
   const root = document.documentElement;
   for(const name of CSS_COLOR_VAR_NAMES) root.style.setProperty("--"+name, resolveColor("css."+name));
-  // A handful of general <style> component colors (screen vignette, chip
-  // text-shadow) were hardcoded rgba() literals tuned ONLY for a dark theme —
-  // a light theme (see COLOR_THEME_PRESETS.white) needs a genuinely different
-  // look here, not just a different hex plugged into the same formula (a
-  // dark vignette painted over a light panel just looks broken). These two
-  // are hand-picked per light/dark, same spirit as themeIsLight()'s canvas-
-  // grid branch above — the dark branch is pixel-identical to what was
-  // hardcoded before this existed, so no existing (non-white) theme's look
-  // changes at all.
+  // The screen vignette's two colors were hardcoded rgba() literals tuned ONLY for a
+  // dark theme — a light theme (see COLOR_THEME_PRESETS.white) needs a genuinely
+  // different look here, not just a different hex plugged into the same formula (a
+  // dark vignette painted over a light panel just looks broken). Hand-picked per
+  // light/dark, same spirit as themeIsLight()'s canvas-grid branch above — the dark
+  // branch is pixel-identical to what was hardcoded before this existed, so no
+  // existing (non-white) theme's look changes at all.
   const light = themeIsLight();
   root.style.setProperty("--veil-inner", light ? hexToRgba(resolveColor("css.accent"), 0.10) : "rgba(30,20,50,0.55)");
   root.style.setProperty("--veil-outer", light ? "rgba(120,128,150,0.16)" : "rgba(4,5,8,0.92)");
-  root.style.setProperty("--chip-text-shadow", light ? "0 1px 2px rgba(255,255,255,0.6)" : "0 1px 2px rgba(0,0,0,0.6)");
   // Re-applies static labels so a future editor edit updates already-visible
   // buttons immediately. Dynamic textContent= sites (achievement/log/shop
   // messages built at the moment they're shown) aren't re-rendered here —
@@ -3860,6 +3915,11 @@ const RING_SHAPES = { fire_nova:"segmented", frost_field:"hex", poison_cloud:"se
 // not just a bigger number in the level-up card.
 function weaponVisualTier(level){ return level>=7?4 : level>=5?3 : level>=3?2 : 1; }
 function weaponColor(wid){ return CONFIG.colors.semantic["weapon."+wid] ? resolveColor("weapon."+wid) : resolveColor("weapon.bow"); }
+// Individually-configurable glow variant of weaponColor() — every weapon has its own
+// "weapon.X.glow" CONFIG entry (same dedup-by-hex palette as every other color), so a
+// weapon's halo (chain arcs/beam lines/bullets/minions/nova pulses/aura rings) can be
+// retuned independently of its bullet/aura fill color.
+function weaponGlowColor(wid){ return CONFIG.colors.semantic["weapon."+wid+".glow"] ? resolveColor("weapon."+wid+".glow") : resolveColor("weapon.bow.glow"); }
 
 const EVOLUTIONS = {
   crimson_executioner:{from:"blood_blade",catalyst:"blood_chalice",name:"Crimson Executioner",icon:"🩸",desc:"Every hit heals for 8% of damage dealt; executes below 15% HP."},
@@ -4094,18 +4154,21 @@ const SYNERGIES = [
 // reload to reach here, not a per-frame re-read) since this array literal
 // only evaluates once.
 const CHARACTERS = [
-  {id:"warrior",name:"Warrior",icon:"🛡",color:resolveColor("character.warrior"),playstyle:"Melee bruiser, high HP, sustained brawling.",startWeapon:"warhammer",uniqueBonus:p=>{p.maxHp+=30;p.hp=p.maxHp;p.stats.armor+=1;},uniqueDesc:"+30 max HP, +1 armor at run start."},
-  {id:"mage",name:"Mage",icon:"🔮",color:resolveColor("character.mage"),playstyle:"Elemental caster, weaves multiple elements together.",startWeapon:"fire_nova",uniqueBonus:p=>{["fireMult","frostMult","lightningMult","poisonMult"].forEach(k=>p.stats[k]=(p.stats[k]||1)*1.15);},uniqueDesc:"+15% to all elemental multipliers at run start."},
+  {id:"warrior",name:"Warrior",icon:"🛡",color:resolveColor("character.warrior"),glow:resolveColor("character.warrior.glow"),playstyle:"Melee bruiser, high HP, sustained brawling.",startWeapon:"warhammer",uniqueBonus:p=>{p.maxHp+=30;p.hp=p.maxHp;p.stats.armor+=1;},uniqueDesc:"+30 max HP, +1 armor at run start."},
+  {id:"mage",name:"Mage",icon:"🔮",color:resolveColor("character.mage"),glow:resolveColor("character.mage.glow"),playstyle:"Elemental caster, weaves multiple elements together.",startWeapon:"fire_nova",uniqueBonus:p=>{["fireMult","frostMult","lightningMult","poisonMult"].forEach(k=>p.stats[k]=(p.stats[k]||1)*1.15);},uniqueDesc:"+15% to all elemental multipliers at run start."},
   // Small regen nudge: crit/move-speed don't help against unmitigated wave-pressure
   // chip damage, so a direct survivability boost closes the gap without diluting
   // the glass-cannon identity the way flat armor/maxHp would.
-  {id:"hunter",name:"Hunter",icon:"🏹",color:resolveColor("character.hunter"),playstyle:"Ranged precision, crit-focused, kites and pierces.",startWeapon:"bow",uniqueBonus:p=>{p.stats.critChance+=0.1;p.stats.moveSpeed*=1.06;p.stats.regen+=0.5;},uniqueDesc:"+10% crit chance, +6% move speed, +0.5 HP regen/s at run start."},
-  {id:"engineer",name:"Engineer",icon:"🗿",color:resolveColor("character.engineer"),playstyle:"Turret/trap zoning, controls space rather than chasing.",startWeapon:"turret_deployer",uniqueBonus:p=>{p.stats.cdrMult=(p.stats.cdrMult||1)*0.9;},uniqueDesc:"-10% cooldown on summon/trap weapons at run start."},
-  {id:"necromancer",name:"Necromancer",icon:"💀",color:resolveColor("character.necromancer"),playstyle:"Minion army, scales with summon count and duration.",startWeapon:"necro_staff",uniqueBonus:p=>{p.stats.summonDmgMult=(p.stats.summonDmgMult||1)*1.2;},uniqueDesc:"+20% minion damage at run start."},
+  {id:"hunter",name:"Hunter",icon:"🏹",color:resolveColor("character.hunter"),glow:resolveColor("character.hunter.glow"),playstyle:"Ranged precision, crit-focused, kites and pierces.",startWeapon:"bow",uniqueBonus:p=>{p.stats.critChance+=0.1;p.stats.moveSpeed*=1.06;p.stats.regen+=0.5;},uniqueDesc:"+10% crit chance, +6% move speed, +0.5 HP regen/s at run start."},
+  {id:"engineer",name:"Engineer",icon:"🗿",color:resolveColor("character.engineer"),glow:resolveColor("character.engineer.glow"),playstyle:"Turret/trap zoning, controls space rather than chasing.",startWeapon:"turret_deployer",uniqueBonus:p=>{p.stats.cdrMult=(p.stats.cdrMult||1)*0.9;},uniqueDesc:"-10% cooldown on summon/trap weapons at run start."},
+  {id:"necromancer",name:"Necromancer",icon:"💀",color:resolveColor("character.necromancer"),glow:resolveColor("character.necromancer.glow"),playstyle:"Minion army, scales with summon count and duration.",startWeapon:"necro_staff",uniqueBonus:p=>{p.stats.summonDmgMult=(p.stats.summonDmgMult||1)*1.2;},uniqueDesc:"+20% minion damage at run start."},
 ];
 // Player body/ring color by class — falls back to Mage's violet (the old universal default)
 // for any unrecognized id, same fallback pattern weaponColor() uses.
 function characterColor(id){ const c=CHARACTERS.find(x=>x.id===id); return (c&&c.color)||resolveColor("css.accent"); }
+// Individually-configurable glow variant of characterColor() — the player body's own
+// halo, one dedicated "character.X.glow" CONFIG entry per class.
+function characterGlowColor(id){ const c=CHARACTERS.find(x=>x.id===id); return (c&&c.glow)||resolveColor("css.accentGlow"); }
 // POLISH_PLAN_7 — talent branch id matches a CHARACTERS id for 5 of 6 branches
 // (reusing characterColor keeps them in sync if a class color ever changes);
 // "survivor" has no CHARACTERS entry (it's the generic/economy branch, open to
@@ -4122,15 +4185,12 @@ const TALENT_BRANCH_COLOR = { warrior:characterColor('warrior'), mage:characterC
 function roleColor(role, idx){
   const hueBase = {melee:0,ranged:200,tank:100,swarm:280,assassin:320,support:48}[role] ?? 0;
   const hue = (hueBase + idx*11) % 360;
-  // The glow halo (drawGlowSprite: color -> transparent) was always a DARK
-  // 28%-lightness shade — reads as a soft dusky aura on a dark canvas
-  // background, but as a literal dark smudge around every enemy once the
-  // canvas itself goes light (COLOR_THEME_PRESETS.white). themeIsLight()
-  // flips it to a bright, pale variant instead — a light bloom radiating
-  // outward reads correctly on a light background the same way a dark aura
-  // does on a dark one.
-  const glowL = themeIsLight() ? 82 : 28;
-  return { color:`hsl(${hue},72%,62%)`, glow:`hsl(${hue},72%,${glowL}%)` };
+  // Glow is the SAME value as color, no separate lightness — matches the
+  // weapon/character/orb glow policy elsewhere in CONFIG (glow = the entity's own
+  // color, full stop, not a dimmed/lightened derivative that can end up reading as
+  // a washed-out grey at high lightness or mismatching the body at low lightness).
+  const color = `hsl(${hue},72%,62%)`;
+  return { color, glow:color };
 }
 function brainForRole(role){
   return {melee:"chase",ranged:"keep_distance_shoot",tank:"chase",swarm:"swarm",assassin:"charge",support:"summon"}[role] || "chase";
@@ -5465,10 +5525,10 @@ function weaponFire(wid, lvl, dt){
     if(wid==="poison_cloud" && evo==="plague_zone") player.stats.poisonSpread = true;
     // Absolute Zero: enemies under 30% HP caught in the field are fully frozen (near-total slow).
     if(wid==="frost_field" && evo==="absolute_zero") forEachEnemyNear(player.x,player.y,radius,e=>{ if(e.hp/e.maxHp<0.3){ e.slowed=true; e.slowT=Math.max(e.slowT||0,2.5); e.frozenSolid=true; } });
-    novaPulses.push({x:player.x,y:player.y,radius,life:0.4,maxLife:0.4,color:weaponColor(wid),weaponId:wid});
+    novaPulses.push({x:player.x,y:player.y,radius,life:0.4,maxLife:0.4,color:weaponColor(wid),glowColor:weaponGlowColor(wid),weaponId:wid});
     // Second, slightly-delayed inner ring at higher levels — a leveled-up nova visibly pulses
     // twice instead of just growing a bigger single ring.
-    if(weaponVisualTier(lvl)>=3) novaPulses.push({x:player.x,y:player.y,radius:radius*0.6,life:0.55,maxLife:0.55,color:weaponColor(wid),weaponId:wid});
+    if(weaponVisualTier(lvl)>=3) novaPulses.push({x:player.x,y:player.y,radius:radius*0.6,life:0.55,maxLife:0.55,color:weaponColor(wid),glowColor:weaponGlowColor(wid),weaponId:wid});
     if(wid==="fire_nova") SFX.novaBurst(); else if(wid==="poison_cloud") SFX.chainZap(); else SFX.novaBurst();
     return;
   }
@@ -5497,7 +5557,7 @@ function weaponFire(wid, lvl, dt){
       const again = nearestEnemy(player.x,player.y,jumpRange*1.4);
       if(again && !hit.has(again)){ dealDamage(again, dmg*0.6, wid); arcPoints.push({x:player.x,y:player.y},{x:again.x,y:again.y}); }
     }
-    if(arcPoints.length>1){ chainArcs.push({points:arcPoints,life:0.18,maxLife:0.18,color:weaponColor(wid),width:2+weaponVisualTier(lvl)*0.9}); SFX.chainZap(); }
+    if(arcPoints.length>1){ chainArcs.push({points:arcPoints,life:0.18,maxLife:0.18,color:weaponColor(wid),glowColor:weaponGlowColor(wid),width:2+weaponVisualTier(lvl)*0.9}); SFX.chainZap(); }
     return;
   }
   if(player.weaponTimers[wid]>0) return;
@@ -5556,7 +5616,13 @@ function spawnBullet(props){
   const b = bulletPool.pop() || {};
   b.traveled=0; b.returning=false; b.weaponId=undefined; b.pierce=0; b.forceCrit=false; b.detonate=false;
   b.shape=undefined; b.evolved=false; b.homing=undefined; b.orbit=null; b.wobble=undefined; b.dead=false;
+  b.glowColor=undefined;
   Object.assign(b, props);
+  // Player-weapon bullets get their weapon's own individually-configured glow;
+  // everything else (a caller-provided glowColor, or an enemy bullet with no fixed
+  // "unit" identity — it just inherits the firing enemy's own procedural color)
+  // just glows its own bullet color, computed once here instead of every render frame.
+  if(!b.glowColor) b.glowColor = props.weaponId ? weaponGlowColor(props.weaponId) : b.color;
   if(b.owner==="player"){ if(!b.hitset) b.hitset=new Set(); else b.hitset.clear(); }
   bullets.push(b);
   return b;
@@ -6118,7 +6184,7 @@ function bossCtx(dt){
     teleportAway:(b,dist)=>{ const ang=rand(0,Math.PI*2); b.x=clamp(b.x+Math.cos(ang)*dist,b.radius,WORLD.w-b.radius); b.y=clamp(b.y+Math.sin(ang)*dist,b.radius,WORLD.h-b.radius); spawnParticle(b.x,b.y,b.color,14); },
     teleportBehindAndStrike:(b)=>{ const ang=rand(0,Math.PI*2); b.x=clamp(player.x+Math.cos(ang)*(b.radius+player.radius+20),b.radius,WORLD.w-b.radius); b.y=clamp(player.y+Math.sin(ang)*(b.radius+player.radius+20),b.radius,WORLD.h-b.radius); spawnParticle(b.x,b.y,b.color,10); damagePlayer(b.dmg*1.1); },
     zoneDenial:(b,dmgPerTick,radius,duration)=>{ spawnZone({x:player.x,y:player.y,radius,dmg:dmgPerTick,life:duration,maxLife:duration,tickCd:0,tag:"boss",targetsPlayer:true}); },
-    sweepLaser:(b,range)=>{ for(let a=0;a<10;a++){ const ang=(a/10)*Math.PI*2; spawnBullet({owner:"enemy",x:b.x,y:b.y,vx:Math.cos(ang)*260,vy:Math.sin(ang)*260,dmg:b.dmg*0.5,radius:6,life:range/260,color:resolveColor("css.metal"),pierce:0}); } },
+    sweepLaser:(b,range)=>{ for(let a=0;a<10;a++){ const ang=(a/10)*Math.PI*2; spawnBullet({owner:"enemy",x:b.x,y:b.y,vx:Math.cos(ang)*260,vy:Math.sin(ang)*260,dmg:b.dmg*0.5,radius:6,life:range/260,color:resolveColor("css.metal"),glowColor:resolveColor("css.metalGlow"),pierce:0}); } },
     deployTurrets:(b,count)=>{ for(let i=0;i<count;i++){ if(enemies.length<dynamicMaxEnemies()){ const ang=(i/count)*Math.PI*2; const t=spawnEnemy("skeleton_archer",{x:b.x+Math.cos(ang)*70,y:b.y+Math.sin(ang)*70}); if(t){ t.speed=0; t.hp=t.maxHp=30; t.color=resolveColor("css.metal"); } } } },
     grantShield:(b,amount)=>{ b.shield=(b.shield||0)+amount; },
     stealResource:(b,type,pct)=>{ if(type==="gold"){ const amt=Math.floor(player.gold*pct); player.gold-=amt; runStats.stolenByCollector=true; logEvent("The Collector steals your gold!"); } else { player.xp=Math.max(0,player.xp-player.xp*pct); runStats.stolenByCollector=true; logEvent("The Collector siphons your XP!"); } },
@@ -6410,7 +6476,7 @@ function updateEnemies(dt){
       }
       e.x += e.vx*dt*speedMult; e.y += e.vy*dt*speedMult;
       e.shootCd -= dt;
-      if(e.shootCd<=0){ spawnBullet({owner:"enemy",x:e.x,y:e.y,vx:(dx/d)*260,vy:(dy/d)*260,dmg:e.dmg,radius:5,life:3,color:resolveColor("css.parry"),pierce:0}); e.shootCd=1.6; }
+      if(e.shootCd<=0){ spawnBullet({owner:"enemy",x:e.x,y:e.y,vx:(dx/d)*260,vy:(dy/d)*260,dmg:e.dmg,radius:5,life:3,color:resolveColor("css.parry"),glowColor:resolveColor("css.parryGlow"),pierce:0}); e.shootCd=1.6; }
     } else if(e.brain==="charge"){
       e.chargeCd -= dt;
       if(e.chargeState==="idle"){
@@ -6475,7 +6541,7 @@ function updateMinions(dt){
       else { m.x=clamp(m.x+(player.x-m.x)*0.02,m.radius,WORLD.w-m.radius); m.y=clamp(m.y+(player.y-m.y)*0.02,m.radius,WORLD.h-m.radius); }
     } else {
       const target=nearestEnemy(m.x,m.y,weaponRange(260)); m.atkCd-=dt;
-      if(target && m.atkCd<=0){ const ang=Math.atan2(target.y-m.y,target.x-m.x); spawnBullet({owner:"player",x:m.x,y:m.y,vx:Math.cos(ang)*400,vy:Math.sin(ang)*400,dmg:m.dmg,radius:4,life:1.5,color:resolveColor("css.turretBolt"),pierce:0}); m.atkCd=0.6; }
+      if(target && m.atkCd<=0){ const ang=Math.atan2(target.y-m.y,target.x-m.x); spawnBullet({owner:"player",x:m.x,y:m.y,vx:Math.cos(ang)*400,vy:Math.sin(ang)*400,dmg:m.dmg,radius:4,life:1.5,color:resolveColor("css.turretBolt"),glowColor:resolveColor("css.turretBoltGlow"),pierce:0}); m.atkCd=0.6; }
     }
   }
   pruneMinions();
@@ -6648,7 +6714,7 @@ function updatePlayer(dt){
       if(player.stats.dashImpactDmg>0){
         const r=60*(player.stats.aoeRadiusMult||1);
         forEachEnemyNear(player.x,player.y,r,e=>dealDamage(e,player.stats.dashImpactDmg*player.stats.dmgMult,null));
-        novaPulses.push({x:player.x,y:player.y,radius:r,life:0.35,maxLife:0.35,color:resolveColor("css.accent")});
+        novaPulses.push({x:player.x,y:player.y,radius:r,life:0.35,maxLife:0.35,color:resolveColor("css.accent"),glowColor:resolveColor("css.accentGlow")});
       }
     }
   }
@@ -7720,6 +7786,22 @@ function glow(size){ return quality==='low'?0:(quality==='medium'?size*0.6:size)
 // per exact float radius ever requested (enemy radii vary continuously with e.g. level scaling).
 // Only wired up for enemies for now (by far the largest population in profiling) — bullets/
 // minions/orbs/beams still use live shadowBlur, a smaller-scoped follow-up if this proves out.
+// The actual bug behind "glow reads as grey/black instead of the entity's color":
+// a gradient stop of the literal keyword 'transparent' is rgba(0,0,0,0) — BLACK at
+// zero alpha, not "this same color at zero alpha". Canvas interpolates gradient
+// stops through RGBA space, so every pixel between the two stops blends toward
+// black as alpha drops, not just fading the original hue out — a muddy dark ring
+// around an otherwise-bright center. Used to be much less visible when glow was
+// already a dimmed color (see roleColor()'s old lightness split); now that glow
+// equals the entity's own full-brightness color everywhere, the black-fade became
+// the dominant visible feature of the halo. Fixed by fading to THIS color at alpha
+// 0 instead of a different (black) color at alpha 0.
+function fadeToTransparent(color){
+  if(color[0]==='#') return hexToRgba(color,0);
+  if(color.startsWith('hsl(')) return color.replace('hsl(','hsla(').replace(/\)$/,',0)');
+  if(color.startsWith('rgb(')) return color.replace('rgb(','rgba(').replace(/\)$/,',0)');
+  return color; // already hsla()/rgba()/other — best-effort passthrough
+}
 const glowSpriteCache = new Map();
 function getGlowSprite(color,radius){
   const bucket = Math.max(4, Math.ceil(radius/4)*4);
@@ -7730,7 +7812,7 @@ function getGlowSprite(color,radius){
   const c = document.createElement('canvas'); c.width=size; c.height=size;
   const g = c.getContext('2d');
   const grad = g.createRadialGradient(bucket,bucket,0,bucket,bucket,bucket);
-  grad.addColorStop(0, color); grad.addColorStop(1, 'transparent');
+  grad.addColorStop(0, color); grad.addColorStop(1, fadeToTransparent(color));
   g.fillStyle = grad; g.fillRect(0,0,size,size);
   spr = {canvas:c, r:bucket};
   glowSpriteCache.set(key, spr);
@@ -7765,10 +7847,13 @@ function drawEnergyRing(cx,cy,r,color,alpha,opts){
   const spin=runTime*(opts.spinSpeed??1.2);
   const shape=opts.shape||"dashed";
   if(opts.glow!==false && quality!=='low'){
+    // Individually-configurable glow: opts.glowColor (weaponGlowColor()/resolveColor("X.glow"))
+    // when the caller has one, falling back to the ring's own stroke color for callers that don't.
+    const glowColor = opts.glowColor || color;
     const grad=ctx2d.createRadialGradient(cx,cy,0,cx,cy,r);
-    grad.addColorStop(0,hexToRgba(color,alpha*0.22));
-    grad.addColorStop(0.75,hexToRgba(color,alpha*0.08));
-    grad.addColorStop(1,hexToRgba(color,0));
+    grad.addColorStop(0,hexToRgba(glowColor,alpha*0.22));
+    grad.addColorStop(0.75,hexToRgba(glowColor,alpha*0.08));
+    grad.addColorStop(1,hexToRgba(glowColor,0));
     ctx2d.beginPath(); ctx2d.fillStyle=grad; ctx2d.arc(cx,cy,r,0,7); ctx2d.fill();
   }
   ctx2d.save();
@@ -7948,19 +8033,27 @@ function render(){
   // highest-frequency glowing shape on screen late-game, and gold's near-max-
   // contrast yellow-on-black is a real flash/photosensitivity concern at volume
   // (see spawnOrb's MAX_ORBS cap, which cuts the count; this cuts the intensity).
-  for(const o of orbs){ if(!inView(o.x,o.y)) continue; ctx2d.beginPath(); ctx2d.fillStyle = o.type==="xp"?resolveColor("css.xp"): o.type==="gold"?resolveColor("css.gold"): o.type==="crystal"?resolveColor("css.crystal"):resolveColor("css.artifact"); ctx2d.shadowColor=ctx2d.fillStyle; ctx2d.shadowBlur=glow(3.5); ctx2d.arc(o.x,o.y,o.radius,0,7); ctx2d.fill(); }
+  for(const o of orbs){
+    if(!inView(o.x,o.y)) continue; ctx2d.beginPath();
+    // css.xp/gold/crystal/artifact are tuned for UI-text contrast (shop prices/resource
+    // chips) — the orb is a canvas game object, not text, so both its fill AND glow read
+    // through the dedicated css.*Glow keys instead (see their own CONFIG comment).
+    const oColor = o.type==="xp"?resolveColor("css.xpGlow"): o.type==="gold"?resolveColor("css.goldGlow"): o.type==="crystal"?resolveColor("css.crystalGlow"):resolveColor("css.artifactGlow");
+    ctx2d.fillStyle = oColor;
+    ctx2d.shadowColor=oColor; ctx2d.shadowBlur=glow(3.5); ctx2d.arc(o.x,o.y,o.radius,0,7); ctx2d.fill();
+  }
   ctx2d.shadowBlur=0;
   // Chain-lightning arcs and area-burst pulses (see updateJuice fix above) — actually drawn now.
   for(const c of chainArcs){
     const alpha=clamp(c.life/c.maxLife,0,1); ctx2d.beginPath();
-    ctx2d.strokeStyle = c.color||resolveColor("css.crit"); ctx2d.globalAlpha=alpha*0.85; ctx2d.lineWidth=c.width||3; ctx2d.shadowColor=c.color||resolveColor("css.crit"); ctx2d.shadowBlur=glow(10);
+    ctx2d.strokeStyle = c.color||resolveColor("css.crit"); ctx2d.globalAlpha=alpha*0.85; ctx2d.lineWidth=c.width||3; ctx2d.shadowColor=c.glowColor||resolveColor("css.critGlow"); ctx2d.shadowBlur=glow(10);
     ctx2d.moveTo(c.points[0].x,c.points[0].y);
     for(let i=1;i<c.points.length;i++) ctx2d.lineTo(c.points[i].x,c.points[i].y);
     ctx2d.stroke(); ctx2d.globalAlpha=1; ctx2d.shadowBlur=0;
   }
   for(const n of novaPulses){
     const alpha=clamp(n.life/n.maxLife,0,1); const grow=1+(1-alpha)*0.25;
-    drawEnergyRing(n.x,n.y,n.radius*grow,n.color,alpha*0.85,{lineWidth:3.5,ticks:5,spinSpeed:2.4,shape:RING_SHAPES[n.weaponId]});
+    drawEnergyRing(n.x,n.y,n.radius*grow,n.color,alpha*0.85,{lineWidth:3.5,ticks:5,spinSpeed:2.4,shape:RING_SHAPES[n.weaponId],glowColor:n.glowColor});
   }
   if(player.swordFx){
     const fx=player.swordFx, alpha=fx.t/0.22;
@@ -7972,7 +8065,7 @@ function render(){
     for(const wid of Object.keys(player.beamTargets)){
       const bt = player.beamTargets[wid]; if(!bt || !enemies.includes(bt.target)) continue;
       const t=bt.target, color=weaponColor(wid);
-      ctx2d.beginPath(); ctx2d.strokeStyle=color; ctx2d.lineWidth=2+bt.tier*0.6; ctx2d.shadowColor=color; ctx2d.shadowBlur=glow(12);
+      ctx2d.beginPath(); ctx2d.strokeStyle=color; ctx2d.lineWidth=2+bt.tier*0.6; ctx2d.shadowColor=weaponGlowColor(wid); ctx2d.shadowBlur=glow(12);
       if(wid==="arc_lance") ctx2d.setLineDash([9,5]); // jagged/pulsing look, distinct from the other two beams' solid lines
       ctx2d.moveTo(player.x,player.y); ctx2d.lineTo(t.x,t.y); ctx2d.stroke();
       ctx2d.setLineDash([]); ctx2d.shadowBlur=0;
@@ -7981,7 +8074,7 @@ function render(){
   if(player.auraRadius){
     for(const k of Object.keys(player.auraRadius)){
       const a = player.auraRadius[k];
-      drawEnergyRing(player.x,player.y,a.radius,weaponColor(k),0.3,{lineWidth:2+a.tier*0.5,ticks:4+a.tier,spinSpeed:0.6,glow:quality==='high',shape:RING_SHAPES[k]});
+      drawEnergyRing(player.x,player.y,a.radius,weaponColor(k),0.3,{lineWidth:2+a.tier*0.5,ticks:4+a.tier,spinSpeed:0.6,glow:quality==='high',shape:RING_SHAPES[k],glowColor:weaponGlowColor(k)});
       // Higher-level auras pulse a second, tighter inner ring instead of just growing radius.
       if(a.tier>=3) drawEnergyRing(player.x,player.y,a.radius*0.82,weaponColor(k),0.18,{lineWidth:1.5,ticks:0,spinSpeed:-0.8,glow:false,shape:RING_SHAPES[k]});
     }
@@ -7994,11 +8087,12 @@ function render(){
     // small 12px label floating above a plain colored circle — a summon now reads as *itself* at
     // a glance, not as an anonymous dot with a tiny badge.
     const mc = m.weaponId==="raised" ? resolveColor("css.bone") : weaponColor(m.weaponId);
+    const mgc = m.weaponId==="raised" ? resolveColor("css.boneGlow") : weaponGlowColor(m.weaponId);
     // Same glow-sprite swap as bullets above — measured ~0.18ms/minion with
     // live shadowBlur (150 synthetic minions dropped the same 613-enemy
     // scene from 53fps to 22fps), the highest per-entity cost of any type
     // profiled so far (fillText icon + shadowBlur stacked).
-    drawGlowSprite(m.x,m.y,mc,8);
+    drawGlowSprite(m.x,m.y,mgc,8);
     if(m.icon && quality!=='low'){
       ctx2d.font=(m.radius*2)+"px sans-serif"; ctx2d.textAlign="center";
       ctx2d.fillText(m.icon,m.x,m.y+m.radius*0.35);
@@ -8033,13 +8127,13 @@ function render(){
   for(const e of enemies){
     if(!inView(e.x,e.y)) continue;
     const canGlow = e.boss || e.elite || !glowSet || glowSet.has(e);
-    ctx2d.fillStyle=e.hitFlash>0?resolveColor("css.text"):e.color;
+    ctx2d.fillStyle=e.hitFlash>0?resolveColor("css.hitFlash"):e.color;
     if(canGlow) drawGlowSprite(e.x,e.y,e.glow,e.boss?26:(e.elite?18:10));
     if(e.boss || !e.shape){ ctx2d.beginPath(); ctx2d.arc(e.x,e.y,e.radius,0,7); ctx2d.fill(); } else drawEnemyShape(ctx2d,e);
     if(e.mutation){ ctx2d.beginPath(); ctx2d.strokeStyle=e.mutationColor; ctx2d.lineWidth=2.5; ctx2d.arc(e.x,e.y,e.radius+2,0,7); ctx2d.stroke(); }
     if(e.elite||e.boss){ const bw=e.radius*2.4; ctx2d.fillStyle=resolveColor("css.panel2"); ctx2d.fillRect(e.x-bw/2,e.y-e.radius-14,bw,5);
       ctx2d.fillStyle=e.boss?resolveColor("css.hp"):resolveColor("css.gold");
-      if(e.boss) drawGlowSprite(e.x,e.y-e.radius-11.5,resolveColor("css.hp"),10);
+      if(e.boss) drawGlowSprite(e.x,e.y-e.radius-11.5,resolveColor("css.hpGlow"),10);
       ctx2d.fillRect(e.x-bw/2,e.y-e.radius-14,bw*clamp(e.hp/e.maxHp,0,1),5); }
     // Status-effect icons: previously the only visible feedback for burn/poison/slow/
     // shield/stagger/mark was a one-frame white hit-flash. Each active effect now
@@ -8085,7 +8179,7 @@ function render(){
     // untreated render cost found after enemies (bullets can reach the full
     // MAX_BULLETS=900 at once, unlike minions' MAX_MINIONS=150).
     ctx2d.fillStyle=b.color; ctx2d.strokeStyle=b.color;
-    drawGlowSprite(b.x,b.y,b.color,8);
+    drawGlowSprite(b.x,b.y,b.glowColor||b.color,8);
     if(b.shape==="spiral"){
       // Elongated comet with a fading tail pointing back along its travel direction —
       // makes a sweeping burst read as a curling streak instead of a plain dot.
@@ -8133,6 +8227,7 @@ function render(){
   for(const p of particles){ ctx2d.globalAlpha=clamp(p.life/p.maxLife,0,1); ctx2d.fillStyle=p.color; ctx2d.fillRect(p.x-2,p.y-2,4,4); }
   ctx2d.globalAlpha=1;
   const pc = characterColor(player.character);
+  const pgc = characterGlowColor(player.character);
   if(player.abilities.dash.active){
     const dash=player.abilities.dash;
     // POLISH_PLAN item 2 — gradient trail (transparent tail -> character color ->
@@ -8147,7 +8242,7 @@ function render(){
     ctx2d.beginPath(); ctx2d.moveTo(tailX,tailY); ctx2d.lineTo(player.x,player.y); ctx2d.stroke();
     ctx2d.restore();
   }
-  ctx2d.beginPath(); ctx2d.fillStyle=player.hitFlash>0?resolveColor("css.danger"):resolveColor("css.playerBody"); ctx2d.shadowColor=pc; ctx2d.shadowBlur=glow(player.abilities.dash.active?26:16); ctx2d.arc(player.x,player.y,player.radius,0,7); ctx2d.fill(); ctx2d.shadowBlur=0;
+  ctx2d.beginPath(); ctx2d.fillStyle=player.hitFlash>0?resolveColor("css.danger"):resolveColor("css.playerBody"); ctx2d.shadowColor=pgc; ctx2d.shadowBlur=glow(player.abilities.dash.active?26:16); ctx2d.arc(player.x,player.y,player.radius,0,7); ctx2d.fill(); ctx2d.shadowBlur=0;
   ctx2d.beginPath(); ctx2d.strokeStyle=pc; ctx2d.lineWidth=2; ctx2d.arc(player.x,player.y,player.radius+4,0,7); ctx2d.stroke();
   ctx2d.font="bold 13px 'JetBrains Mono', monospace"; ctx2d.textAlign="center";
   for(const f of floaters){ ctx2d.globalAlpha=clamp(f.life/0.6,0,1); ctx2d.fillStyle=f.color; ctx2d.fillText(f.text,f.x,f.y); }
