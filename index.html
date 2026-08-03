@@ -898,6 +898,7 @@
         <div class="setting-row"><div><div class="s-name">Movement Input</div><div class="s-desc">Auto uses a floating touch joystick on phones/tablets and keyboard (WASD / arrows) elsewhere.</div></div>
           <div class="seg-control" id="ctrlMode"><button class="seg-btn" data-val="auto">Auto</button><button class="seg-btn" data-val="joystick">Joystick</button><button class="seg-btn" data-val="keyboard">Keyboard</button></div></div>
         <div class="setting-row"><div><div class="s-name">Vibration</div><div class="s-desc">Short haptic pulse on hits, level-ups and death.</div></div><div class="toggle-switch" id="ctrlHaptics"><div class="knob"></div></div></div>
+        <div class="setting-row"><div><div class="s-name">Auto-Pause</div><div class="s-desc">Pause the run automatically when you switch away from this tab or window.</div></div><div class="toggle-switch" id="ctrlAutoPause"><div class="knob"></div></div></div>
       </div>
       <div class="settings-pane hidden" id="pane-video">
         <div class="setting-row"><div><div class="s-name">Graphics Quality</div><div class="s-desc">Lower settings reduce glow and particle effects.</div></div>
@@ -5097,7 +5098,7 @@ const DEFAULT_SAVE = { version:SAVE_VERSION, soul:0, artifacts:0, talentLevels:{
   // that require an explicit "Collect" click on the Achievements screen, not just
   // finishing the achievement — see renderAchievementsScreen() and buildCardPool().
   collectedRewards:{},
-  settings:{ muted:false, sfxVolume:1, musicVolume:0.35, controlMode:'auto', haptics:true, quality:'high', enemyDensity:'high', screenShake:true, debugOverlay:false } };
+  settings:{ muted:false, sfxVolume:1, musicVolume:0.35, controlMode:'auto', haptics:true, quality:'high', enemyDensity:'high', screenShake:true, debugOverlay:false, autoPauseOnBlur:true } };
 let save = JSON.parse(JSON.stringify(DEFAULT_SAVE));
 
 /* ---- Armory: a real spending sink for the previously-unused `save.artifacts`
@@ -6797,7 +6798,7 @@ function damagePlayer(amount){
     SFX.hurt(); vibrate(30);
   }
   if(player.hp<=0 && state==='playing'){
-    if((player.stats.deathDefianceCharges||0)>0){ player.stats.deathDefianceCharges--; player.hp=1; player.stats.dmgMult*=2; setTimeout(()=>player.stats.dmgMult/=2,3000); logEvent("Death defied!"); return; }
+    if((player.stats.deathDefianceCharges||0)>0){ player.stats.deathDefianceCharges--; player.hp=1; player.stats.dmgMult*=2; const defiedPlayer=player; setTimeout(()=>defiedPlayer.stats.dmgMult/=2,3000); logEvent("Death defied!"); return; }
     if(player.hasRevive){ player.hasRevive=false; player.hp=Math.floor(player.maxHp*0.5); player.gold=0; logEvent("☥ REBORN! Gold reset to 0."); SFX.levelup(); vibrate([0,50,50,50]); return; }
     if((player.stats.reviveChance||0)>0 && Math.random()<player.stats.reviveChance){ player.hp=Math.floor(player.maxHp*0.4); logEvent("Undying talent triggers — you cling to life!"); SFX.levelup(); vibrate([0,50,50,50]); return; }
     die();
@@ -7065,7 +7066,7 @@ function renderFusion(){
     el.onclick=()=>{
       if(el.dataset.forging) return; el.dataset.forging='1';
       SFX.uiClick(); const resultIcon=document.getElementById('fuseResult_'+f.id); if(resultIcon) resultIcon.classList.add('forging');
-      setTimeout(()=>{ applyFusion(f.id); renderFusion(); refreshHud(); }, 550);
+      setTimeout(()=>{ if(state==='fusion'){ applyFusion(f.id); renderFusion(); refreshHud(); } }, 550);
     };
     wrap.appendChild(el);
   }
@@ -7563,8 +7564,8 @@ async function doAutosave(showIndicator){
 }
 function flashSavedIndicator(){ const el=document.getElementById('saveIndicator'); if(!el) return; el.classList.remove('show'); void el.offsetWidth; el.classList.add('show'); }
 function saveOnExitIfNeeded(){ if(state==='playing'||state==='paused') doAutosave(false); }
-document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden') saveOnExitIfNeeded(); });
-window.addEventListener('pagehide', saveOnExitIfNeeded); window.addEventListener('blur', saveOnExitIfNeeded);
+document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden'){ saveOnExitIfNeeded(); autoPauseIfNeeded(); } });
+window.addEventListener('pagehide', saveOnExitIfNeeded); window.addEventListener('blur', ()=>{ saveOnExitIfNeeded(); autoPauseIfNeeded(); });
 
 // POLISH_PLAN item 8 — character-scramble glitch for the death title: unlike the
 // CSS-only RGB-split/scanline styles (menu/victory/talent/achievements), this one
@@ -9095,7 +9096,7 @@ document.getElementById('fullscreenToggleBtn').onclick=()=>{ SFX.uiClick(); togg
 if(!fullscreenSupported()){ const toggleBtn=document.getElementById('fullscreenToggleBtn'); if(toggleBtn){ toggleBtn.disabled=true; toggleBtn.textContent=t('settings_screen.fullscreenUnavailable'); } const hudBtn=document.getElementById('fullscreenBtnHud'); if(hudBtn) hudBtn.style.opacity='0.35'; }
 function setSegActive(containerId,value){ document.querySelectorAll('#'+containerId+' .seg-btn').forEach(b=>b.classList.toggle('active',b.dataset.val===value)); }
 function setToggle(id,on){ const el=document.getElementById(id); if(el) el.classList.toggle('on',!!on); }
-function refreshSettingsUI(){ setSegActive('ctrlMode',save.settings.controlMode); setSegActive('vidQuality',save.settings.quality); setSegActive('vidDensity',save.settings.enemyDensity||'high'); setToggle('ctrlHaptics',save.settings.haptics); setToggle('vidShake',save.settings.screenShake); setToggle('vidDebugOverlay',save.settings.debugOverlay); setToggle('audioMuted',save.settings.muted); updateFullscreenButtons();
+function refreshSettingsUI(){ setSegActive('ctrlMode',save.settings.controlMode); setSegActive('vidQuality',save.settings.quality); setSegActive('vidDensity',save.settings.enemyDensity||'high'); setToggle('ctrlHaptics',save.settings.haptics); setToggle('ctrlAutoPause',save.settings.autoPauseOnBlur); setToggle('vidShake',save.settings.screenShake); setToggle('vidDebugOverlay',save.settings.debugOverlay); setToggle('audioMuted',save.settings.muted); updateFullscreenButtons();
   const vol=Math.round(save.settings.sfxVolume*100); document.getElementById('audioVolume').value=vol; document.getElementById('audioVolumeVal').textContent=vol;
   const mvol=Math.round(save.settings.musicVolume*100); document.getElementById('musicVolume').value=mvol; document.getElementById('musicVolumeVal').textContent=mvol; }
 let settingsReturnTo='menu';
@@ -9105,6 +9106,7 @@ document.getElementById('ctrlMode').addEventListener('click',e=>{ const b=e.targ
 document.getElementById('vidQuality').addEventListener('click',e=>{ const b=e.target.closest('.seg-btn'); if(!b) return; save.settings.quality=b.dataset.val; persistSave(); applySettings(); refreshSettingsUI(); });
 document.getElementById('vidDensity').addEventListener('click',e=>{ const b=e.target.closest('.seg-btn'); if(!b) return; save.settings.enemyDensity=b.dataset.val; persistSave(); applySettings(); refreshSettingsUI(); });
 document.getElementById('ctrlHaptics').onclick=()=>{ save.settings.haptics=!save.settings.haptics; persistSave(); applySettings(); refreshSettingsUI(); vibrate(20); };
+document.getElementById('ctrlAutoPause').onclick=()=>{ save.settings.autoPauseOnBlur=!save.settings.autoPauseOnBlur; persistSave(); refreshSettingsUI(); };
 document.getElementById('vidShake').onclick=()=>{ save.settings.screenShake=!save.settings.screenShake; persistSave(); applySettings(); refreshSettingsUI(); };
 document.getElementById('vidDebugOverlay').onclick=()=>{ save.settings.debugOverlay=!save.settings.debugOverlay; persistSave(); applySettings(); refreshSettingsUI(); };
 document.getElementById('audioVolume').addEventListener('input',e=>{ const v=Number(e.target.value); document.getElementById('audioVolumeVal').textContent=v; save.settings.sfxVolume=v/100; SFX.setVolume(save.settings.sfxVolume); });
@@ -9307,9 +9309,8 @@ function renderCharSelect(){
 // rotates/scales each card by its distance from the container's horizontal
 // center. rAF-throttled since 'scroll' can fire far faster than one paint.
 function setupCharCarouselTilt(wrap){
-  let ticking=false;
   function apply(){
-    ticking=false;
+    wrap.dataset.tiltTicking='';
     const mid=wrap.scrollLeft+wrap.clientWidth/2;
     for(const card of wrap.children){
       const cardMid=card.offsetLeft+card.offsetWidth/2;
@@ -9319,7 +9320,14 @@ function setupCharCarouselTilt(wrap){
       card.style.zIndex=String(100-Math.round(Math.abs(norm)*10));
     }
   }
-  wrap.addEventListener('scroll',()=>{ if(!ticking){ ticking=true; requestAnimationFrame(apply); } },{passive:true});
+  // Called on every renderCharSelect() (new run, play-again, resize) — wire the
+  // scroll listener onto the persistent #charWrap element only once (dataset
+  // flag survives across calls since wrap itself is never recreated, only its
+  // children), otherwise re-opening char-select N times stacks N listeners.
+  if(!wrap.dataset.tiltWired){
+    wrap.dataset.tiltWired='1';
+    wrap.addEventListener('scroll',()=>{ if(!wrap.dataset.tiltTicking){ wrap.dataset.tiltTicking='1'; requestAnimationFrame(apply); } },{passive:true});
+  }
   requestAnimationFrame(apply);
   // The very first apply() above fires within a frame or two of setup — while
   // charCardSlideIn (transform entrance, up to ~0.45s + per-card stagger
@@ -9683,7 +9691,12 @@ document.getElementById('fusionBtnHud').onclick=()=>{ SFX.uiClick(); openFusion(
 document.getElementById('fusionBack').onclick=()=>{ hideAll(); setState('playing'); MUSIC.start(); };
 document.getElementById('statsBack').onclick=()=>{ hideAll(); setState('playing'); MUSIC.start(); };
 document.getElementById('btnPauseShop').onclick=()=>{ openShop(); };
-function togglePause(){ if(state==='playing'){ setState('paused'); SFX.stopHeartbeat(); MUSIC.stop(); show('screen-pause'); doAutosave(false); } else if(state==='paused'){ hideAll(); setState('playing'); MUSIC.start(); } }
+function pauseGame(){ setState('paused'); SFX.stopHeartbeat(); MUSIC.stop(); show('screen-pause'); doAutosave(false); }
+function togglePause(){ if(state==='playing'){ pauseGame(); } else if(state==='paused'){ hideAll(); setState('playing'); MUSIC.start(); } }
+// Auto-pause on tab/window blur — idempotent (only acts while actually
+// 'playing') so visibilitychange+blur firing together can't double-toggle
+// back into 'playing'.
+function autoPauseIfNeeded(){ if(save.settings.autoPauseOnBlur && state==='playing') pauseGame(); }
 // e.key is layout-dependent (WASD types as "цфыв" on a Cyrillic ЙЦУКЕН layout, so
 // keys['w'] would never fire) — e.code is the physical key position and is the
 // same regardless of active layout, so movement mirrors it into the same
