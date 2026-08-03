@@ -7826,6 +7826,34 @@ function drawGlowSprite(x,y,color,rawSize){
   const spr = getGlowSprite(color, size*1.4);
   ctx2d.drawImage(spr.canvas, x-spr.r, y-spr.r);
 }
+// Enemy-bullet "core+rim" pixel-art sprite — same bucket-by-color+radius/
+// offscreen-canvas/single-drawImage pattern as getGlowSprite above, so a
+// darker rim + bright core costs one blit per bullet instead of 3 live
+// stroke/fill calls (see the render() call site for the measured regression
+// that made this necessary at MAX_BULLETS=900).
+const bulletCoreSpriteCache = new Map();
+function getBulletCoreSprite(color,radius){
+  const bucket = Math.max(4, Math.round(radius));
+  const key = color+'|'+bucket;
+  let spr = bulletCoreSpriteCache.get(key);
+  if(spr) return spr;
+  const size = bucket*2+2;
+  const c = document.createElement('canvas'); c.width=size; c.height=size;
+  const g = c.getContext('2d');
+  const cx=size/2, cy=size/2;
+  g.beginPath(); g.arc(cx,cy,bucket,0,7); g.fillStyle=color; g.fill();
+  g.strokeStyle='rgba(0,0,0,0.45)'; g.lineWidth=Math.max(1,bucket*0.35);
+  g.beginPath(); g.arc(cx,cy,bucket*0.82,0,7); g.stroke();
+  g.fillStyle='#fff'; g.globalAlpha=0.5;
+  g.beginPath(); g.arc(cx,cy,bucket*0.42,0,7); g.fill();
+  spr = {canvas:c, r:size/2};
+  bulletCoreSpriteCache.set(key, spr);
+  return spr;
+}
+function drawBulletCoreSprite(x,y,color,radius){
+  const spr = getBulletCoreSprite(color,radius);
+  ctx2d.drawImage(spr.canvas, x-spr.r, y-spr.r);
+}
 // POLISH_PLAN_3 item 4 — replaces the flat arc()-stroke/fill "boring circle" look
 // shared by area-weapon bursts, aura radii, and the melee swing ring with a
 // layered abstract-pattern look: soft radial glow (instead of flat fill) + a
@@ -8216,6 +8244,17 @@ function render(){
       ctx2d.save(); ctx2d.translate(b.x,b.y); ctx2d.rotate(ang);
       ctx2d.beginPath(); ctx2d.moveTo(b.radius*2.1,0); ctx2d.lineTo(-b.radius*0.8,-b.radius*0.6); ctx2d.lineTo(-b.radius*0.8,b.radius*0.6); ctx2d.closePath(); ctx2d.fill();
       ctx2d.restore();
+    } else if(b.owner!=="player"){
+      // Axolotl-style pixel-art read (saturated fill + darker rim + bright
+      // core) so the plain single-tone circle every ranged trash mob's shot
+      // fell back to reads as more distinct/dangerous than before. Measured
+      // live via browser-check.mjs: drawing this as 3 live stroke/fill calls
+      // per bullet cost real frame time at MAX_BULLETS=900 (40.2fps baseline
+      // -> 22.3fps) — same class of regression the existing glow-sprite cache
+      // was built to avoid — so this is pre-rendered once per color+radius
+      // bucket and blitted with a single drawImage, exactly like
+      // getGlowSprite/drawGlowSprite below.
+      drawBulletCoreSprite(b.x,b.y,b.color,b.radius);
     } else {
       ctx2d.beginPath(); ctx2d.arc(b.x,b.y,b.radius,0,7); ctx2d.fill();
     }
