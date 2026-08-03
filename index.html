@@ -9720,8 +9720,24 @@ function menuNavMove(dir){
   menuNavSetFocus(list[cur<0?0:(cur+dir+list.length)%list.length]);
 }
 function menuNavActivate(){ if(menuKbdFocusEl && menuKbdFocusEl.tagName!=='INPUT') menuKbdFocusEl.click(); }
+// Generic Esc-back / click-outside-close: every `.screen` overlay has exactly
+// one "go back" button (charBack, shopBack, btnResume, etc) with its own
+// hardcoded destination — this maps screen id -> that button's id so Escape
+// and clicking the dimmed .veil backdrop can both just click it, instead of
+// re-hardcoding each screen's destination a second time. Screens absent from
+// this map (menu, levelup, event) intentionally have no back action.
+const SCREEN_BACK_BTN={ 'screen-charselect':'charBack', 'screen-shop':'shopBack', 'screen-fusion':'fusionBack', 'screen-ingame-stats':'statsBack', 'screen-pause':'btnResume', 'screen-death':'btnToMenu', 'screen-victory':'btnVictoryMenu', 'screen-meta':'metaBack', 'screen-stats':'statsBackMenu', 'screen-achievements':'achBack', 'screen-armory':'armoryBack', 'screen-settings':'settingsBack' };
+function escBack(){
+  const visible=document.querySelector('.screen:not(.hidden)');
+  if(!visible) return false;
+  const btnId=SCREEN_BACK_BTN[visible.id];
+  const btn=btnId&&document.getElementById(btnId);
+  if(btn){ btn.click(); return true; }
+  return false;
+}
+document.addEventListener('click',e=>{ if(e.target.classList.contains('veil')) escBack(); });
 window.addEventListener('keydown',e=>{ keys[e.key.toLowerCase()]=true; const wasd=CODE_TO_WASD[e.code]; if(wasd) keys[wasd]=true;
-  if(e.key==='Escape' && ["playing","paused","shop","ingame-stats"].includes(state)){ if(state==='shop'||state==='ingame-stats'){ hideAll(); setState('playing'); MUSIC.start(); } else togglePause(); }
+  if(e.key==='Escape'){ if(state==='playing'){ togglePause(); } else escBack(); }
   if(e.code==='KeyP' && (state==='playing'||state==='paused')){ e.preventDefault(); togglePause(); }
   if(e.code==='Space' && state==='playing'){ e.preventDefault(); tryDash(); }
   if(e.key==='Shift' && state==='playing'){ tryFastHeal(); }
