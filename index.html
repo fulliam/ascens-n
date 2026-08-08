@@ -2645,6 +2645,14 @@ const CONFIG_DEFAULTS = {
       {t:760,  ratio:1.75}, {t:930,  ratio:1.80}, {t:1120, ratio:1.70}, {t:1320, ratio:1.55},
       {t:1520, ratio:1.40}, {t:1720, ratio:1.25}, {t:1900, ratio:1.15},
     ],
+    // XP orbs lying near each other on the ground periodically merge into one
+    // (decluttering), and an orb nobody picks up for a while depreciates
+    // toward a floor instead of keeping its full nominal value forever.
+    XP_ORB_MERGE_RADIUS: 26,
+    XP_ORB_MERGE_INTERVAL: 0.4,
+    XP_ORB_DECAY_GRACE_S: 14,
+    XP_ORB_DECAY_DURATION_S: 20,
+    XP_ORB_DECAY_FLOOR: 0.5,
   },
   // Phase 4 — palette is a deduped set of raw hex values (55 unique, named by
   // hex so identical literals used in different places share one entry
@@ -3040,6 +3048,11 @@ const CONFIG_SCHEMA = {
   "balance.HP_PER_LEVEL": {type:"number", min:0, max:100},
   "balance.ENDLESS_MULT_PER_MIN": {type:"number", min:0, max:5},
   "balance.ENDLESS_INTERVAL_MULT_PER_MIN": {type:"number", min:0.5, max:1},
+  "balance.XP_ORB_MERGE_RADIUS": {type:"number", min:0, max:200},
+  "balance.XP_ORB_MERGE_INTERVAL": {type:"number", min:0.05, max:5},
+  "balance.XP_ORB_DECAY_GRACE_S": {type:"number", min:0, max:300},
+  "balance.XP_ORB_DECAY_DURATION_S": {type:"number", min:1, max:300},
+  "balance.XP_ORB_DECAY_FLOOR": {type:"number", min:0, max:1},
   // DANGER_TIERS is an array of whole tier objects (armorPierce/enrageMult/
   // unlockT/name/numeral together, see its own definition above for why it's
   // not split apart) — too structurally different from a flat number/color/
@@ -5241,6 +5254,7 @@ let eliteKillsRun=0, bossKilledRun=false, appliedEliteKills=0, appliedBossFolded
 let runStats = {}; // extended per-run achievement/event tracking, reset in startRun
 let selectedCharacter = "warrior";
 let eventTimer=0, activeEventDef=null, tempModifiers=[]; // {key,mult,life,extra} — extra multipliers are reverted when life expires (see updateTempModifiers)
+let orbMergeTimer=0;
 let rerollCharges=0;
 
 function freshStats(){
@@ -5305,7 +5319,7 @@ function startRun(){
   spawnedBossIds=new Set(); warnedBossIds=new Set();
   appliedKills=0; appliedGold=0; autosaveTimer=AUTOSAVE_INTERVAL;
   eliteKillsRun=0; bossKilledRun=false; appliedEliteKills=0; appliedBossFolded=false;
-  lastWeaponSig=null; eventTimer=rand(70,110); tempModifiers=[]; rerollCharges=0; formationTimer=18;
+  lastWeaponSig=null; eventTimer=rand(70,110); tempModifiers=[]; rerollCharges=0; formationTimer=18; orbMergeTimer=0;
   runStats = { evolutionsThisRun:0, synergiesTriggered:0, legendaryCardsTaken:0, merchantEventsVisited:0,
     treasureEventsOpened:0, arenasCleared:0, miniBossesDefeated:0, riskyChoicesTaken:0, cursedShrinesActivated:0,
     passiveSlotsFilled:0, bossesKilledIds:[], stolenByCollector:false, overlordReachedAtSeconds:null, completed:false };
@@ -5868,7 +5882,6 @@ function killEnemy(enemy){
   killCount++; player.momentumStacks=(player.momentumStacks||0)+1;
   if(enemy.elite){ eliteKillsRun++; save.lifetime.uniqueElitesKilled = Array.from(new Set([...(save.lifetime.uniqueElitesKilled||[]),enemy.id])); }
   if(enemy.boss){ bossKilledRun=true; runStats.bossesKilledIds.push(enemy.bossDefId); save.lifetime.uniqueBossesKilled = Array.from(new Set([...(save.lifetime.uniqueBossesKilled||[]),enemy.bossDefId])); }
-  const goldMult = player.stats.goldMult||1;
   spawnOrb({type:"xp",x:enemy.x,y:enemy.y,value:enemy.xp,radius:6});
   // Path A Milestone 3 — same rngBool() (Rust-backed, JS-fallback) primitive
   // as Milestone 2's dealDamage() procs, just no new Rust function needed:
@@ -6823,6 +6836,7 @@ function applyKnockback(fromX, fromY, dist){
 // nearest same-type orb instead of spawning another shape, so nothing is
 // ever lost — kills just stop multiplying the on-screen orb count.
 function spawnOrb(orb){
+  orb.bornAt=runTime;
   if(orbs.length<CONFIG.caps.MAX_ORBS){ orbs.push(orb); return; }
   let nearest=null, nearestD=Infinity;
   for(const o of orbs){
@@ -6833,13 +6847,31 @@ function spawnOrb(orb){
   if(nearest){ nearest.value+=orb.value; nearest.radius=Math.min(nearest.radius+0.15,14); }
   else orbs.push(orb);
 }
+function xpOrbValue(o){
+  const age=runTime-(o.bornAt||runTime), grace=CONFIG.balance.XP_ORB_DECAY_GRACE_S, dur=CONFIG.balance.XP_ORB_DECAY_DURATION_S, floor=CONFIG.balance.XP_ORB_DECAY_FLOOR;
+  if(age<=grace) return o.value;
+  const t=clamp((age-grace)/dur,0,1);
+  return o.value*(1-t*(1-floor));
+}
 function updateOrbs(dt){
+  orbMergeTimer-=dt;
+  if(orbMergeTimer<=0){
+    orbMergeTimer=CONFIG.balance.XP_ORB_MERGE_INTERVAL;
+    const mergeR=CONFIG.balance.XP_ORB_MERGE_RADIUS;
+    for(let i=orbs.length-1;i>=0;i--){
+      const a=orbs[i]; if(!a||a.type!=="xp") continue;
+      for(let j=i-1;j>=0;j--){
+        const b=orbs[j]; if(!b||b.type!=="xp") continue;
+        if(Math.hypot(a.x-b.x,a.y-b.y)<=mergeR){ b.value+=a.value; b.radius=Math.min((b.radius||6)+0.4,16); orbs.splice(i,1); break; }
+      }
+    }
+  }
   for(let i=orbs.length-1;i>=0;i--){
     const o=orbs[i]; const d=Math.hypot(player.x-o.x,player.y-o.y);
     const pullRadius = o.type==="xp" && player.stats.xpAutoPull ? 99999 : player.stats.pickupRadius;
     if(d<pullRadius){ const speed=620; const ang=Math.atan2(player.y-o.y,player.x-o.x); o.x+=Math.cos(ang)*speed*dt; o.y+=Math.sin(ang)*speed*dt; }
     if(d<18){
-      if(o.type==="xp"){ gainXp(o.value); SFX.pickupXp(); }
+      if(o.type==="xp"){ gainXp(xpOrbValue(o)); SFX.pickupXp(); }
       else if(o.type==="gold"){ player.gold+=o.value*player.stats.goldMult; SFX.pickupGold(); }
       else if(o.type==="crystal"){ player.crystals+=o.value; SFX.pickupGold(); }
       else if(o.type==="passive"){ equipPassive(randomPassive()); SFX.levelup(); }
@@ -9255,7 +9287,7 @@ function continueRun(){
   eliteKillsRun=snap.eliteKillsRun||0; bossKilledRun=!!snap.bossKilledRun;
   appliedEliteKills=snap.appliedEliteKills!=null?snap.appliedEliteKills:eliteKillsRun; appliedBossFolded=snap.appliedBossFolded!=null?snap.appliedBossFolded:false;
   runStats = snap.runStatsSnap || { evolutionsThisRun:0, synergiesTriggered:0, legendaryCardsTaken:0, merchantEventsVisited:0, treasureEventsOpened:0, arenasCleared:0, miniBossesDefeated:0, riskyChoicesTaken:0, cursedShrinesActivated:0, passiveSlotsFilled:player.passives.length, bossesKilledIds:[], stolenByCollector:false, overlordReachedAtSeconds:null, completed:false };
-  autosaveTimer=AUTOSAVE_INTERVAL; lastWeaponSig=null; eventTimer=rand(70,110); tempModifiers=[]; formationTimer=18;
+  autosaveTimer=AUTOSAVE_INTERVAL; lastWeaponSig=null; eventTimer=rand(70,110); tempModifiers=[]; formationTimer=18; orbMergeTimer=0;
   setState("playing"); document.getElementById('hud').classList.remove('hidden');
   logEvent("Run resumed."); SFX.runStart(); MUSIC.start();
 }
